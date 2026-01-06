@@ -54,7 +54,7 @@ if (!googleClientId || !googleClientSecret) {
   console.error("   请检查 .env 文件是否在项目根目录，且内容正确。");
 }
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
   // 使用 JWT 策略（不需要数据库）
   session: {
     strategy: "jwt",
