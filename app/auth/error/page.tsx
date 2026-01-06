@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
@@ -21,7 +22,7 @@ const errorMessages: Record<string, string> = {
   Default: "发生未知错误，请重试",
 };
 
-export default function AuthErrorPage() {
+function ErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error") || "Default";
 
@@ -70,6 +71,18 @@ export default function AuthErrorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-600">加载中...</div>
+      </div>
+    }>
+      <ErrorContent />
+    </Suspense>
   );
 }
 
