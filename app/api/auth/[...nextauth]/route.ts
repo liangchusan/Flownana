@@ -87,6 +87,7 @@ const authOptions: NextAuthOptions = {
           hasAccessToken: !!account?.access_token 
         });
       }
+      // 允许所有登录
       return true;
     },
     async jwt({ token, user, account }) {
@@ -123,6 +124,17 @@ const authOptions: NextAuthOptions = {
       if (process.env.NODE_ENV === "development") {
         console.log("🔄 重定向:", { url, baseUrl });
       }
+      
+      // 如果 URL 是错误页面，重定向到首页
+      if (url.includes("/api/auth/error") || url.includes("/api/auth/signin?error")) {
+        return baseUrl;
+      }
+      
+      // 如果 URL 是回调页面，重定向到首页
+      if (url.includes("/api/auth/callback")) {
+        return baseUrl;
+      }
+      
       // 确保重定向到同源
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (new URL(url).origin === baseUrl) return url;
