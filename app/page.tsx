@@ -1,38 +1,49 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Features } from "@/components/sections/features";
-import { Examples } from "@/components/sections/examples";
-import { Pricing } from "@/components/sections/pricing";
-import { Testimonials } from "@/components/sections/testimonials";
-import { FAQ } from "@/components/sections/faq";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { Features } from "@/components/sections/features";
+import { Examples } from "@/components/sections/examples";
+import { Testimonials } from "@/components/sections/testimonials";
+import { Pricing } from "@/components/sections/pricing";
+import { FAQ } from "@/components/sections/faq";
+import { ArrowRight, Sparkles, Video, Image as ImageIcon, Mic, Zap } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-white">
       <Header />
       
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-20 pb-32 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50"></div>
+        <div className="relative max-w-7xl mx-auto">
           <div className="text-center">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6">
-              革命性的 AI 图像生成与编辑
+            <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-8">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Powered by Advanced AI
+            </div>
+            <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-gray-900 mb-6 leading-tight">
+              Create Anything
+              <br />
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                with AI
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              使用简单的文本命令转换您的图像。体验 Nano Banana，革命性的 AI 模型，
-              通过无与伦比的多图像融合和自然语言理解，彻底改变基于文本的图像编辑和生成。
+            <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+              Generate stunning videos, images, and voices with simple text prompts. 
+              Transform your creative ideas into reality in seconds.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/generate">
-                <Button size="lg" className="text-lg px-8 py-6">
-                  开始创作
+              <Link href="/create?mode=image">
+                <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0">
+                  Start Creating Free
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/generate">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-                  查看示例
+              <Link href="/pricing">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-2">
+                  View Pricing
                 </Button>
               </Link>
             </div>
@@ -40,34 +51,80 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Grid */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Link href="/create?mode=video" className="group">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                <div className="bg-blue-500 rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Video className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">AI Video</h3>
+                <p className="text-gray-600 mb-4">
+                  Create professional videos from text prompts. Generate animations, transitions, and effects instantly.
+                </p>
+                <div className="flex items-center text-blue-600 font-medium">
+                  Try it now
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/create?mode=image" className="group">
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                <div className="bg-purple-500 rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <ImageIcon className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">AI Image</h3>
+                <p className="text-gray-600 mb-4">
+                  Generate stunning images with AI. Transform text descriptions into beautiful visuals in seconds.
+                </p>
+                <div className="flex items-center text-purple-600 font-medium">
+                  Try it now
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/create?mode=voice" className="group">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
+                <div className="bg-green-500 rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <Mic className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">AI Voices</h3>
+                <p className="text-gray-600 mb-4">
+                  Create natural-sounding voices. Generate professional voiceovers in multiple languages and styles.
+                </p>
+                <div className="flex items-center text-green-600 font-medium">
+                  Try it now
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <Features />
-
-      {/* Examples Section */}
       <Examples />
-
-      {/* Testimonials */}
       <Testimonials />
-
-      {/* Pricing */}
       <Pricing />
-
-      {/* FAQ */}
       <FAQ />
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-primary-500 to-primary-600 py-20 px-4 sm:px-6 lg:px-8">
+      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 to-purple-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            准备好用 AI 魔法转换您的图像了吗？
+            Ready to Create Something Amazing?
           </h2>
-          <p className="text-xl text-primary-50 mb-8">
-            加入数千名创作者，使用 Nano Banana 的革命性 AI 技术。
-            体验最先进的多图像融合、完美的一次性编辑和无与伦比的角色一致性。
+          <p className="text-xl text-blue-50 mb-8">
+            Join thousands of creators using Flownana to bring their ideas to life.
           </p>
-          <Link href="/generate">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-6">
-              立即开始创作
+          <Link href="/create?mode=image">
+            <Button size="lg" variant="secondary" className="text-lg px-8 py-6 bg-white text-blue-600 hover:bg-gray-100">
+              Start Creating Now
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
         </div>
@@ -77,6 +134,3 @@ export default function Home() {
     </div>
   );
 }
-
-
-

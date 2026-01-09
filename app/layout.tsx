@@ -6,8 +6,8 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Nano Banana - AI 图像生成与编辑",
-  description: "使用简单的文本命令转换您的图像。体验 Nano Banana，革命性的 AI 模型，通过无与伦比的多图像融合和自然语言理解，彻底改变基于文本的图像编辑和生成。",
+  title: "Flownana - AI Video, Image & Voice Generation",
+  description: "Create stunning AI-generated videos, images, and voices with simple text commands. Experience the revolutionary Flownana AI model.",
 };
 
 export default function RootLayout({
@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>

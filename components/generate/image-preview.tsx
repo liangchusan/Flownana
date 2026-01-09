@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ImagePreviewProps {
@@ -21,38 +21,41 @@ export function ImagePreview({ imageUrl, isGenerating }: ImagePreviewProps) {
   };
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">生成结果</h2>
+    <div className="w-full h-full flex flex-col items-center justify-center space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Generated Result</h2>
       
       {isGenerating ? (
-        <div className="flex flex-col items-center justify-center h-96 bg-gray-100 rounded-lg">
-          <Loader2 className="h-12 w-12 text-primary-500 animate-spin mb-4" />
-          <p className="text-gray-600">正在生成图像，请稍候...</p>
+        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+          <Loader2 className="h-16 w-16 text-purple-500 animate-spin mb-6" />
+          <p className="text-gray-700 text-lg font-medium">Generating image, please wait...</p>
         </div>
       ) : imageUrl ? (
-        <div className="space-y-4">
-          <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
+        <div className="w-full max-w-2xl space-y-6">
+          <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden shadow-lg">
             <img
               src={imageUrl}
-              alt="生成的图像"
+              alt="Generated image"
               className="w-full h-full object-contain"
             />
           </div>
           <Button
             onClick={handleDownload}
-            className="w-full"
+            className="w-full py-6 text-base font-medium"
             variant="outline"
           >
-            <Download className="h-4 w-4 mr-2" />
-            下载图像
+            <Download className="h-5 w-5 mr-2" />
+            Download Image
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center h-96 bg-gray-100 rounded-lg">
-          <p className="text-gray-500 text-lg">准备创建</p>
-          <p className="text-gray-400 text-sm mt-2">
-            上传图像并描述您的编辑
-          </p>
+        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+          <div className="text-center">
+            <ImageIcon className="h-20 w-20 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 text-xl font-medium mb-2">Ready to Create</p>
+            <p className="text-gray-500 text-sm">
+              Upload an image and describe your edit
+            </p>
+          </div>
         </div>
       )}
     </div>

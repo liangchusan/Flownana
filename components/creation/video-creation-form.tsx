@@ -3,25 +3,26 @@
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, Sparkles } from "lucide-react";
 import axios from "axios";
 
-interface GenerateFormProps {
-  onGenerate: (imageUrl: string) => void;
+interface VideoCreationFormProps {
+  onGenerate: (videoUrl: string) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
 }
 
-export function GenerateForm({
+export function VideoCreationForm({
   onGenerate,
   isGenerating,
   setIsGenerating,
-}: GenerateFormProps) {
+}: VideoCreationFormProps) {
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<"text-to-image" | "image-to-image">("text-to-image");
+  const [mode, setMode] = useState<"text-to-video" | "image-to-video">("text-to-video");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [resolution, setResolution] = useState("1K");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [model, setModel] = useState("veo3_fast");
+  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [duration, setDuration] = useState(5);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -34,7 +35,7 @@ export function GenerateForm({
         const reader = new FileReader();
         reader.onload = () => {
           setUploadedImage(reader.result as string);
-          setMode("image-to-image");
+          setMode("image-to-video");
         };
         reader.readAsDataURL(file);
       }
@@ -49,22 +50,24 @@ export function GenerateForm({
 
     setIsGenerating(true);
     try {
-      const response = await axios.post("/api/generate", {
+      const imageUrls = uploadedImage ? [uploadedImage] : undefined;
+      
+      const response = await axios.post("/api/veo/generate", {
         prompt,
-        imageUrl: uploadedImage,
-        mode,
-        resolution,
+        imageUrls,
+        model,
         aspectRatio,
+        duration,
       });
 
       if (response.data.success) {
-        onGenerate(response.data.imageUrl);
+        onGenerate(response.data.videoUrl);
       } else {
         alert("Generation failed, please try again");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Generation error:", error);
-      alert("Generation failed, please try again");
+      alert(error.response?.data?.error || "Generation failed, please try again");
     } finally {
       setIsGenerating(false);
     }
@@ -72,41 +75,38 @@ export function GenerateForm({
 
   return (
     <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Mode
-        </label>
-        <div className="flex gap-2 border-b border-gray-200 mb-6">
-          <button
-            onClick={() => {
-              setMode("text-to-image");
-              setUploadedImage(null);
-            }}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              mode === "text-to-image"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Text to Image
-          </button>
-          <button
-            onClick={() => setMode("image-to-image")}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              mode === "image-to-image"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Image Edit
-          </button>
-        </div>
+      {/* Mode Selection */}
+      <div className="flex gap-2 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => {
+            setMode("text-to-video");
+            setUploadedImage(null);
+          }}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            mode === "text-to-video"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Text to Video
+        </button>
+        <button
+          onClick={() => setMode("image-to-video")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            mode === "image-to-video"
+              ? "border-b-2 border-blue-600 text-blue-600"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Image to Video
+        </button>
       </div>
 
-      {mode === "image-to-image" && (
+      {/* Image Upload (for Image to Video) - Must be above Prompt */}
+      {mode === "image-to-video" && (
         <div className="mb-6">
           {uploadedImage ? (
-            <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
+            <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
               <img
                 src={uploadedImage}
                 alt="Uploaded image"
@@ -140,32 +140,33 @@ export function GenerateForm({
         </div>
       )}
 
+      {/* Prompt Input */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Prompt <span className="text-gray-500">({prompt.length}/5000)</span>
+          Prompt <span className="text-gray-500">({prompt.length}/500)</span>
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe the image you want to generate or edit..."
-          className="w-full h-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-          maxLength={5000}
+          placeholder="Describe the video you want to create..."
+          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          maxLength={500}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* Settings */}
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Resolution
+            Model
           </label>
           <select
-            value={resolution}
-            onChange={(e) => setResolution(e.target.value)}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="1K">1K</option>
-            <option value="2K">2K</option>
-            <option value="4K">4K</option>
+            <option value="veo3_fast">VEO3 Fast</option>
+            <option value="veo3_quality">VEO3 Quality</option>
           </select>
         </div>
 
@@ -178,15 +179,30 @@ export function GenerateForm({
             onChange={(e) => setAspectRatio(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="1:1">1:1</option>
             <option value="16:9">16:9</option>
             <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
             <option value="4:3">4:3</option>
-            <option value="3:4">3:4</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Duration (sec)
+          </label>
+          <select
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value={5}>5 sec</option>
+            <option value={10}>10 sec</option>
+            <option value={15}>15 sec</option>
           </select>
         </div>
       </div>
 
+      {/* Generate Button */}
       <Button
         onClick={handleGenerate}
         disabled={isGenerating || !prompt.trim()}
@@ -199,12 +215,13 @@ export function GenerateForm({
             Generating...
           </>
         ) : (
-          "Generate Image"
+          <>
+            <Sparkles className="h-5 w-5 mr-2" />
+            Generate Video
+          </>
         )}
       </Button>
     </div>
   );
 }
-
-
 

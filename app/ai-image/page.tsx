@@ -3,11 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function GeneratePage() {
+export default function AIImagePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/ai-image");
+    router.replace("/create?mode=image");
   }, [router]);
 
   return (
