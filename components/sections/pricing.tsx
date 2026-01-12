@@ -4,52 +4,52 @@ import { Check } from "lucide-react";
 
 const plans = [
   {
-    name: "基础版",
-    description: "适合爱好者和初学者",
+    name: "Starter",
+    description: "Perfect for hobbyists and beginners",
     monthlyPrice: 4.90,
     yearlyPrice: 58.80,
-    credits: "6,000 积分/年",
+    credits: "6,000 credits/year",
     features: [
-      "500 积分/月",
-      "最多 50 张图像/月",
-      "Nano Banana 模型",
-      "标准生成速度",
-      "无水印",
-      "客户支持",
-      "商业使用许可",
+      "500 credits/month",
+      "Up to 50 images/month",
+      "Flownana AI models",
+      "Standard generation speed",
+      "No watermarks",
+      "Customer support",
+      "Commercial license",
     ],
   },
   {
-    name: "标准版",
-    description: "适合创作者和专业人士",
+    name: "Standard",
+    description: "Perfect for creators and professionals",
     monthlyPrice: 9.90,
     yearlyPrice: 118.80,
-    credits: "24,000 积分/年",
+    credits: "24,000 credits/year",
     popular: true,
     features: [
-      "2,000 积分/月",
-      "最多 200 张图像/月",
-      "Nano Banana 模型",
-      "优先生成队列",
-      "无水印",
-      "优先客户支持",
-      "商业使用许可",
+      "2,000 credits/month",
+      "Up to 200 images/month",
+      "Flownana AI models",
+      "Priority generation queue",
+      "No watermarks",
+      "Priority customer support",
+      "Commercial license",
     ],
   },
   {
-    name: "专业版",
-    description: "适合高级用户",
+    name: "Professional",
+    description: "Perfect for advanced users",
     monthlyPrice: 19.90,
     yearlyPrice: 238.80,
-    credits: "72,000 积分/年",
+    credits: "72,000 credits/year",
     features: [
-      "6,000 积分/月",
-      "最多 600 张图像/月",
-      "Nano Banana 模型",
-      "最快生成速度",
-      "无水印",
-      "专家团队支持",
-      "商业使用许可",
+      "6,000 credits/month",
+      "Up to 600 images/month",
+      "Flownana AI models",
+      "Fastest generation speed",
+      "No watermarks",
+      "Expert team support",
+      "Commercial license",
     ],
   },
 ];
@@ -60,10 +60,10 @@ export function Pricing() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            定价
+            Pricing
           </h2>
           <p className="text-xl text-gray-600">
-            选择最适合您的计划。所有计划都包括访问我们的核心功能。
+            Choose the plan that works best for you. All plans include access to our core features.
           </p>
         </div>
 
@@ -73,14 +73,14 @@ export function Pricing() {
               key={index}
               className={`relative rounded-lg border-2 p-8 ${
                 plan.popular
-                  ? "border-primary-500 shadow-xl scale-105"
+                  ? "border-blue-500 shadow-xl scale-105"
                   : "border-gray-200"
               }`}
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-primary-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                    最受欢迎
+                  <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    Most Popular
                   </span>
                 </div>
               )}
@@ -94,29 +94,29 @@ export function Pricing() {
                 <span className="text-4xl font-bold text-gray-900">
                   ${plan.monthlyPrice}
                 </span>
-                <span className="text-gray-600">/月</span>
+                <span className="text-gray-600">/month</span>
               </div>
 
               <div className="text-sm text-gray-600 mb-6">
-                <div>${plan.yearlyPrice}/年</div>
+                <div>${plan.yearlyPrice}/year</div>
                 <div>{plan.credits}</div>
               </div>
 
               <ul className="space-y-3 mb-8">
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start">
-                    <Check className="h-5 w-5 text-primary-500 mr-2 flex-shrink-0 mt-0.5" />
+                    <Check className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
                     <span className="text-gray-700">{feature}</span>
                   </li>
                 ))}
               </ul>
 
-              <Link href="/generate" className="block">
+              <Link href="/create?mode=image" className="block">
                 <Button
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}
                 >
-                  订阅
+                  Subscribe
                 </Button>
               </Link>
             </div>
@@ -126,6 +126,3 @@ export function Pricing() {
     </section>
   );
 }
-
-
-

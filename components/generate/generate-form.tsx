@@ -18,7 +18,6 @@ export function GenerateForm({
   setIsGenerating,
 }: GenerateFormProps) {
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<"text-to-image" | "image-to-image">("text-to-image");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [resolution, setResolution] = useState("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -34,7 +33,6 @@ export function GenerateForm({
         const reader = new FileReader();
         reader.onload = () => {
           setUploadedImage(reader.result as string);
-          setMode("image-to-image");
         };
         reader.readAsDataURL(file);
       }
@@ -49,6 +47,9 @@ export function GenerateForm({
 
     setIsGenerating(true);
     try {
+      // Automatically determine mode based on whether image is uploaded
+      const mode = uploadedImage ? "image-to-image" : "text-to-image";
+      
       const response = await axios.post("/api/generate", {
         prompt,
         imageUrl: uploadedImage,
@@ -62,9 +63,10 @@ export function GenerateForm({
       } else {
         alert("Generation failed, please try again");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Generation error:", error);
-      alert("Generation failed, please try again");
+      const errorMessage = error.response?.data?.error || error.message || "Generation failed, please try again";
+      alert(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -72,73 +74,41 @@ export function GenerateForm({
 
   return (
     <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Mode
-        </label>
-        <div className="flex gap-2 border-b border-gray-200 mb-6">
-          <button
-            onClick={() => {
-              setMode("text-to-image");
-              setUploadedImage(null);
-            }}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              mode === "text-to-image"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Text to Image
-          </button>
-          <button
-            onClick={() => setMode("image-to-image")}
-            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-              mode === "image-to-image"
-                ? "border-blue-600 text-blue-600"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Image Edit
-          </button>
-        </div>
-      </div>
-
-      {mode === "image-to-image" && (
-        <div className="mb-6">
-          {uploadedImage ? (
-            <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
-              <img
-                src={uploadedImage}
-                alt="Uploaded image"
-                className="w-full h-full object-contain"
-              />
-              <button
-                onClick={() => setUploadedImage(null)}
-                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-lg"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors bg-gray-50 ${
-                isDragActive
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-gray-400"
-              }`}
+      {/* Image Upload - Always visible, above Prompt */}
+      <div className="mb-6">
+        {uploadedImage ? (
+          <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
+            <img
+              src={uploadedImage}
+              alt="Uploaded image"
+              className="w-full h-full object-contain"
+            />
+            <button
+              onClick={() => setUploadedImage(null)}
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-lg"
             >
-              <input {...getInputProps()} />
-              <Upload className="h-20 w-20 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium text-base">
-                {isDragActive
-                  ? "Drop image file"
-                  : "Click or drop an image to upload"}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors bg-gray-50 ${
+              isDragActive
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400"
+            }`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="h-20 w-20 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 font-medium text-base">
+              {isDragActive
+                ? "Drop image file"
+                : "Click or drop an image to upload"}
+            </p>
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">

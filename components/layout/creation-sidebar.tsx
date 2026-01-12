@@ -8,7 +8,7 @@ import { Video, Image as ImageIcon, Mic, Home } from "lucide-react";
 
 function SidebarContent() {
   const searchParams = useSearchParams();
-  const currentMode = searchParams.get("mode") || "video";
+  const currentMode = searchParams.get("mode");
 
   const navItems = [
     { id: "video", label: "AI Video", icon: Video, href: "/create?mode=video" },
@@ -16,8 +16,11 @@ function SidebarContent() {
     { id: "voice", label: "AI Voices", icon: Mic, href: "/create?mode=voice" },
   ];
 
+  // Check if we're on the home page (no mode parameter)
+  const isHome = !currentMode;
+
   return (
-    <aside className="w-64 bg-gray-50 border-r border-gray-200 h-screen fixed left-0 top-0 overflow-y-auto">
+    <aside className="w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 overflow-y-auto">
       <div className="p-6">
         {/* Logo */}
         <Link href="/" className="block mb-8">
@@ -28,7 +31,11 @@ function SidebarContent() {
         <nav className="space-y-2">
           <Link
             href="/create"
-            className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors text-gray-700"
+            className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+              isHome
+                ? "bg-gray-100 text-blue-600"
+                : "hover:bg-gray-100 text-gray-700"
+            }`}
           >
             <Home className="h-5 w-5" />
             <span className="text-sm font-medium">Home</span>
@@ -43,7 +50,7 @@ function SidebarContent() {
                 href={item.href}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive
-                    ? "bg-white text-blue-600 border border-gray-200 shadow-sm"
+                    ? "bg-gray-100 text-blue-600"
                     : "hover:bg-gray-100 text-gray-700"
                 }`}
               >

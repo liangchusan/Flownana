@@ -3,23 +3,23 @@ import { Star } from "lucide-react";
 const testimonials = [
   {
     rating: 5,
-    text: "Nano Banana 的一次性编辑绝对令人惊叹！我可以用简单的英语描述复杂的编辑，立即获得完美结果。不再需要在 Photoshop 中花费数小时 - 我只需告诉它我想要什么，它就会发生。我们设计团队的生产力提高了 300%，客户满意度达到了顶峰！",
+    text: "Flownana's one-shot editing is absolutely amazing! I can describe complex edits in simple English and get perfect results immediately. No more spending hours in Photoshop - I just tell it what I want and it happens. Our design team's productivity has increased by 300%, and client satisfaction is at an all-time high!",
     author: "Emily Rodriguez",
-    role: "创意总监",
+    role: "Creative Director",
     company: "Digital Canvas Agency",
   },
   {
     rating: 5,
-    text: "Nano Banana 中的角色一致性是无与伦比的。我可以用相同的角色在不同的场景和姿势中创建整个视觉故事，它们保持完美可识别。面部完成功能拯救了我的肖像摄影业务 - 我现在可以用简单的文本描述修复任何面部缺陷！",
+    text: "The character consistency in Flownana is unmatched. I can create entire visual stories with the same character across different scenes and poses, and they remain perfectly recognizable. The facial completion feature saved my portrait photography business - I can now fix any facial imperfection with a simple text description!",
     author: "David Chen",
-    role: "专业摄影师",
+    role: "Professional Photographer",
     company: "Visionary Studios",
   },
   {
     rating: 5,
-    text: "Nano Banana 理解上下文的能力是我使用过的任何其他 AI 都无法比拟的。我可以给它复杂的多步骤指令，它会完美执行。场景保持令人难以置信 - 我的编辑看起来完全自然。它比 FLUX Kontext 好得多。这就是图像编辑的未来！",
+    text: "Flownana's ability to understand context is unmatched by any other AI I've used. I can give it complex multi-step instructions and it executes perfectly. The scene preservation is incredible - my edits look completely natural. It's so much better than FLUX Kontext. This is the future of content editing!",
     author: "Dr. Sarah Thompson",
-    role: "数字艺术家和教育家",
+    role: "Digital Artist & Educator",
     company: "Innovation University",
   },
 ];
@@ -30,11 +30,10 @@ export function Testimonials() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            受到全球创作者信赖
+            Trusted by Creators Worldwide
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            看看设计师、摄影师和数字艺术家如何使用 Nano Banana 的革命性 AI 技术
-            改变他们的创意工作流程。
+            See how designers, photographers, and digital artists are using Flownana's revolutionary AI technology to transform their creative workflows.
           </p>
         </div>
 
@@ -71,6 +70,3 @@ export function Testimonials() {
     </section>
   );
 }
-
-
-

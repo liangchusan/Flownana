@@ -19,7 +19,7 @@ async function createVeoTask(params: {
 
   if (!apiKey) {
     throw new Error(
-      "未配置 KIE_API_KEY 环境变量，请在 .env 中添加后重试。"
+      "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -45,8 +45,8 @@ async function createVeoTask(params: {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("VEO3.1 createTask 返回错误:", text);
-    throw new Error("创建视频生成任务失败，请稍后重试。");
+    console.error("VEO3.1 createTask returned error:", text);
+    throw new Error("Failed to create video generation task. Please try again later.");
   }
 
   const json = (await res.json()) as {
@@ -56,8 +56,8 @@ async function createVeoTask(params: {
   };
 
   if (json.code !== 200 || !json.data?.taskId) {
-    console.error("VEO3.1 createTask 响应异常:", json);
-    throw new Error(json.msg || "创建视频生成任务失败，请稍后重试。");
+    console.error("VEO3.1 createTask response异常:", json);
+    throw new Error(json.msg || "Failed to create video generation task. Please try again later.");
   }
 
   return json.data.taskId;
@@ -68,7 +68,7 @@ async function pollVeoResult(taskId: string) {
 
   if (!apiKey) {
     throw new Error(
-      "未配置 KIE_API_KEY 环境变量，请在 .env 中添加后重试。"
+      "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -89,7 +89,7 @@ async function pollVeoResult(taskId: string) {
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("VEO3.1 details 返回错误:", text);
+      console.error("VEO3.1 details returned error:", text);
       await sleep(intervalMs);
       continue;
     }
@@ -105,7 +105,7 @@ async function pollVeoResult(taskId: string) {
     };
 
     if (json.code !== 200 || !json.data) {
-      console.error("VEO3.1 details 响应异常:", json);
+      console.error("VEO3.1 details response异常:", json);
       await sleep(intervalMs);
       continue;
     }
@@ -118,13 +118,13 @@ async function pollVeoResult(taskId: string) {
     }
 
     if (status === "failed") {
-      console.error("VEO3.1 任务失败:", json.data.error);
-      throw new Error(json.data.error || "视频生成失败，请稍后重试。");
+    console.error("VEO3.1 task failed:", json.data.error);
+    throw new Error(json.data.error || "Video generation failed. Please try again later.");
     }
 
     if (status === "completed") {
       if (!json.data.videoUrl) {
-        throw new Error("任务成功但未返回视频地址，请稍后重试。");
+        throw new Error("Task succeeded but did not return video URL. Please try again later.");
       }
 
       return json.data.videoUrl;
@@ -133,7 +133,7 @@ async function pollVeoResult(taskId: string) {
     await sleep(intervalMs);
   }
 
-  throw new Error("视频生成超时，请稍后重试。");
+  throw new Error("Video generation timeout. Please try again later.");
 }
 
 export async function POST(request: NextRequest) {
@@ -180,11 +180,11 @@ export async function POST(request: NextRequest) {
       taskId,
     });
   } catch (error: any) {
-    console.error("生成视频时出错:", error);
+    console.error("Error generating video:", error);
     const message =
       typeof error?.message === "string"
         ? error.message
-        : "生成视频时出错，请稍后重试。";
+        : "Error generating video. Please try again later.";
 
     return NextResponse.json(
       { error: message },

@@ -15,7 +15,7 @@ async function createNanoBananaTask(params: {
 
   if (!apiKey) {
     throw new Error(
-      "未配置 NANO_BANANA_API_KEY 环境变量，请在 .env 中添加后重试。"
+      "NANO_BANANA_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -39,8 +39,8 @@ async function createNanoBananaTask(params: {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("Nano Banana createTask 返回错误:", text);
-    throw new Error("创建生成任务失败，请稍后重试。");
+    console.error("Nano Banana createTask returned error:", text);
+    throw new Error("Failed to create generation task. Please try again later.");
   }
 
   const json = (await res.json()) as {
@@ -50,8 +50,8 @@ async function createNanoBananaTask(params: {
   };
 
   if (json.code !== 200 || !json.data?.taskId) {
-    console.error("Nano Banana createTask 响应异常:", json);
-    throw new Error(json.msg || "创建生成任务失败，请稍后重试。");
+    console.error("Nano Banana createTask response异常:", json);
+    throw new Error(json.msg || "Failed to create generation task. Please try again later.");
   }
 
   return json.data.taskId;
@@ -62,7 +62,7 @@ async function pollNanoBananaResult(taskId: string) {
 
   if (!apiKey) {
     throw new Error(
-      "未配置 NANO_BANANA_API_KEY 环境变量，请在 .env 中添加后重试。"
+      "NANO_BANANA_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -85,8 +85,8 @@ async function pollNanoBananaResult(taskId: string) {
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("Nano Banana recordInfo 返回错误:", text);
-      throw new Error("查询任务状态失败，请稍后重试。");
+    console.error("Nano Banana recordInfo returned error:", text);
+    throw new Error("Failed to query task status. Please try again later.");
     }
 
     const json = (await res.json()) as {
@@ -100,8 +100,8 @@ async function pollNanoBananaResult(taskId: string) {
     };
 
     if (json.code !== 200 || !json.data) {
-      console.error("Nano Banana recordInfo 响应异常:", json);
-      throw new Error(json.msg || "查询任务状态失败，请稍后重试。");
+    console.error("Nano Banana recordInfo response异常:", json);
+    throw new Error(json.msg || "Failed to query task status. Please try again later.");
     }
 
     const state = json.data.state;
@@ -112,13 +112,13 @@ async function pollNanoBananaResult(taskId: string) {
     }
 
     if (state === "fail") {
-      console.error("Nano Banana 任务失败:", json.data.failMsg);
-      throw new Error(json.data.failMsg || "生成失败，请稍后重试。");
+    console.error("Nano Banana task failed:", json.data.failMsg);
+    throw new Error(json.data.failMsg || "Generation failed. Please try again later.");
     }
 
     if (state === "success") {
       if (!json.data.resultJson) {
-        throw new Error("任务成功但未返回结果，请稍后重试。");
+        throw new Error("Task succeeded but did not return results. Please try again later.");
       }
 
       // resultJson 是一个 JSON 字符串，例如：
@@ -127,15 +127,15 @@ async function pollNanoBananaResult(taskId: string) {
       try {
         parsed = JSON.parse(json.data.resultJson);
       } catch (e) {
-        console.error("解析 resultJson 出错:", e, json.data.resultJson);
-        throw new Error("解析生成结果失败，请稍后重试。");
+        console.error("Error parsing resultJson:", e, json.data.resultJson);
+        throw new Error("Failed to parse generation results. Please try again later.");
       }
 
       const result = parsed as { resultUrls?: string[] };
       const imageUrl = result.resultUrls?.[0];
 
       if (!imageUrl) {
-        throw new Error("未找到生成的图像地址，请稍后重试。");
+        throw new Error("Generated image URL not found. Please try again later.");
       }
 
       return imageUrl;
@@ -145,7 +145,7 @@ async function pollNanoBananaResult(taskId: string) {
     await sleep(intervalMs);
   }
 
-  throw new Error("生成超时，请稍后重试。");
+  throw new Error("Generation timeout. Please try again later.");
 }
 
 export async function POST(request: NextRequest) {
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     if (!prompt) {
       return NextResponse.json(
-        { error: "提示词不能为空" },
+        { error: "Prompt cannot be empty" },
         { status: 400 }
       );
     }
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
     // 未来如果官方支持图像编辑，可以根据 mode 和 imageUrl 扩展 input 参数
     if (mode === "image-to-image") {
       console.warn(
-        "当前 Nano Banana 官方文档未提供图像编辑参数支持，已按文本生图处理。"
+        "Nano Banana official documentation does not currently provide image editing parameter support. Processing as text-to-image."
       );
     }
 
@@ -198,11 +198,11 @@ export async function POST(request: NextRequest) {
       taskId,
     });
   } catch (error: any) {
-    console.error("生成图像时出错:", error);
+    console.error("Error generating image:", error);
     const message =
       typeof error?.message === "string"
         ? error.message
-        : "生成图像时出错，请稍后重试。";
+        : "Error generating image. Please try again later.";
 
     return NextResponse.json(
       { error: message },

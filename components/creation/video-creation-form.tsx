@@ -18,7 +18,6 @@ export function VideoCreationForm({
   setIsGenerating,
 }: VideoCreationFormProps) {
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState<"text-to-video" | "image-to-video">("text-to-video");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [model, setModel] = useState("veo3_fast");
   const [aspectRatio, setAspectRatio] = useState("16:9");
@@ -35,7 +34,6 @@ export function VideoCreationForm({
         const reader = new FileReader();
         reader.onload = () => {
           setUploadedImage(reader.result as string);
-          setMode("image-to-video");
         };
         reader.readAsDataURL(file);
       }
@@ -75,70 +73,41 @@ export function VideoCreationForm({
 
   return (
     <div className="space-y-6">
-      {/* Mode Selection */}
-      <div className="flex gap-2 border-b border-gray-200 mb-6">
-        <button
-          onClick={() => {
-            setMode("text-to-video");
-            setUploadedImage(null);
-          }}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            mode === "text-to-video"
-              ? "border-b-2 border-blue-600 text-blue-600"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Text to Video
-        </button>
-        <button
-          onClick={() => setMode("image-to-video")}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            mode === "image-to-video"
-              ? "border-b-2 border-blue-600 text-blue-600"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Image to Video
-        </button>
-      </div>
-
-      {/* Image Upload (for Image to Video) - Must be above Prompt */}
-      {mode === "image-to-video" && (
-        <div className="mb-6">
-          {uploadedImage ? (
-            <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
-              <img
-                src={uploadedImage}
-                alt="Uploaded image"
-                className="w-full h-full object-contain"
-              />
-              <button
-                onClick={() => setUploadedImage(null)}
-                className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-lg"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors bg-gray-50 ${
-                isDragActive
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-300 hover:border-gray-400"
-              }`}
+      {/* Image Upload - Always visible, above Prompt */}
+      <div className="mb-6">
+        {uploadedImage ? (
+          <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
+            <img
+              src={uploadedImage}
+              alt="Uploaded image"
+              className="w-full h-full object-contain"
+            />
+            <button
+              onClick={() => setUploadedImage(null)}
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-lg"
             >
-              <input {...getInputProps()} />
-              <Upload className="h-20 w-20 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium text-base">
-                {isDragActive
-                  ? "Drop image file"
-                  : "Click or drop an image to upload"}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors bg-gray-50 ${
+              isDragActive
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400"
+            }`}
+          >
+            <input {...getInputProps()} />
+            <Upload className="h-20 w-20 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 font-medium text-base">
+              {isDragActive
+                ? "Drop image file"
+                : "Click or drop an image to upload"}
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Prompt Input */}
       <div>

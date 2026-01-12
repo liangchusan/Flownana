@@ -5,28 +5,28 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 const faqs = [
   {
-    question: "什么是 Nano Banana AI？",
-    answer: "Nano Banana 是一个突破性的 AI 模型，提供最先进的文本到图像生成和基于文本的图像编辑。它具有多图像融合、角色一致性、自然语言的针对性转换等功能，并利用世界知识实现前所未有的准确性。",
+    question: "What is Flownana AI?",
+    answer: "Flownana is a comprehensive AI platform that provides advanced video, image, and voice generation capabilities. Powered by cutting-edge models like VEO 3.1, Nano Banana, and Suno, it enables creators to generate professional content with simple text prompts.",
   },
   {
-    question: "支持哪些图像格式和分辨率？",
-    answer: "Nano Banana 支持所有主要图像格式，包括 PNG、JPEG 和 WebP。该模型在所有分辨率下保持卓越的质量，同时处理时间仅需 15-30 秒。",
+    question: "What image formats and resolutions are supported?",
+    answer: "Flownana supports all major image formats including PNG, JPEG, and WebP. Our AI models maintain excellent quality across all resolutions, with processing times typically ranging from 15-30 seconds.",
   },
   {
-    question: "为什么 Nano Banana 比其他 AI 图像模型更好？",
-    answer: "Nano Banana 通过独特的功能超越竞争对手：多图像融合能力、世界知识集成、自然语言的针对性编辑、用于故事叙述的完美角色一致性，以及场景感知转换。作为最新的 AI 创新，它在第一次尝试时就能提供完美结果。",
+    question: "Why is Flownana better than other AI content generation platforms?",
+    answer: "Flownana stands out with unique capabilities: multi-image fusion, world knowledge integration, natural language editing, perfect character consistency for storytelling, and scene-aware transformations. As the latest AI innovation, it delivers perfect results on the first try.",
   },
   {
-    question: "我可以用 Nano Banana 编辑面部和肖像吗？",
-    answer: "是的！Nano Banana 的先进 AI 技术在面部编辑和完成方面表现出色。您可以使用简单的文本描述修改表情、添加缺失特征、修复缺陷或增强肖像。我们的 AI 在所有面部编辑中保持照片级真实质量和自然外观。",
+    question: "Can I edit faces and portraits with Flownana?",
+    answer: "Yes! Flownana's advanced AI technology excels at facial editing and completion. You can modify expressions, add missing features, fix imperfections, or enhance portraits using simple text descriptions. Our AI maintains photorealistic quality and natural appearance in all facial edits.",
   },
   {
-    question: "我可以将生成的图像用于商业目的吗？",
-    answer: "是的，通过我们平台生成或编辑的所有图像都可以用于商业目的，包括营销、广告、产品设计和任何其他商业应用。您保留对创建内容的完全权利。",
+    question: "Can I use generated content for commercial purposes?",
+    answer: "Yes, all images, videos, and audio generated or edited through our platform can be used for commercial purposes, including marketing, advertising, product design, and any other business applications. You retain full rights to the content you create.",
   },
   {
-    question: "如何取消订阅？",
-    answer: "您可以随时通过您的账户设置取消订阅。如果您有任何问题或需要帮助，请联系我们的支持团队。",
+    question: "How do I cancel my subscription?",
+    answer: "You can cancel your subscription at any time through your account settings. If you have any questions or need assistance, please contact our support team.",
   },
 ];
 
@@ -42,10 +42,10 @@ export function FAQ() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            常见问题
+            Frequently Asked Questions
           </h2>
           <p className="text-xl text-gray-600">
-            查找关于 Nano Banana AI 图像生成和编辑的常见问题答案
+            Find answers to common questions about Flownana AI content generation
           </p>
         </div>
 
@@ -80,6 +80,3 @@ export function FAQ() {
     </section>
   );
 }
-
-
-

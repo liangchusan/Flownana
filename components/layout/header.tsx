@@ -1,22 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
-import { LogOut } from "lucide-react";
+import { UserMenu } from "@/components/layout/user-menu";
 
 export function Header() {
   const { data: session } = useSession();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-      <div className="container flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <Link href="/">
+      <div className="container flex h-16 items-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        {/* Logo - Left */}
+        <Link href="/" className="flex-shrink-0">
           <Logo size="md" />
         </Link>
 
-        <nav className="hidden md:flex items-center space-x-8">
+        {/* Navigation - Left aligned after logo */}
+        <nav className="hidden md:flex items-center space-x-8 ml-8">
           <Link 
             href="/create?mode=video" 
             className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
@@ -43,29 +45,16 @@ export function Header() {
           </Link>
         </nav>
 
-        <div className="flex items-center space-x-4">
+        {/* User Menu / Login Button - Right */}
+        <div className="flex items-center ml-auto">
           {session ? (
-            <>
-              <div className="hidden sm:flex items-center space-x-2">
-                {session.user?.image && (
-                  <img
-                    src={session.user.image}
-                    alt={session.user.name || "User"}
-                    className="h-8 w-8 rounded-full"
-                  />
-                )}
-                <span className="text-sm text-gray-700">{session.user?.name}</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => signOut()}
-                className="flex items-center space-x-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            </>
+            <UserMenu
+              user={{
+                name: session.user?.name,
+                email: session.user?.email,
+                image: session.user?.image,
+              }}
+            />
           ) : (
             <Button
               onClick={() => signIn("google")}

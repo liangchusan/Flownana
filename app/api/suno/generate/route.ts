@@ -17,7 +17,7 @@ async function createSunoTask(params: {
 
   if (!apiKey) {
     throw new Error(
-      "未配置 KIE_API_KEY 环境变量，请在 .env 中添加后重试。"
+      "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -40,8 +40,8 @@ async function createSunoTask(params: {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("Suno createTask 返回错误:", text);
-    throw new Error("创建音频生成任务失败，请稍后重试。");
+    console.error("Suno createTask returned error:", text);
+    throw new Error("Failed to create audio generation task. Please try again later.");
   }
 
   const json = (await res.json()) as {
@@ -51,8 +51,8 @@ async function createSunoTask(params: {
   };
 
   if (json.code !== 200 || !json.data?.taskId) {
-    console.error("Suno createTask 响应异常:", json);
-    throw new Error(json.msg || "创建音频生成任务失败，请稍后重试。");
+    console.error("Suno createTask response异常:", json);
+    throw new Error(json.msg || "Failed to create audio generation task. Please try again later.");
   }
 
   return json.data.taskId;
@@ -63,7 +63,7 @@ async function pollSunoResult(taskId: string) {
 
   if (!apiKey) {
     throw new Error(
-      "未配置 KIE_API_KEY 环境变量，请在 .env 中添加后重试。"
+      "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -84,7 +84,7 @@ async function pollSunoResult(taskId: string) {
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("Suno details 返回错误:", text);
+      console.error("Suno details returned error:", text);
       await sleep(intervalMs);
       continue;
     }
@@ -100,7 +100,7 @@ async function pollSunoResult(taskId: string) {
     };
 
     if (json.code !== 200 || !json.data) {
-      console.error("Suno details 响应异常:", json);
+      console.error("Suno details response异常:", json);
       await sleep(intervalMs);
       continue;
     }
@@ -113,13 +113,13 @@ async function pollSunoResult(taskId: string) {
     }
 
     if (status === "failed") {
-      console.error("Suno 任务失败:", json.data.error);
-      throw new Error(json.data.error || "音频生成失败，请稍后重试。");
+    console.error("Suno task failed:", json.data.error);
+    throw new Error(json.data.error || "Audio generation failed. Please try again later.");
     }
 
     if (status === "completed") {
       if (!json.data.audioUrl) {
-        throw new Error("任务成功但未返回音频地址，请稍后重试。");
+        throw new Error("Task succeeded but did not return audio URL. Please try again later.");
       }
 
       return json.data.audioUrl;
@@ -128,7 +128,7 @@ async function pollSunoResult(taskId: string) {
     await sleep(intervalMs);
   }
 
-  throw new Error("音频生成超时，请稍后重试。");
+  throw new Error("Audio generation timeout. Please try again later.");
 }
 
 export async function POST(request: NextRequest) {
@@ -169,11 +169,11 @@ export async function POST(request: NextRequest) {
       taskId,
     });
   } catch (error: any) {
-    console.error("生成音频时出错:", error);
+    console.error("Error generating audio:", error);
     const message =
       typeof error?.message === "string"
         ? error.message
-        : "生成音频时出错，请稍后重试。";
+        : "Error generating audio. Please try again later.";
 
     return NextResponse.json(
       { error: message },

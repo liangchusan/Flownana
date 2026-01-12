@@ -10,9 +10,9 @@ import { ImagePreview } from "@/components/generate/image-preview";
 import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
 import { VoicePreview } from "@/components/creation/voice-preview";
 import { Video, Image as ImageIcon, Mic, ArrowRight, Play, Sparkles } from "lucide-react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { UserMenu } from "@/components/layout/user-menu";
 import Link from "next/link";
 
 type CreationMode = "video" | "image" | "voice";
@@ -60,24 +60,13 @@ function CreateContent() {
           {/* Top Bar with User Info */}
           <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-8 py-4 flex justify-end items-center">
             {session ? (
-              <div className="flex items-center space-x-3">
-                {session.user?.image && (
-                  <img
-                    src={session.user.image}
-                    alt={session.user.name || "User"}
-                    className="h-8 w-8 rounded-full"
-                  />
-                )}
-                <span className="text-sm text-gray-700">{session.user?.name}</span>
-                <Button
-                  onClick={() => signOut()}
-                  variant="outline"
-                  size="sm"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </Button>
-              </div>
+              <UserMenu
+                user={{
+                  name: session.user?.name,
+                  email: session.user?.email,
+                  image: session.user?.image,
+                }}
+              />
             ) : (
               <Button
                 onClick={() => signIn("google")}
@@ -277,24 +266,13 @@ function CreateContent() {
         {/* Top Bar with User Info */}
         <div className="sticky top-0 z-10 bg-white px-8 py-4 flex justify-end items-center">
           {session ? (
-            <div className="flex items-center space-x-3">
-              {session.user?.image && (
-                <img
-                  src={session.user.image}
-                  alt={session.user.name || "User"}
-                  className="h-8 w-8 rounded-full"
-                />
-              )}
-              <span className="text-sm text-gray-700">{session.user?.name}</span>
-              <Button
-                onClick={() => signOut()}
-                variant="outline"
-                size="sm"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
+            <UserMenu
+              user={{
+                name: session.user?.name,
+                email: session.user?.email,
+                image: session.user?.image,
+              }}
+            />
           ) : (
             <Button
               onClick={() => signIn("google")}

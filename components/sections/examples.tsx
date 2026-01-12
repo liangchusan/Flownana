@@ -6,26 +6,26 @@ import { Button } from "@/components/ui/button";
 
 const examples = [
   {
-    title: "圣诞贺卡",
-    description: "一个忠实描绘的圣诞卡设计，展示戴着圣诞帽的情侣，文字为\"圣诞快乐 2025\"，友好传统，经典设计，在冬季仙境中",
+    title: "Christmas Card Design",
+    description: "A faithfully rendered Christmas card design featuring a couple wearing Santa hats, with text reading 'Merry Christmas 2025', friendly and traditional, classic design, in a winter wonderland setting.",
     before: "https://picsum.photos/600/400?random=1",
     after: "https://picsum.photos/600/400?random=2",
   },
   {
-    title: "虚拟试衣",
-    description: "体验革命性的虚拟试穿技术，无缝地将服装物品放置在模特身上，完美贴合、逼真的垂坠和自然的光照保持。",
+    title: "Virtual Try-On",
+    description: "Experience revolutionary virtual try-on technology that seamlessly places clothing items on models with perfect fit, realistic draping, and natural lighting preservation.",
     before: "https://picsum.photos/600/400?random=3",
     after: "https://picsum.photos/600/400?random=4",
   },
   {
-    title: "文字移除",
-    description: "从产品包装中移除不需要的文字和标志，同时保持完美的图像质量和上下文。",
+    title: "Text Removal",
+    description: "Remove unwanted text and logos from product packaging while maintaining perfect image quality and context.",
     before: "https://picsum.photos/600/400?random=5",
     after: "https://picsum.photos/600/400?random=6",
   },
   {
-    title: "背景更换",
-    description: "修改发型和发色，自然逼真的结果与原始图像无缝融合。",
+    title: "Background Replacement",
+    description: "Modify hairstyles and hair colors with natural, photorealistic results that seamlessly blend with the original image.",
     before: "https://picsum.photos/600/400?random=7",
     after: "https://picsum.photos/600/400?random=8",
   },
@@ -49,11 +49,11 @@ export function Examples() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Nano Banana 应用场景
+            Flownana Use Cases
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            发现 Nano Banana 的多功能性 - 从风格转换到场景修改，
-            这个先进的 AI 通过复杂的多图像融合功能，在各种创意项目中提供专业质量的编辑结果。
+            Discover the versatility of Flownana - from style transformations to scene modifications, 
+            this advanced AI delivers professional-quality editing results across various creative projects through sophisticated multi-image fusion capabilities.
           </p>
         </div>
 
@@ -88,24 +88,24 @@ export function Examples() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
             <div>
               <div className="bg-gray-100 rounded-lg p-2 mb-2">
-                <span className="text-sm font-semibold text-gray-700">修改前</span>
+                <span className="text-sm font-semibold text-gray-700">Before</span>
               </div>
               <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
                 <img
                   src={currentExample.before}
-                  alt="修改前"
+                  alt="Before"
                   className="w-full h-full object-cover"
                 />
               </div>
             </div>
             <div>
-              <div className="bg-primary-100 rounded-lg p-2 mb-2">
-                <span className="text-sm font-semibold text-primary-700">修改后</span>
+              <div className="bg-blue-100 rounded-lg p-2 mb-2">
+                <span className="text-sm font-semibold text-blue-700">After</span>
               </div>
               <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
                 <img
                   src={currentExample.after}
-                  alt="修改后"
+                  alt="After"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -120,6 +120,3 @@ export function Examples() {
     </section>
   );
 }
-
-
-
