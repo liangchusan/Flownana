@@ -75,6 +75,9 @@ export function VideoCreationForm({
     <div className="space-y-6">
       {/* Image Upload - Always visible, above Prompt */}
       <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Image
+        </label>
         {uploadedImage ? (
           <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
             <img
@@ -92,14 +95,14 @@ export function VideoCreationForm({
         ) : (
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors bg-gray-50 ${
+            className={`border-2 border-dashed rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50 ${
               isDragActive
                 ? "border-blue-500 bg-blue-50"
                 : "border-gray-300 hover:border-gray-400"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-20 w-20 text-gray-400 mx-auto mb-4" />
+            <Upload className="h-20 w-20 text-gray-400 mb-4" />
             <p className="text-gray-600 font-medium text-base">
               {isDragActive
                 ? "Drop image file"
@@ -126,28 +129,24 @@ export function VideoCreationForm({
       {/* Settings */}
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Model
-          </label>
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
+            <option value="" disabled>Model</option>
             <option value="veo3_fast">VEO3 Fast</option>
             <option value="veo3_quality">VEO3 Quality</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Aspect Ratio
-          </label>
           <select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
+            <option value="" disabled>Aspect Ratio</option>
             <option value="16:9">16:9</option>
             <option value="9:16">9:16</option>
             <option value="1:1">1:1</option>
@@ -156,14 +155,12 @@ export function VideoCreationForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Duration (sec)
-          </label>
           <select
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
+            <option value="" disabled>Duration (sec)</option>
             <option value={5}>5 sec</option>
             <option value={10}>10 sec</option>
             <option value={15}>15 sec</option>

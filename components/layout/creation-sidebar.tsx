@@ -20,25 +20,23 @@ function SidebarContent() {
   const isHome = !currentMode;
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 h-screen fixed left-0 top-0 overflow-y-auto">
-      <div className="p-6">
-        {/* Logo */}
-        <Link href="/" className="block mb-8">
-          <Logo size="sm" />
-        </Link>
-
+    <aside className="w-20 bg-white h-screen fixed left-0 top-0 overflow-y-auto">
+      <div className="p-2 pt-4">
         {/* Navigation */}
-        <nav className="space-y-2">
+        <nav className="space-y-1">
           <Link
             href="/create"
-            className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+            className={`group relative flex items-center justify-center p-3 rounded-lg transition-colors ${
               isHome
-                ? "bg-gray-100 text-blue-600"
-                : "hover:bg-gray-100 text-gray-700"
+                ? "text-blue-600"
+                : "text-gray-700 hover:text-gray-900"
             }`}
           >
             <Home className="h-5 w-5" />
-            <span className="text-sm font-medium">Home</span>
+            {/* Tooltip on hover */}
+            <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+              Home
+            </span>
           </Link>
 
           {navItems.map((item) => {
@@ -48,14 +46,17 @@ function SidebarContent() {
               <Link
                 key={item.id}
                 href={item.href}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`group relative flex items-center justify-center p-3 rounded-lg transition-colors ${
                   isActive
-                    ? "bg-gray-100 text-blue-600"
-                    : "hover:bg-gray-100 text-gray-700"
+                    ? "text-blue-600"
+                    : "text-gray-700 hover:text-gray-900"
                 }`}
               >
                 <Icon className="h-5 w-5" />
-                <span className="text-sm font-medium">{item.label}</span>
+                {/* Tooltip on hover */}
+                <span className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -68,12 +69,11 @@ function SidebarContent() {
 export function CreationSidebar() {
   return (
     <Suspense fallback={
-      <aside className="w-64 bg-gray-50 border-r border-gray-200 h-screen fixed left-0 top-0">
-        <div className="p-6">
-          <div className="h-8 bg-gray-200 rounded mb-8"></div>
-          <div className="space-y-2">
+      <aside className="w-20 bg-white h-screen fixed left-0 top-0">
+        <div className="p-2">
+          <div className="space-y-1">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded-lg"></div>
+              <div key={i} className="h-10 bg-gray-200 rounded-lg"></div>
             ))}
           </div>
         </div>
