@@ -20,22 +20,22 @@ export function Header() {
         {/* Navigation - Left aligned after logo */}
         <nav className="hidden md:flex items-center space-x-8 ml-8">
           <Link 
-            href="/create?mode=video" 
+            href="/ai-video" 
             className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
           >
             AI Video
           </Link>
           <Link 
-            href="/create?mode=image" 
+            href="/ai-image" 
             className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
           >
             AI Image
           </Link>
           <Link 
-            href="/create?mode=voice" 
+            href="/ai-music" 
             className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
           >
-            AI Voices
+            AI Music
           </Link>
           <Link 
             href="/pricing" 

@@ -1,0 +1,76 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoWaterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#87CEEB" stopOpacity="0.6" />
+      <stop offset="50%" stopColor="#4FC3F7" stopOpacity="0.7" />
+      <stop offset="100%" stopColor="#29B6F6" stopOpacity="0.8" />
+    </linearGradient>
+    <linearGradient id="logoWaterShine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+      <stop offset="30%" stopColor="#FFFFFF" stopOpacity="0.4" />
+      <stop offset="70%" stopColor="#FFFFFF" stopOpacity="0.4" />
+      <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+    </linearGradient>
+    <linearGradient id="logoDeepWater" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#4FC3F7" stopOpacity="0.5" />
+      <stop offset="100%" stopColor="#0288D1" stopOpacity="0.7" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Water body - bottom section -->
+  <rect
+    x="0"
+    y="26"
+    width="40"
+    height="14"
+    fill="url(#logoWaterGradient)"
+  />
+  
+  <!-- First wave - flowing water surface -->
+  <path
+    d="M0 28 Q8 26, 16 28 T32 28 T40 28 L40 40 L0 40 Z"
+    fill="url(#logoWaterGradient)"
+    opacity="0.9"
+  />
+  
+  <!-- Second wave - deeper layer -->
+  <path
+    d="M0 30 Q10 28, 20 30 T40 30 L40 40 L0 40 Z"
+    fill="url(#logoDeepWater)"
+    opacity="0.8"
+  />
+  
+  <!-- Water surface shine/highlight -->
+  <path
+    d="M0 28 Q8 26, 16 28 T32 28 T40 28"
+    stroke="url(#logoWaterShine)"
+    stroke-width="2"
+    fill="none"
+    opacity="0.6"
+  />
+  
+  <!-- Subtle water ripples -->
+  <circle
+    cx="20"
+    cy="30"
+    r="6"
+    fill="none"
+    stroke="#87CEEB"
+    stroke-width="1"
+    opacity="0.3"
+  />
+  <circle
+    cx="20"
+    cy="30"
+    r="4"
+    fill="none"
+    stroke="#4FC3F7"
+    stroke-width="1"
+    opacity="0.4"
+  />
+  
+  <!-- Banana emoji - rotated -25 degrees, matching Logo component exactly -->
+  <g transform="translate(20, 20) rotate(-25)">
+    <text x="0" y="0" font-size="24" text-anchor="middle" dominant-baseline="central" font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif">🍌</text>
+  </g>
+</svg>

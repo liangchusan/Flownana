@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { CreateContent } from "./create-content";
 
-export default function AIImagePage() {
+export default function AIMusicPage() {
   return (
     <Suspense fallback={
       <div className="flex h-screen bg-white">
@@ -13,7 +13,7 @@ export default function AIImagePage() {
         </div>
       </div>
     }>
-      <CreateContent mode="image" />
+      <CreateContent mode="voice" />
     </Suspense>
   );
 }

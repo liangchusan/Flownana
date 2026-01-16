@@ -1,0 +1,93 @@
+<svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iconWaterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#87CEEB" stopOpacity="0.6" />
+      <stop offset="50%" stopColor="#4FC3F7" stopOpacity="0.7" />
+      <stop offset="100%" stopColor="#29B6F6" stopOpacity="0.8" />
+    </linearGradient>
+    <linearGradient id="iconWaterShine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+      <stop offset="30%" stopColor="#FFFFFF" stopOpacity="0.4" />
+      <stop offset="70%" stopColor="#FFFFFF" stopOpacity="0.4" />
+      <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+    </linearGradient>
+    <linearGradient id="iconDeepWater" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#4FC3F7" stopOpacity="0.5" />
+      <stop offset="100%" stopColor="#0288D1" stopOpacity="0.7" />
+    </linearGradient>
+    <linearGradient id="iconBananaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FFD700" />
+      <stop offset="50%" stopColor="#FFC107" />
+      <stop offset="100%" stopColor="#FFA000" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Water body - bottom section -->
+  <rect
+    x="0"
+    y="26"
+    width="40"
+    height="14"
+    fill="url(#iconWaterGradient)"
+  />
+  
+  <!-- First wave - flowing water surface -->
+  <path
+    d="M0 28 Q8 26, 16 28 T32 28 T40 28 L40 40 L0 40 Z"
+    fill="url(#iconWaterGradient)"
+    opacity="0.9"
+  />
+  
+  <!-- Second wave - deeper layer -->
+  <path
+    d="M0 30 Q10 28, 20 30 T40 30 L40 40 L0 40 Z"
+    fill="url(#iconDeepWater)"
+    opacity="0.8"
+  />
+  
+  <!-- Water surface shine/highlight -->
+  <path
+    d="M0 28 Q8 26, 16 28 T32 28 T40 28"
+    stroke="url(#iconWaterShine)"
+    stroke-width="2"
+    fill="none"
+    opacity="0.6"
+  />
+  
+  <!-- Subtle water ripples -->
+  <circle
+    cx="20"
+    cy="30"
+    r="6"
+    fill="none"
+    stroke="#87CEEB"
+    stroke-width="1"
+    opacity="0.3"
+  />
+  <circle
+    cx="20"
+    cy="30"
+    r="4"
+    fill="none"
+    stroke="#4FC3F7"
+    stroke-width="1"
+    opacity="0.4"
+  />
+  
+  <!-- Banana shape using SVG path, rotated -25 degrees to match Logo -->
+  <g transform="translate(20, 20) rotate(-25)">
+    <!-- Banana body - curved crescent shape -->
+    <path d="M -7,-11 Q -5,-13 -3,-11 Q -1,-9 1,-7 Q 3,-5 5,-7 Q 7,-9 9,-11 Q 7,-13 5,-15 Q 3,-13 1,-11 Q -1,-13 -3,-15 Q -5,-13 -7,-11 Z" 
+          fill="url(#iconBananaGradient)" />
+    <!-- Banana highlight/shine -->
+    <ellipse cx="-1" cy="-7" rx="4" ry="6" fill="#FFF9C4" opacity="0.8" />
+    <!-- Banana stem/bottom -->
+    <ellipse cx="0" cy="-13" rx="2" ry="3" fill="#8D6E63" opacity="0.9" />
+    <!-- Banana inner curve detail -->
+    <path d="M -4,-10 Q -2,-8 0,-6 Q 2,-4 4,-6" 
+          stroke="#FFA000" 
+          stroke-width="0.5" 
+          fill="none" 
+          opacity="0.4" />
+  </g>
+</svg>

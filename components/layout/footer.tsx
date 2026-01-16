@@ -19,18 +19,18 @@ export function Footer() {
             <h3 className="text-white font-semibold mb-4">Products</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/create?mode=video" className="hover:text-white">
+                <Link href="/ai-video" className="hover:text-white">
                   AI Video
                 </Link>
               </li>
               <li>
-                <Link href="/create?mode=image" className="hover:text-white">
+                <Link href="/ai-image" className="hover:text-white">
                   AI Image
                 </Link>
               </li>
               <li>
-                <Link href="/create?mode=voice" className="hover:text-white">
-                  AI Voices
+                <Link href="/ai-music" className="hover:text-white">
+                  AI Music
                 </Link>
               </li>
             </ul>

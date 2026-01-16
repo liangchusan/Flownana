@@ -6,15 +6,17 @@ import { Loader2, Sparkles, Music } from "lucide-react";
 import axios from "axios";
 
 interface VoiceCreationFormProps {
-  onGenerate: (audioUrl: string) => void;
+  onGenerate: (audioUrl: string, taskId?: string, prompt?: string) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
+  onTaskIdChange?: (taskId: string) => void;
 }
 
 export function VoiceCreationForm({
   onGenerate,
   isGenerating,
   setIsGenerating,
+  onTaskIdChange,
 }: VoiceCreationFormProps) {
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
@@ -37,7 +39,12 @@ export function VoiceCreationForm({
       });
 
       if (response.data.success) {
-        onGenerate(response.data.audioUrl);
+        const taskId = response.data.taskId || response.data.id; // Suno API 可能使用 id
+        const responsePrompt = response.data.prompt || prompt;
+        if (taskId && onTaskIdChange) {
+          onTaskIdChange(taskId);
+        }
+        onGenerate(response.data.audioUrl, taskId, responsePrompt);
       } else {
         alert("Generation failed, please try again");
       }

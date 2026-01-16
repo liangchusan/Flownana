@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { CreateContent } from "./create-content";
 
 export default function AIVideoPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/create?mode=video");
-  }, [router]);
-
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-gray-600">Redirecting...</div>
-    </div>
+    <Suspense fallback={
+      <div className="flex h-screen bg-white">
+        <div className="w-[70px] bg-white"></div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-gray-600">Loading...</div>
+        </div>
+      </div>
+    }>
+      <CreateContent mode="video" />
+    </Suspense>
   );
 }

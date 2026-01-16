@@ -7,7 +7,7 @@ import { Examples } from "@/components/sections/examples";
 import { Testimonials } from "@/components/sections/testimonials";
 import { Pricing } from "@/components/sections/pricing";
 import { FAQ } from "@/components/sections/faq";
-import { ArrowRight, Sparkles, Video, Image as ImageIcon, Mic, Zap } from "lucide-react";
+import { ArrowRight, Sparkles, Video, Image as ImageIcon, Music, Zap } from "lucide-react";
 
 export default function Home() {
   return (
@@ -35,7 +35,7 @@ export default function Home() {
               Transform your creative ideas into reality in seconds.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/create?mode=image">
+              <Link href="/ai-image">
                 <Button size="lg" className="text-lg px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0">
                   Start Creating Free
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -55,7 +55,7 @@ export default function Home() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Link href="/create?mode=video" className="group">
+            <Link href="/ai-video" className="group">
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
                 <div className="bg-blue-500 rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <Video className="h-8 w-8 text-white" />
@@ -87,12 +87,12 @@ export default function Home() {
               </div>
             </Link>
 
-            <Link href="/create?mode=voice" className="group">
+            <Link href="/ai-music" className="group">
               <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-2">
                 <div className="bg-green-500 rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Mic className="h-8 w-8 text-white" />
+                  <Music className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">AI Voices</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">AI Music</h3>
                 <p className="text-gray-600 mb-4">
                   Create natural-sounding voices. Generate professional voiceovers in multiple languages and styles.
                 </p>

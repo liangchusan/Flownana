@@ -7,15 +7,17 @@ import { Upload, X, Loader2 } from "lucide-react";
 import axios from "axios";
 
 interface GenerateFormProps {
-  onGenerate: (imageUrl: string) => void;
+  onGenerate: (imageUrl: string, taskId?: string, prompt?: string) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
+  onTaskIdChange?: (taskId: string) => void;
 }
 
 export function GenerateForm({
   onGenerate,
   isGenerating,
   setIsGenerating,
+  onTaskIdChange,
 }: GenerateFormProps) {
   const [prompt, setPrompt] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -59,7 +61,12 @@ export function GenerateForm({
       });
 
       if (response.data.success) {
-        onGenerate(response.data.imageUrl);
+        const taskId = response.data.taskId;
+        const responsePrompt = response.data.prompt || prompt;
+        if (taskId && onTaskIdChange) {
+          onTaskIdChange(taskId);
+        }
+        onGenerate(response.data.imageUrl, taskId, responsePrompt);
       } else {
         alert("Generation failed, please try again");
       }
@@ -76,8 +83,11 @@ export function GenerateForm({
     <div className="space-y-6">
       {/* Image Upload - Always visible, above Prompt */}
       <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Image
+        </label>
         {uploadedImage ? (
-          <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
+          <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
             <img
               src={uploadedImage}
               alt="Uploaded image"
@@ -93,15 +103,15 @@ export function GenerateForm({
         ) : (
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors bg-gray-50 ${
+            className={`border-2 border-dashed rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50 ${
               isDragActive
                 ? "border-blue-500 bg-blue-50"
                 : "border-gray-300 hover:border-gray-400"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-20 w-20 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 font-medium text-base">
+            <Upload className="h-10 w-10 text-gray-400 mb-3" />
+            <p className="text-gray-600 text-sm">
               {isDragActive
                 ? "Drop image file"
                 : "Click or drop an image to upload"}
@@ -112,42 +122,38 @@ export function GenerateForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Prompt <span className="text-gray-500">({prompt.length}/5000)</span>
+          Prompt
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the image you want to generate or edit..."
-          className="w-full h-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm placeholder:text-sm"
           maxLength={5000}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Resolution
-          </label>
+      <div className="flex gap-3">
+        <div className="flex-[1.5]">
           <select
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
+            <option value="" disabled>Resolution</option>
             <option value="1K">1K</option>
             <option value="2K">2K</option>
             <option value="4K">4K</option>
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Aspect Ratio
-          </label>
+        <div className="flex-1">
           <select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
+            <option value="" disabled>Aspect Ratio</option>
             <option value="1:1">1:1</option>
             <option value="16:9">16:9</option>
             <option value="9:16">9:16</option>

@@ -111,7 +111,7 @@ export function Pricing() {
                 ))}
               </ul>
 
-              <Link href="/create?mode=image" className="block">
+              <Link href="/ai-image" className="block">
                 <Button
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}

@@ -7,15 +7,17 @@ import { Upload, X, Loader2, Sparkles } from "lucide-react";
 import axios from "axios";
 
 interface VideoCreationFormProps {
-  onGenerate: (videoUrl: string) => void;
+  onGenerate: (videoUrl: string, taskId?: string, prompt?: string) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
+  onTaskIdChange?: (taskId: string) => void;
 }
 
 export function VideoCreationForm({
   onGenerate,
   isGenerating,
   setIsGenerating,
+  onTaskIdChange,
 }: VideoCreationFormProps) {
   const [prompt, setPrompt] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -59,7 +61,12 @@ export function VideoCreationForm({
       });
 
       if (response.data.success) {
-        onGenerate(response.data.videoUrl);
+        const taskId = response.data.taskId;
+        const responsePrompt = response.data.prompt || prompt;
+        if (taskId && onTaskIdChange) {
+          onTaskIdChange(taskId);
+        }
+        onGenerate(response.data.videoUrl, taskId, responsePrompt);
       } else {
         alert("Generation failed, please try again");
       }
@@ -102,8 +109,8 @@ export function VideoCreationForm({
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-20 w-20 text-gray-400 mb-4" />
-            <p className="text-gray-600 font-medium text-base">
+            <Upload className="h-10 w-10 text-gray-400 mb-3" />
+            <p className="text-gray-600 text-sm">
               {isDragActive
                 ? "Drop image file"
                 : "Click or drop an image to upload"}
@@ -115,24 +122,24 @@ export function VideoCreationForm({
       {/* Prompt Input */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Prompt <span className="text-gray-500">({prompt.length}/500)</span>
+          Prompt
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the video you want to create..."
-          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm placeholder:text-sm"
           maxLength={500}
         />
       </div>
 
       {/* Settings */}
-      <div className="grid grid-cols-3 gap-4">
-        <div>
+      <div className="flex gap-3">
+        <div className="flex-[1.5]">
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Model</option>
             <option value="veo3_fast">VEO3 Fast</option>
@@ -140,11 +147,11 @@ export function VideoCreationForm({
           </select>
         </div>
 
-        <div>
+        <div className="flex-1">
           <select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Aspect Ratio</option>
             <option value="16:9">16:9</option>
@@ -154,11 +161,11 @@ export function VideoCreationForm({
           </select>
         </div>
 
-        <div>
+        <div className="flex-1">
           <select
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Duration (sec)</option>
             <option value={5}>5 sec</option>
