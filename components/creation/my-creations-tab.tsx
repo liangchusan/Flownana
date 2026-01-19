@@ -53,12 +53,13 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   // 处理新的生成任务
   useEffect(() => {
     if (currentGeneration?.taskId && session?.user?.email) {
+      const taskId = currentGeneration.taskId;
       setCreations((prev) => {
         // 检查是否已存在
-        const exists = prev.find((c) => c.id === currentGeneration.taskId);
+        const exists = prev.find((c) => c.id === taskId);
         if (exists) {
           const updated = prev.map((c) =>
-            c.id === currentGeneration.taskId
+            c.id === taskId
               ? {
                   ...c,
                   status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
@@ -70,13 +71,13 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
           return updated;
         } else {
           const newCreation: Creation = {
-            id: currentGeneration.taskId,
+            id: taskId,
             type: mode,
             status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
             urls: currentGeneration.url ? [currentGeneration.url] : [],
             prompt: currentGeneration.prompt || "",
             createdAt: new Date().toISOString(),
-            taskId: currentGeneration.taskId,
+            taskId: taskId,
           };
           return [newCreation, ...prev];
         }
