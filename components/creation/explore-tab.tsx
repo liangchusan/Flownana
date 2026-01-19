@@ -489,8 +489,8 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
   }, [visibleCount, filteredExamples.length]);
 
   // 视频懒加载：只加载可见区域的视频
-  const handleVideoIntersection = useCallback((id: string, videoElement: HTMLVideoElement | null) => {
-    if (!videoElement || loadedVideos.has(id)) return;
+  const handleVideoIntersection = useCallback((id: string, containerElement: HTMLDivElement | null) => {
+    if (!containerElement || loadedVideos.has(id)) return;
 
     const videoObserver = new IntersectionObserver(
       (entries) => {
@@ -504,10 +504,10 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
           videoObserver.disconnect();
         }
       },
-      { rootMargin: "100px" } // 提前 100px 加载视频
+      { rootMargin: "200px" } // 提前 200px 加载视频
     );
 
-    videoObserver.observe(videoElement);
+    videoObserver.observe(containerElement);
   }, [loadedVideos]);
 
   // 视频点击时打开模态框（视频在模态框中加载）
@@ -560,17 +560,28 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                 {loadedVideos.has(example.id) ? (
                   <video
                     ref={(video) => {
-                      if (video) {
+                      if (video && !videoRefs.current[example.id]) {
                         videoRefs.current[example.id] = video;
-                        // 设置视频属性并自动播放
+                        // 设置视频属性
                         video.muted = true;
                         video.loop = true;
                         video.playsInline = true;
-                        video.addEventListener('loadeddata', () => {
-                          video.play().catch(() => {
-                            // 忽略自动播放错误
-                          });
-                        }, { once: true });
+                        // 尝试自动播放
+                        const tryPlay = async () => {
+                          try {
+                            await video.play();
+                          } catch (error) {
+                            // 如果自动播放失败，可能是浏览器策略限制
+                            console.debug("Video autoplay prevented:", error);
+                          }
+                        };
+                        // 如果视频已加载，直接播放；否则等待加载完成
+                        if (video.readyState >= 2) {
+                          tryPlay();
+                        } else {
+                          video.addEventListener('loadeddata', tryPlay, { once: true });
+                          video.addEventListener('canplay', tryPlay, { once: true });
+                        }
                       }
                     }}
                     src={example.url}
@@ -581,7 +592,14 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                     preload="auto"
                   />
                 ) : (
-                  <div className={`relative w-full aspect-video bg-gradient-to-br ${getVideoPoster(example.url, example.prompt)}`}>
+                  <div 
+                    ref={(div) => {
+                      if (div) {
+                        handleVideoIntersection(example.id, div);
+                      }
+                    }}
+                    className={`relative w-full aspect-video bg-gradient-to-br ${getVideoPoster(example.url, example.prompt)}`}
+                  >
                     {/* 视频封面占位 - 使用渐变背景 */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-gray-400 text-xs opacity-50">{example.model}</div>
@@ -594,18 +612,6 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                         </svg>
                       </div>
                     </div>
-                    {/* 延迟加载视频元素（隐藏，用于 Intersection Observer） */}
-                    <video
-                      ref={(video) => {
-                        if (video) {
-                          videoRefs.current[example.id] = video;
-                          handleVideoIntersection(example.id, video);
-                        }
-                      }}
-                      src={example.url}
-                      className="hidden"
-                      preload="none"
-                    />
                   </div>
                 )}
               </div>
