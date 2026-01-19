@@ -61,7 +61,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
             c.id === currentGeneration.taskId
               ? {
                   ...c,
-                  status: currentGeneration.isGenerating ? "generating" : "success",
+                  status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
                   urls: currentGeneration.url ? [currentGeneration.url] : c.urls,
                   prompt: currentGeneration.prompt || c.prompt,
                 }
@@ -72,7 +72,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
           const newCreation: Creation = {
             id: currentGeneration.taskId,
             type: mode,
-            status: currentGeneration.isGenerating ? "generating" : "success",
+            status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
             urls: currentGeneration.url ? [currentGeneration.url] : [],
             prompt: currentGeneration.prompt || "",
             createdAt: new Date().toISOString(),
