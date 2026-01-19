@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Upload, X, Loader2 } from "lucide-react";
@@ -11,6 +11,8 @@ interface GenerateFormProps {
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
   onTaskIdChange?: (taskId: string) => void;
+  initialPrompt?: string;
+  initialImage?: string;
 }
 
 export function GenerateForm({
@@ -18,11 +20,27 @@ export function GenerateForm({
   isGenerating,
   setIsGenerating,
   onTaskIdChange,
+  initialPrompt,
+  initialImage,
 }: GenerateFormProps) {
-  const [prompt, setPrompt] = useState("");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState(initialPrompt || "");
+  const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
+  const [model, setModel] = useState("nano-banana");
   const [resolution, setResolution] = useState("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
+
+  // 当外部传入初始值时更新
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
+
+  useEffect(() => {
+    if (initialImage !== undefined) {
+      setUploadedImage(initialImage);
+    }
+  }, [initialImage]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -56,6 +74,7 @@ export function GenerateForm({
         prompt,
         imageUrl: uploadedImage,
         mode,
+        model,
         resolution,
         aspectRatio,
       });
@@ -136,6 +155,17 @@ export function GenerateForm({
       <div className="flex gap-3">
         <div className="flex-[1.5]">
           <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+          >
+            <option value="" disabled>Model</option>
+            <option value="nano-banana">Nano Banana</option>
+          </select>
+        </div>
+
+        <div className="flex-1">
+          <select
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
@@ -175,7 +205,7 @@ export function GenerateForm({
             Generating...
           </>
         ) : (
-          "Generate Image"
+          "Generate"
         )}
       </Button>
     </div>

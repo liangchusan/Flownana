@@ -13,9 +13,10 @@ interface ResultPanelProps {
     taskId?: string;
     prompt?: string;
   };
+  onGenerateSimilar?: (data: { prompt: string; imageUrl?: string }) => void;
 }
 
-export function ResultPanel({ mode, currentGeneration }: ResultPanelProps) {
+export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: ResultPanelProps) {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<"explore" | "creations">("explore");
   const [hasHistory, setHasHistory] = useState(false);
@@ -87,7 +88,7 @@ export function ResultPanel({ mode, currentGeneration }: ResultPanelProps) {
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === "explore" ? (
-          <ExploreTab mode={mode} />
+          <ExploreTab mode={mode} onGenerateSimilar={onGenerateSimilar} />
         ) : (
           <MyCreationsTab
             mode={mode}

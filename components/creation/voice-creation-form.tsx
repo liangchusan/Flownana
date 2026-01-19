@@ -127,10 +127,7 @@ export function VoiceCreationForm({
             Generating...
           </>
         ) : (
-          <>
-            <Music className="h-5 w-5 mr-2" />
-            Generate Audio
-          </>
+          "Generate"
         )}
       </Button>
     </div>

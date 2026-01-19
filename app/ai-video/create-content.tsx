@@ -18,6 +18,8 @@ export function CreateContent({ mode }: { mode: "video" }) {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | undefined>(undefined);
   const [currentPrompt, setCurrentPrompt] = useState<string | undefined>(undefined);
+  const [similarPrompt, setSimilarPrompt] = useState<string | undefined>(undefined);
+  const [similarImage, setSimilarImage] = useState<string | undefined>(undefined);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -68,6 +70,8 @@ export function CreateContent({ mode }: { mode: "video" }) {
               isGenerating={isGeneratingVideo}
               setIsGenerating={setIsGeneratingVideo}
               onTaskIdChange={setCurrentTaskId}
+              initialPrompt={similarPrompt}
+              initialImage={similarImage}
             />
           </div>
 
@@ -80,6 +84,10 @@ export function CreateContent({ mode }: { mode: "video" }) {
                 isGenerating: isGeneratingVideo,
                 taskId: currentTaskId,
                 prompt: currentPrompt,
+              }}
+              onGenerateSimilar={(data) => {
+                setSimilarPrompt(data.prompt);
+                setSimilarImage(data.imageUrl);
               }}
             />
           </div>

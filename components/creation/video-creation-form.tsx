@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Upload, X, Loader2, Sparkles } from "lucide-react";
@@ -11,6 +11,8 @@ interface VideoCreationFormProps {
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
   onTaskIdChange?: (taskId: string) => void;
+  initialPrompt?: string;
+  initialImage?: string;
 }
 
 export function VideoCreationForm({
@@ -18,12 +20,27 @@ export function VideoCreationForm({
   isGenerating,
   setIsGenerating,
   onTaskIdChange,
+  initialPrompt,
+  initialImage,
 }: VideoCreationFormProps) {
-  const [prompt, setPrompt] = useState("");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState(initialPrompt || "");
+  const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
   const [model, setModel] = useState("veo3_fast");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [duration, setDuration] = useState(5);
+
+  // 当外部传入初始值时更新
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
+
+  useEffect(() => {
+    if (initialImage !== undefined) {
+      setUploadedImage(initialImage);
+    }
+  }, [initialImage]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -167,10 +184,10 @@ export function VideoCreationForm({
             onChange={(e) => setDuration(Number(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
-            <option value="" disabled>Duration (sec)</option>
-            <option value={5}>5 sec</option>
-            <option value={10}>10 sec</option>
-            <option value={15}>15 sec</option>
+            <option value="" disabled>Duration</option>
+            <option value={5}>5 s</option>
+            <option value={10}>10 s</option>
+            <option value={15}>15 s</option>
           </select>
         </div>
       </div>
@@ -188,10 +205,7 @@ export function VideoCreationForm({
             Generating...
           </>
         ) : (
-          <>
-            <Sparkles className="h-5 w-5 mr-2" />
-            Generate Video
-          </>
+          "Generate"
         )}
       </Button>
     </div>
