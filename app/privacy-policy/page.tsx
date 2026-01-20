@@ -12,19 +12,45 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-white">
       <Header showBackground />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">Privacy Policy</h1>
+          <div className="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-600">
+            Legal
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-3">Privacy Policy</h1>
           <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
         </div>
 
-        <div className="prose prose-gray max-w-none">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
+          {/* Table of Contents */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-24">
+              <div className="text-xs font-semibold text-gray-900 mb-3">On this page</div>
+              <nav className="text-sm text-gray-600 space-y-2">
+                <a className="block hover:text-gray-900" href="#information-we-collect">1. Information We Collect</a>
+                <a className="block hover:text-gray-900" href="#how-we-use">2. How We Use Information</a>
+                <a className="block hover:text-gray-900" href="#how-we-share">3. How We Share Information</a>
+                <a className="block hover:text-gray-900" href="#content-and-outputs">4. Your Content and AI Outputs</a>
+                <a className="block hover:text-gray-900" href="#data-retention">5. Data Retention</a>
+                <a className="block hover:text-gray-900" href="#security">6. Security</a>
+                <a className="block hover:text-gray-900" href="#your-choices">7. Your Choices</a>
+                <a className="block hover:text-gray-900" href="#children">8. Children’s Privacy</a>
+                <a className="block hover:text-gray-900" href="#international">9. International Transfers</a>
+                <a className="block hover:text-gray-900" href="#changes">10. Changes to This Policy</a>
+                <a className="block hover:text-gray-900" href="#contact">11. Contact Us</a>
+              </nav>
+            </div>
+          </aside>
+
+          {/* Content */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
+            <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
           <p>
             This Privacy Policy explains how Flownana (“Flownana”, “we”, “us”, “our”) collects, uses, shares, and
             protects information when you use our website and services (the “Services”).
           </p>
 
-          <h2>1. Information We Collect</h2>
+          <h2 id="information-we-collect">1. Information We Collect</h2>
           <h3>1.1 Information you provide</h3>
           <ul>
             <li>
@@ -53,7 +79,7 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
-          <h2>2. How We Use Information</h2>
+          <h2 id="how-we-use">2. How We Use Information</h2>
           <ul>
             <li>
               <strong>Provide and operate</strong> the Services, including generating content you request.
@@ -72,7 +98,7 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
-          <h2>3. How We Share Information</h2>
+          <h2 id="how-we-share">3. How We Share Information</h2>
           <p>We do not sell your personal information. We may share information in the following situations:</p>
           <ul>
             <li>
@@ -91,7 +117,7 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
-          <h2>4. Your Content and AI Outputs</h2>
+          <h2 id="content-and-outputs">4. Your Content and AI Outputs</h2>
           <ul>
             <li>
               <strong>Inputs</strong>: prompts and uploaded images are used to provide the requested generation.
@@ -107,19 +133,19 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
-          <h2>5. Data Retention</h2>
+          <h2 id="data-retention">5. Data Retention</h2>
           <p>
             We retain information for as long as necessary to provide the Services, comply with legal obligations,
             resolve disputes, and enforce agreements. Retention periods can vary depending on the type of data.
           </p>
 
-          <h2>6. Security</h2>
+          <h2 id="security">6. Security</h2>
           <p>
             We use reasonable administrative, technical, and organizational measures to protect information. No method
             of transmission or storage is 100% secure, so we cannot guarantee absolute security.
           </p>
 
-          <h2>7. Your Choices</h2>
+          <h2 id="your-choices">7. Your Choices</h2>
           <ul>
             <li>
               <strong>Access and update</strong>: you may update certain account details through your sign-in provider.
@@ -133,29 +159,31 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
-          <h2>8. Children’s Privacy</h2>
+          <h2 id="children">8. Children’s Privacy</h2>
           <p>
             The Services are not intended for children under 13 (or the minimum age required by your jurisdiction). We
             do not knowingly collect personal information from children.
           </p>
 
-          <h2>9. International Transfers</h2>
+          <h2 id="international">9. International Transfers</h2>
           <p>
             If you access the Services from outside the United States, your information may be processed in countries
             with different data protection laws. We take steps designed to ensure appropriate safeguards.
           </p>
 
-          <h2>10. Changes to This Policy</h2>
+          <h2 id="changes">10. Changes to This Policy</h2>
           <p>
             We may update this Privacy Policy from time to time. We will post the updated version on this page and
             update the “Last updated” date.
           </p>
 
-          <h2>11. Contact Us</h2>
+          <h2 id="contact">11. Contact Us</h2>
           <p>
             If you have questions about this Privacy Policy, contact us at{" "}
             <a href="mailto:support@flownana.com">support@flownana.com</a>.
           </p>
+            </div>
+          </div>
         </div>
       </main>
 
