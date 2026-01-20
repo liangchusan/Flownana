@@ -70,7 +70,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
-          <p>Copyright © 2025 Flownana. All rights reserved.</p>
+          <p>Copyright © {new Date().getFullYear()} Flownana. All rights reserved.</p>
         </div>
       </div>
     </footer>
