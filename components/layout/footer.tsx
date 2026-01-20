@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="mb-4">
-              <Logo size="sm" className="[&_span]:text-white" />
+              <Logo size="sm" textColor="text-white" />
             </div>
             <p className="text-sm mb-4">
               <span className="block font-semibold text-white">Empowering Every Creator</span>

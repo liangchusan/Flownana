@@ -14,6 +14,12 @@ export function Logo({ className = "", showText = true, size = "md", textColor }
     lg: "h-12 w-12",
   };
 
+  const iconTextSizes = {
+    sm: "text-xl",
+    md: "text-2xl",
+    lg: "text-4xl",
+  };
+
   const textSizes = {
     sm: "text-lg",
     md: "text-xl",
@@ -29,7 +35,7 @@ export function Logo({ className = "", showText = true, size = "md", textColor }
           className="absolute inset-0 flex items-center justify-center"
           style={{ transform: 'rotate(-25deg)' }}
         >
-          <span className="text-2xl">🍌</span>
+          <span className={iconTextSizes[size]}>🍌</span>
         </div>
         
         {/* Realistic flowing water - clear and natural */}
