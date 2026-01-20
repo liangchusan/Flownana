@@ -230,7 +230,7 @@ export default function Home() {
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
               Three Ways to Create
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
               Choose your creative path. From videos to images to music, we've got you covered.
             </p>
           </div>
@@ -238,19 +238,19 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {/* AI Video */}
             <Link href="/ai-video" className="group">
-              <div className="relative h-[500px] rounded-3xl overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105">
+              <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
-                    <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                      <Video className="h-8 w-8" />
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 w-12 h-12 flex items-center justify-center mb-5 transition-transform group-hover:scale-105">
+                      <Video className="h-6 w-6" />
                     </div>
-                    <h3 className="text-3xl font-bold mb-3">AI Video</h3>
-                    <p className="text-blue-100 mb-4 text-lg">
+                    <h3 className="text-2xl md:text-3xl font-bold mb-2">AI Video</h3>
+                    <p className="text-blue-100/90 text-base md:text-lg">
                       Create professional videos from text. Powered by VEO3.1
                     </p>
                   </div>
-                  <div className="flex items-center text-white font-medium">
+                  <div className="flex items-center text-white/95 font-medium">
                     Try VEO3.1
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
                   </div>
@@ -273,19 +273,19 @@ export default function Home() {
 
             {/* AI Image */}
             <Link href="/ai-image" className="group">
-              <div className="relative h-[500px] rounded-3xl overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105">
+              <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
-                    <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                      <ImageIcon className="h-8 w-8" />
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 w-12 h-12 flex items-center justify-center mb-5 transition-transform group-hover:scale-105">
+                      <ImageIcon className="h-6 w-6" />
                     </div>
-                    <h3 className="text-3xl font-bold mb-3">AI Image</h3>
-                    <p className="text-purple-100 mb-4 text-lg">
+                    <h3 className="text-2xl md:text-3xl font-bold mb-2">AI Image</h3>
+                    <p className="text-purple-100/90 text-base md:text-lg">
                       Generate stunning visuals instantly. Powered by Nano Banana
                     </p>
                   </div>
-                  <div className="flex items-center text-white font-medium">
+                  <div className="flex items-center text-white/95 font-medium">
                     Try Nano Banana
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
                   </div>
@@ -300,19 +300,19 @@ export default function Home() {
 
             {/* AI Music */}
             <Link href="/ai-music" className="group">
-              <div className="relative h-[500px] rounded-3xl overflow-hidden bg-gradient-to-br from-green-500 to-emerald-600 shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-105">
+              <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
-                    <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 w-16 h-16 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                      <Music className="h-8 w-8" />
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 w-12 h-12 flex items-center justify-center mb-5 transition-transform group-hover:scale-105">
+                      <Music className="h-6 w-6" />
                     </div>
-                    <h3 className="text-3xl font-bold mb-3">AI Music</h3>
-                    <p className="text-green-100 mb-4 text-lg">
+                    <h3 className="text-2xl md:text-3xl font-bold mb-2">AI Music</h3>
+                    <p className="text-green-100/90 text-base md:text-lg">
                       Create original music and sounds. Powered by Suno
                     </p>
                   </div>
-                  <div className="flex items-center text-white font-medium">
+                  <div className="flex items-center text-white/95 font-medium">
                     Try Suno
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
                   </div>
