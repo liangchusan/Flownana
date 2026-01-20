@@ -11,7 +11,13 @@ export function Footer() {
               <Logo size="sm" className="[&_span]:text-white" />
             </div>
             <p className="text-sm mb-4">
-              Create stunning videos, images, and voices with AI. Transform your creative ideas into reality with simple text prompts.
+              <span className="block font-semibold text-white">Empowering Every Creator</span>
+              <span className="block mt-2 text-gray-300">
+                At Flownana, we believe technology should serve creativity. By integrating cutting-edge AI tools for image,
+                video, and audio with a professional-grade creative asset library, we’ve built a one-stop ecosystem for
+                visual storytelling. Whether you are a professional editor or a budding enthusiast, Flownana provides the
+                tools and inspiration you need to create with confidence and redefine visual expression in the digital age.
+              </span>
             </p>
           </div>
 
