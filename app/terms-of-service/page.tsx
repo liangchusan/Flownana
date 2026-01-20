@@ -12,7 +12,7 @@ export default function TermsOfServicePage() {
     <div className="min-h-screen bg-white">
       <Header showBackground />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="mb-10">
           <div className="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-600">
             Legal
@@ -21,31 +21,8 @@ export default function TermsOfServicePage() {
           <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
-          {/* Table of Contents */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-24">
-              <div className="text-xs font-semibold text-gray-900 mb-3">On this page</div>
-              <nav className="text-sm text-gray-600 space-y-2">
-                <a className="block hover:text-gray-900" href="#eligibility">1. Eligibility</a>
-                <a className="block hover:text-gray-900" href="#accounts">2. Accounts</a>
-                <a className="block hover:text-gray-900" href="#services">3. The Services</a>
-                <a className="block hover:text-gray-900" href="#content">4. Content</a>
-                <a className="block hover:text-gray-900" href="#payments">5. Payments and Subscriptions</a>
-                <a className="block hover:text-gray-900" href="#ip">6. Intellectual Property</a>
-                <a className="block hover:text-gray-900" href="#third-party">7. Third-Party Services</a>
-                <a className="block hover:text-gray-900" href="#termination">8. Termination</a>
-                <a className="block hover:text-gray-900" href="#disclaimers">9. Disclaimers</a>
-                <a className="block hover:text-gray-900" href="#liability">10. Limitation of Liability</a>
-                <a className="block hover:text-gray-900" href="#changes">11. Changes to These Terms</a>
-                <a className="block hover:text-gray-900" href="#contact">12. Contact</a>
-              </nav>
-            </div>
-          </aside>
-
-          {/* Content */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
-            <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
+          <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
           <p>
             These Terms of Service (“Terms”) govern your access to and use of Flownana’s website and services (the
             “Services”). By using the Services, you agree to these Terms. If you do not agree, do not use the Services.
@@ -153,7 +130,6 @@ export default function TermsOfServicePage() {
             Questions about these Terms? Email{" "}
             <a href="mailto:support@flownana.com">support@flownana.com</a>.
           </p>
-            </div>
           </div>
         </div>
       </main>

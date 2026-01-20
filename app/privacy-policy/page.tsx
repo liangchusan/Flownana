@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-white">
       <Header showBackground />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="mb-10">
           <div className="inline-flex items-center rounded-full border border-gray-200 px-3 py-1 text-xs text-gray-600">
             Legal
@@ -21,30 +21,8 @@ export default function PrivacyPolicyPage() {
           <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-8">
-          {/* Table of Contents */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-24">
-              <div className="text-xs font-semibold text-gray-900 mb-3">On this page</div>
-              <nav className="text-sm text-gray-600 space-y-2">
-                <a className="block hover:text-gray-900" href="#information-we-collect">1. Information We Collect</a>
-                <a className="block hover:text-gray-900" href="#how-we-use">2. How We Use Information</a>
-                <a className="block hover:text-gray-900" href="#how-we-share">3. How We Share Information</a>
-                <a className="block hover:text-gray-900" href="#content-and-outputs">4. Your Content and AI Outputs</a>
-                <a className="block hover:text-gray-900" href="#data-retention">5. Data Retention</a>
-                <a className="block hover:text-gray-900" href="#security">6. Security</a>
-                <a className="block hover:text-gray-900" href="#your-choices">7. Your Choices</a>
-                <a className="block hover:text-gray-900" href="#children">8. Children’s Privacy</a>
-                <a className="block hover:text-gray-900" href="#international">9. International Transfers</a>
-                <a className="block hover:text-gray-900" href="#changes">10. Changes to This Policy</a>
-                <a className="block hover:text-gray-900" href="#contact">11. Contact Us</a>
-              </nav>
-            </div>
-          </aside>
-
-          {/* Content */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
-            <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8">
+          <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
           <p>
             This Privacy Policy explains how Flownana (“Flownana”, “we”, “us”, “our”) collects, uses, shares, and
             protects information when you use our website and services (the “Services”).
@@ -182,7 +160,6 @@ export default function PrivacyPolicyPage() {
             If you have questions about this Privacy Policy, contact us at{" "}
             <a href="mailto:support@flownana.com">support@flownana.com</a>.
           </p>
-            </div>
           </div>
         </div>
       </main>
