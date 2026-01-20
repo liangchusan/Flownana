@@ -45,17 +45,17 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-white">
+                <Link href="/contact" className="hover:text-white">
                   Contact Us
                 </Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-white">
+                <Link href="/privacy-policy" className="hover:text-white">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/" className="hover:text-white">
+                <Link href="/terms-of-service" className="hover:text-white">
                   Terms of Service
                 </Link>
               </li>
