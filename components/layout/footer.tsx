@@ -11,7 +11,6 @@ export function Footer() {
               <Logo size="sm" textColor="text-white" />
             </div>
             <p className="text-sm mb-4">
-              <span className="block font-semibold text-white">Empowering Every Creator</span>
               <span className="block mt-2 text-gray-300">
                 At Flownana, we believe technology should serve creativity. By integrating cutting-edge AI tools for image,
                 video, and audio with a professional-grade creative asset library, we’ve built a one-stop ecosystem for
