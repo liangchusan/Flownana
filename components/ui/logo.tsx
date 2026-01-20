@@ -4,9 +4,10 @@ interface LogoProps {
   className?: string;
   showText?: boolean;
   size?: "sm" | "md" | "lg";
+  textColor?: string;
 }
 
-export function Logo({ className = "", showText = true, size = "md" }: LogoProps) {
+export function Logo({ className = "", showText = true, size = "md", textColor }: LogoProps) {
   const sizeClasses = {
     sm: "h-6 w-6",
     md: "h-8 w-8",
@@ -114,7 +115,7 @@ export function Logo({ className = "", showText = true, size = "md" }: LogoProps
       </div>
       
       {showText && (
-        <span className={`font-bold text-gray-900 ${textSizes[size]}`}>
+        <span className={`font-bold ${textColor || "text-gray-900"} ${textSizes[size]}`}>
           Flownana
         </span>
       )}

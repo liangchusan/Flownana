@@ -6,40 +6,50 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { UserMenu } from "@/components/layout/user-menu";
 
-export function Header() {
+interface HeaderProps {
+  showBackground?: boolean;
+}
+
+export function Header({ showBackground = false }: HeaderProps) {
   const { data: session } = useSession();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <header
+      className={`sticky top-0 z-50 w-full transition-all duration-300 group ${
+        showBackground
+          ? "bg-black/70"
+          : "bg-transparent hover:bg-black/70"
+      }`}
+    >
       <div className="container flex h-16 items-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Logo - Left */}
         <Link href="/" className="flex-shrink-0">
-          <Logo size="md" />
+          <Logo size="md" textColor="text-white" />
         </Link>
 
         {/* Navigation - Left aligned after logo */}
         <nav className="hidden md:flex items-center space-x-8 ml-8">
           <Link 
             href="/ai-video" 
-            className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
           >
             AI Video
           </Link>
           <Link 
             href="/ai-image" 
-            className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
           >
             AI Image
           </Link>
           <Link 
             href="/ai-music" 
-            className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
           >
             AI Music
           </Link>
           <Link 
             href="/pricing" 
-            className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
           >
             Pricing
           </Link>
@@ -58,7 +68,7 @@ export function Header() {
           ) : (
             <Button
               onClick={() => signIn("google")}
-              className="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0"
+              className="flex items-center space-x-2 transition-all bg-white/10 hover:bg-white/20 text-white border border-white/20"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path
