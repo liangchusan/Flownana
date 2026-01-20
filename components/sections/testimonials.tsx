@@ -26,13 +26,13 @@ const testimonials = [
 
 export function Testimonials() {
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Trusted by Creators Worldwide
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
             See how designers, photographers, and digital artists are using Flownana's revolutionary AI technology to transform their creative workflows.
           </p>
         </div>
@@ -41,7 +41,7 @@ export function Testimonials() {
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
-              className="bg-white rounded-lg shadow-lg p-6"
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center mb-4">
                 {[...Array(testimonial.rating)].map((_, i) => (
@@ -51,7 +51,7 @@ export function Testimonials() {
                   />
                 ))}
               </div>
-              <p className="text-gray-700 mb-6 italic">"{testimonial.text}"</p>
+              <p className="text-gray-700 mb-6 italic leading-relaxed">"{testimonial.text}"</p>
               <div>
                 <p className="font-semibold text-gray-900">
                   {testimonial.author}

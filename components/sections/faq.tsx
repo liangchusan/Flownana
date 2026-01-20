@@ -38,13 +38,13 @@ export function FAQ() {
   };
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Frequently Asked Questions
           </h2>
-          <p className="text-xl text-gray-600">
+          <p className="text-lg md:text-xl text-gray-600">
             Find answers to common questions about Flownana AI content generation
           </p>
         </div>
@@ -53,7 +53,7 @@ export function FAQ() {
           {faqs.map((faq, index) => (
             <div
               key={index}
-              className="border border-gray-200 rounded-lg overflow-hidden"
+              className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm"
             >
               <button
                 onClick={() => toggleFAQ(index)}
@@ -70,7 +70,7 @@ export function FAQ() {
               </button>
               {openIndex === index && (
                 <div className="px-6 py-4 bg-gray-50">
-                  <p className="text-gray-700">{faq.answer}</p>
+                  <p className="text-gray-700 leading-relaxed">{faq.answer}</p>
                 </div>
               )}
             </div>

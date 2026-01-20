@@ -35,13 +35,13 @@ const features = [
 
 export function Features() {
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Why Choose Flownana?
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
             Discover Flownana, a breakthrough AI platform that revolutionizes how creators edit and generate content through unprecedented accuracy, world knowledge integration, and natural language control.
           </p>
         </div>
@@ -50,15 +50,15 @@ export function Features() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="p-6 rounded-lg border border-gray-200 hover:shadow-lg transition-shadow"
+              className="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-100 text-blue-600 mb-4">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mb-4">
                 <feature.icon className="h-6 w-6" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
                 {feature.title}
               </h3>
-              <p className="text-gray-600">{feature.description}</p>
+              <p className="text-gray-600 leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>
