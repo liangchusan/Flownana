@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   description: "Create stunning AI-generated videos, images, and voices with simple text commands. Experience the revolutionary Flownana AI model.",
   icons: {
     icon: [
+      { url: "/logo.png", type: "image/png", sizes: "32x32" },
       { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.png", type: "image/png", sizes: "32x32" },
     ],
-    shortcut: "/favicon.svg",
-    apple: "/favicon.svg",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
 };
 
