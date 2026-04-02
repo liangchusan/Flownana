@@ -99,6 +99,28 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
     }
   };
 
+  const upgradeNow = async (pk: PriceKey) => {
+    if (!session) {
+      await signIn("google");
+      return;
+    }
+    setLoading(pk);
+    try {
+      const res = await fetch("/api/stripe/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceKey: pk }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upgrade failed");
+      window.location.href = "/account/billing?upgrade=success";
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Upgrade failed");
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const ctaForPlan = (plan: "pro" | "max") => {
     const pk = priceKeyFor(plan, billing);
     const sub = summary?.subscription;
@@ -130,14 +152,10 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       };
     }
     if (sub.planType === plan) {
-      const otherPk =
-        billing === "monthly"
-          ? priceKeyFor(plan, "yearly")
-          : priceKeyFor(plan, "monthly");
       return {
-        label: billing === "monthly" ? "Switch to yearly" : "Switch to monthly",
+        label: billing === "monthly" ? "Switch to yearly (Portal)" : "Switch to monthly (Portal)",
         disabled: false,
-        onClick: () => subscribe(otherPk),
+        onClick: () => setDowngradeOpen(true),
       };
     }
     return { label: "Subscribe", disabled: false, onClick: () => subscribe(pk) };
@@ -249,7 +267,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         onClose={() => setUpgradeOpen(false)}
         onConfirm={() => {
           setUpgradeOpen(false);
-          subscribe(priceKeyFor("max", billing));
+          upgradeNow(priceKeyFor("max", billing));
         }}
       />
       <DowngradeModal
