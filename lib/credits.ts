@@ -38,7 +38,8 @@ export async function getCreditSummary(userId: string): Promise<{
     orderBy: { expiresAt: "asc" },
   });
 
-  const total = batches.reduce((s, b) => s + b.remaining, 0);
+  // Explicitly type reduce accumulator to avoid TS "implicit any" in stricter builds.
+  const total = batches.reduce((s: number, b) => s + b.remaining, 0);
 
   const soon = batches[0];
   if (!soon) {
