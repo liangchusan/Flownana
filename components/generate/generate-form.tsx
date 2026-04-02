@@ -25,7 +25,7 @@ export function GenerateForm({
 }: GenerateFormProps) {
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
-  const [model, setModel] = useState("nano-banana");
+  const [model, setModel] = useState("nano-banana-2");
   const [resolution, setResolution] = useState("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
@@ -160,7 +160,7 @@ export function GenerateForm({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Model</option>
-            <option value="nano-banana">Nano Banana</option>
+            <option value="nano-banana-2">Nano Banana 2</option>
           </select>
         </div>
 

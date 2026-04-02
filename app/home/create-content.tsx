@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import {
   Video,
   Image as ImageIcon,
   Music,
-  ArrowRight,
-  Play,
   Sparkles,
-  Clock,
-  Activity,
   History,
+  ChevronLeft,
+  ChevronRight,
+  Search,
 } from "lucide-react";
 import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -19,72 +19,160 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
 
-type CreationType = "video" | "image" | "music";
+type CreationType = "image" | "video" | "music";
 
 interface Creation {
   id: string;
   type: CreationType;
+  status: string;
+  urls: string[];
+  prompt: string;
   createdAt: string;
+  taskId?: string;
 }
 
+// 模块1: 顶部大 Banner 卡片（支持图片或视频，横向滑动）
+type BannerType = "image" | "video";
+
+interface HeroBanner {
+  id: string;
+  type: BannerType;
+  mediaUrl: string;
+  title: string;
+  description: string;
+  tag: string;
+}
+
+const heroBanners: HeroBanner[] = [
+  {
+    id: "veo",
+    type: "video",
+    mediaUrl:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    title: "Cinematic AI Video with VEO 3.1",
+    description: "Turn storyboards and prompts into film‑style motion in seconds.",
+    tag: "VEO 3.1",
+  },
+  {
+    id: "nano-banana",
+    type: "image",
+    mediaUrl:
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&auto=format&fit=crop&q=80",
+    title: "Photorealistic Images with Nano Banana",
+    description: "Generate product shots, key visuals and thumbnails in 4K quality.",
+    tag: "Nano Banana",
+  },
+  {
+    id: "suno",
+    type: "video",
+    mediaUrl:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+    title: "Original Soundtracks with Suno",
+    description: "Create music beds and hooks that sync with your visuals.",
+    tag: "Suno",
+  },
+  {
+    id: "workflow",
+    type: "image",
+    mediaUrl:
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80",
+    title: "Unified Workflow in Flownana",
+    description: "Move between image, video and music creation in one simple workspace.",
+    tag: "Workflow",
+  },
+];
+
+// 模块2: 提示词案例（关键词形式，更简洁）
+const promptExamples = [
+  "Forest sunlight",
+  "Neon city at night",
+  "Golden hour ocean waves",
+  "Abstract geometric shapes",
+  "Fantasy castle in clouds",
+  "Minimal modern building",
+  "Tropical beach",
+  "Starry mountain night",
+  "Snowy winter forest",
+  "Futuristic sci‑fi city",
+];
+
 export function CreateContent() {
+  const router = useRouter();
   const { data: session } = useSession();
-  const [stats, setStats] = useState<{
-    total: number;
-    video: number;
-    image: number;
-    music: number;
-    latestMode?: CreationType;
-  }>({
-    total: 0,
-    video: 0,
-    image: 0,
-    music: 0,
-    latestMode: undefined,
-  });
+  const [creationMode, setCreationMode] = useState<CreationType>("image");
+  const [prompt, setPrompt] = useState("");
+  const [recentCreations, setRecentCreations] = useState<Creation[]>([]);
+  const bannerScrollRef = useRef<HTMLDivElement | null>(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
 
+  // 模块1: Banner 精确滚动到指定卡片
+  const scrollToBanner = (index: number) => {
+    const container = bannerScrollRef.current;
+    if (!container) return;
+    const cards = container.querySelectorAll<HTMLDivElement>("[data-banner-card]");
+    const clampedIndex = ((index % cards.length) + cards.length) % cards.length;
+    const targetCard = cards[clampedIndex];
+    if (!targetCard) return;
+
+    // 在可滚动容器中，子元素的 offsetLeft 就是目标 scrollLeft
+    const offsetLeft = targetCard.offsetLeft;
+    container.scrollTo({
+      left: offsetLeft,
+      behavior: "smooth",
+    });
+  };
+
+  const scrollBanners = (direction: "left" | "right") => {
+    const delta = direction === "left" ? -1 : 1;
+    setActiveBannerIndex((prev) => {
+      const next = prev + delta;
+      return ((next % heroBanners.length) + heroBanners.length) % heroBanners.length;
+    });
+  };
+
+  // 当 activeBannerIndex 变化时，滚动到对应卡片
   useEffect(() => {
-    if (!session?.user?.email) return;
+    if (!bannerScrollRef.current) return;
+    scrollToBanner(activeBannerIndex);
+  }, [activeBannerIndex]);
 
+  // 模块3: 加载用户创作记录
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setRecentCreations([]);
+      return;
+    }
     try {
       const raw = localStorage.getItem(`creations_${session.user.email}`);
       if (!raw) return;
       const parsed = JSON.parse(raw) as Creation[];
-
-      const total = parsed.length;
-      let video = 0;
-      let image = 0;
-      let music = 0;
-
-      parsed.forEach((c) => {
-        if (c.type === "video") video += 1;
-        if (c.type === "image") image += 1;
-        if (c.type === "music") music += 1;
-      });
-
-      const latest = parsed[0];
-
-      setStats({
-        total,
-        video,
-        image,
-        music,
-        latestMode: latest?.type,
-      });
-    } catch (error) {
-      console.error("Failed to load creation stats", error);
+      setRecentCreations(parsed.slice(0, 8));
+    } catch {
+      setRecentCreations([]);
     }
   }, [session?.user?.email]);
 
-  const welcomeTitle = session?.user?.name
-    ? `Welcome back, ${session.user.name.split(" ")[0]}`
-    : "Create Anything with AI";
+  const handleStartCreating = () => {
+    const trimmed = prompt.trim();
+    const encoded = trimmed ? `?prompt=${encodeURIComponent(trimmed)}` : "";
+    if (creationMode === "image") {
+      router.push(`/ai-image${encoded}`);
+      return;
+    }
+    if (creationMode === "video") {
+      router.push(`/ai-video${encoded}`);
+      return;
+    }
+    if (creationMode === "music") {
+      router.push(`/ai-music${encoded}`);
+    }
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
       <CreationSidebar />
       <main className="flex-1 overflow-y-auto bg-white">
-        {/* Top Bar with Logo and User Info - Full width, above sidebar */}
+        {/* Top Bar */}
         <div className="sticky top-0 z-20 bg-white px-8 py-2 flex items-center justify-between border-b border-gray-100">
           <Link href="/" className="flex-shrink-0">
             <Logo size="md" />
@@ -110,199 +198,249 @@ export function CreateContent() {
           </div>
         </div>
 
-        {/* Home Navigation / Dashboard - starts below top bar with left margin for sidebar */}
-        <div className="ml-[70px] min-h-[calc(100vh-73px)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-          <div className="max-w-7xl mx-auto px-10 py-10 text-white">
-            {/* Hero + Stats */}
-            <div className="flex flex-col lg:flex-row items-start justify-between gap-8 mb-10">
-              <div>
-                <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-xs font-medium mb-4 border border-white/15">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Powered by VEO3.1, Nano Banana & Suno
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-3">{welcomeTitle}</h1>
-                <p className="text-base md:text-lg text-slate-200 max-w-xl">
-                  Jump back into your creative flow. Generate videos, images, and music in seconds
-                  with simple text prompts.
-                </p>
-                {session && stats.total > 0 && (
-                  <div className="mt-4 inline-flex items-center text-xs text-slate-300 bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                    <History className="h-3 w-3 mr-1.5" />
-                    Last time you created{" "}
-                    <span className="font-medium mx-1">
-                      {stats.latestMode === "video"
-                        ? "an AI Video"
-                        : stats.latestMode === "image"
-                        ? "an AI Image"
-                        : "AI Music"}
-                    </span>
-                    — pick up right where you left off.
-                  </div>
-                )}
-              </div>
-
-              {/* Stats cards */}
-              <div className="grid grid-cols-3 gap-4 w-full lg:w-auto lg:min-w-[320px]">
-                <div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-300 uppercase tracking-wide">
-                      Total Creations
-                    </span>
-                    <Clock className="h-4 w-4 text-slate-300" />
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {stats.total > 0 ? stats.total : session ? 0 : "--"}
-                  </div>
-                </div>
-                <div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-300 uppercase tracking-wide">
-                      This Week
-                    </span>
-                    <Activity className="h-4 w-4 text-slate-300" />
-                  </div>
-                  <div className="text-2xl font-bold">15-30s</div>
-                  <p className="text-[10px] text-slate-300 mt-1">
-                    Typical generation time per creation.
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-purple-500 px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-100 uppercase tracking-wide">
-                      Fast Start
-                    </span>
-                    <Play className="h-4 w-4 text-slate-100" />
-                  </div>
-                  <p className="text-[11px] text-slate-50">
-                    Choose a mode below and start creating instantly.
-                  </p>
+        <div className="ml-[70px] min-h-[calc(100vh-73px)]">
+          {/* ---------- 模块1: 顶部大 Banner 卡片（图片/视频，横向滑动） ---------- */}
+          <section className="border-b border-gray-100 banner-gradient-flow bg-gradient-to-r from-slate-50 via-blue-50/60 to-purple-50/60">
+            <div className="w-full px-6 py-8 md:py-10">
+              <div className="flex items-center justify-between mb-4 md:mb-6 gap-3">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                  <span className="font-medium">Featured capabilities</span>
                 </div>
               </div>
-            </div>
 
-            {/* Mode cards row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-              {/* AI Image Card */}
-              <Link href="/ai-image" className="group">
-                <div className="bg-white rounded-2xl shadow-[0_18px_60px_rgba(15,23,42,0.75)] hover:shadow-[0_26px_80px_rgba(15,23,42,0.9)] transition-all duration-300 p-6 border border-slate-800 hover:border-purple-400 hover:-translate-y-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg p-3">
-                      <ImageIcon className="h-6 w-6 text-white" />
+                <div className="relative group">
+                <div
+                  ref={bannerScrollRef}
+                  className="flex gap-4 md:gap-5 overflow-x-auto pb-2 scroll-smooth no-scrollbar"
+                >
+                  {heroBanners.map((banner) => (
+                    <div
+                      key={banner.id}
+                      data-banner-card
+                      className="shrink-0 w-[260px] sm:w-[320px] md:w-[380px] lg:w-[420px] flex flex-col gap-2"
+                    >
+                      {/* 媒体区域：图片 / 视频，16:9 比例 */}
+                      <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-black">
+                        {banner.type === "video" ? (
+                          <video
+                            src={banner.mediaUrl}
+                            className="h-full w-full object-cover"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={banner.mediaUrl}
+                            alt={banner.title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
+                      </div>
+                      {/* 文本区域：标题和描述放在图片下方（无白色背景，不与上半部分连在一起） */}
+                      <div className="px-1 sm:px-1.5">
+                        <h2 className="text-sm sm:text-base font-semibold leading-snug mb-1 text-gray-900">
+                          {banner.title}
+                        </h2>
+                        <p className="text-[11px] sm:text-xs text-gray-500 line-clamp-2">
+                          {banner.description}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">AI Image</h2>
-                      <p className="text-xs text-slate-500">
-                        Powered by Nano Banana for photorealistic images.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="aspect-square bg-gradient-to-br from-purple-50 via-indigo-50 to-pink-50 rounded-xl overflow-hidden mb-4 border border-purple-100">
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="h-12 w-12 text-purple-500" />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span className="flex items-center font-medium text-purple-600 group-hover:gap-2 transition-all">
-                      <span>Open Image Studio</span>
-                      <ArrowRight className="h-3.5 w-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {stats.image > 0 ? `${stats.image} created` : "Best for thumbnails & ads"}
-                    </span>
-                  </div>
+                  ))}
                 </div>
-              </Link>
 
-              {/* AI Video Card */}
-              <Link href="/ai-video" className="group">
-                <div className="bg-white rounded-2xl shadow-[0_18px_60px_rgba(15,23,42,0.75)] hover:shadow-[0_26px_80px_rgba(15,23,42,0.9)] transition-all duration-300 p-6 border border-slate-800 hover:border-blue-400 hover:-translate-y-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg p-3">
-                      <Video className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">AI Video</h2>
-                      <p className="text-xs text-slate-500">
-                        Powered by VEO 3.1 for cinematic video generation.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="aspect-video bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 rounded-xl overflow-hidden mb-4 border border-blue-100">
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Play className="h-12 w-12 text-blue-500" />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span className="flex items-center font-medium text-blue-600 group-hover:gap-2 transition-all">
-                      <span>Open Video Studio</span>
-                      <ArrowRight className="h-3.5 w-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {stats.video > 0 ? `${stats.video} created` : "Best for social & ads"}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-
-              {/* AI Music Card */}
-              <Link href="/ai-music" className="group">
-                <div className="bg-white rounded-2xl shadow-[0_18px_60px_rgba(15,23,42,0.75)] hover:shadow-[0_26px_80px_rgba(15,23,42,0.9)] transition-all duration-300 p-6 border border-slate-800 hover:border-green-400 hover:-translate-y-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg p-3">
-                      <Music className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">AI Music</h2>
-                      <p className="text-xs text-slate-500">
-                        Powered by Suno for AI-composed tracks and soundscapes.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="aspect-video bg-gradient-to-br from-emerald-50 via-green-50 to-lime-50 rounded-xl overflow-hidden mb-4 border border-green-100">
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Music className="h-12 w-12 text-green-500" />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span className="flex items-center font-medium text-green-600 group-hover:gap-2 transition-all">
-                      <span>Open Music Studio</span>
-                      <ArrowRight className="h-3.5 w-3.5 ml-1 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      {stats.music > 0 ? `${stats.music} created` : "Best for intros & reels"}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            </div>
-
-            {/* Quick links for logged-in users */}
-            {session ? (
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                  <History className="h-3.5 w-3.5 mr-1.5" />
-                  View{" "}
-                  <Link
-                    href="/ai-image"
-                    className="underline decoration-dotted underline-offset-2 mx-1"
+                {/* 左右滑动箭头：尽量对齐图片/视频区域中线，鼠标移入时显示 */}
+                <div className="pointer-events-none absolute top-1 bottom-16 left-0 right-0 hidden md:flex items-center justify-between px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => scrollBanners("left")}
+                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/70 bg-white/80 text-gray-500 hover:bg-white hover:border-gray-300 hover:text-gray-700 transition-colors backdrop-blur-sm"
+                    aria-label="Previous"
                   >
-                    My Creations
-                  </Link>
-                  in any studio.
-                </span>
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                  <Activity className="h-3.5 w-3.5 mr-1.5" />
-                  Tip: use{" "}
-                  <span className="font-semibold mx-1">natural English</span> to describe edits,
-                  Flownana handles the rest.
-                </span>
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollBanners("right")}
+                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/70 bg-white/80 text-gray-500 hover:bg-white hover:border-gray-300 hover:text-gray-700 transition-colors backdrop-blur-sm"
+                    aria-label="Next"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-            ) : (
-              <div className="mt-4 text-xs text-slate-300">
-                Sign in to save your creations across devices and unlock personalized suggestions.
+            </div>
+          </section>
+
+          {/* ---------- 模块2: 引导创作入口 ---------- */}
+          <section className="bg-gradient-to-b from-white via-slate-50/30 to-white py-10 px-6">
+            <div className="max-w-2xl mx-auto">
+              <h1 className="text-3xl md:text-4xl font-bold text-center mb-6 bg-gradient-to-r from-slate-800 via-blue-800 to-purple-800 bg-clip-text text-transparent">
+                What will you create today?
+              </h1>
+
+              {/* 创作类型 Pills */}
+              <div className="flex flex-wrap justify-center gap-2 mb-6">
+                {[
+                  { id: "image" as const, label: "AI Image", icon: ImageIcon },
+                  { id: "video" as const, label: "AI Video", icon: Video },
+                  { id: "music" as const, label: "AI Music", icon: Music },
+                ].map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setCreationMode(id)}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                      creationMode === id
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
+
+              {/* 主输入框 */}
+              <div className="relative rounded-2xl border border-gray-200 bg-white shadow-sm shadow-gray-200/50 focus-within:border-indigo-300 focus-within:shadow-md focus-within:shadow-indigo-100/50 transition-all">
+                <div className="flex items-center px-4 py-3 gap-3">
+                  <Search className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                  <input
+                    type="text"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleStartCreating()}
+                    placeholder="Enter your prompt to get started..."
+                    className="flex-1 min-w-0 bg-transparent text-gray-900 placeholder:text-gray-400 outline-none text-base"
+                  />
+                </div>
+                <div className="px-4 pb-3 pt-0 flex justify-end">
+                  <Button
+                    onClick={handleStartCreating}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-5 py-2 text-sm font-medium"
+                  >
+                    Start creating
+                    <ChevronRight className="h-4 w-4 ml-1 inline" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* 提示词案例 */}
+              <p className="text-xs text-gray-500 mt-3 mb-2 text-left">Try a prompt example</p>
+              <div className="flex flex-wrap justify-start gap-2">
+                {promptExamples.slice(0, 6).map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => setPrompt(example)}
+                    className="px-3 py-1.5 rounded-full text-xs text-gray-600 bg-white border border-gray-200 hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-700 transition-colors line-clamp-1 max-w-[220px]"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- 模块3: 用户创作记录 ---------- */}
+          <section className="border-t border-gray-100 py-8 px-6 bg-gray-50/50">
+            <div className="w-full">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <History className="h-5 w-5 text-gray-500" />
+                Recent creations
+              </h2>
+
+              {session ? (
+                recentCreations.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {recentCreations.map((c) => (
+                      <Link
+                        key={c.id}
+                        href={
+                          c.type === "image"
+                            ? "/ai-image"
+                            : c.type === "video"
+                              ? "/ai-video"
+                              : "/ai-music"
+                        }
+                        className="group rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-gray-300 transition-all"
+                      >
+                        <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                          {c.urls?.[0] ? (
+                            c.type === "video" ? (
+                              <video
+                                src={c.urls[0]}
+                                className="w-full h-full object-cover"
+                                muted
+                                playsInline
+                                preload="metadata"
+                              />
+                            ) : (
+                              <img
+                                src={c.urls[0]}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            )
+                          ) : (
+                            <span className="text-gray-300">
+                              {c.type === "image" && <ImageIcon className="h-10 w-10" />}
+                              {c.type === "video" && <Video className="h-10 w-10" />}
+                              {c.type === "music" && <Music className="h-10 w-10" />}
+                            </span>
+                          )}
+                        </div>
+                        <p className="p-2 text-xs text-gray-500 truncate border-t border-gray-100 group-hover:text-gray-700">
+                          {c.prompt || "Untitled"}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-200 bg-white/50 py-10 text-center">
+                    <p className="text-gray-500 text-sm mb-2">No creations yet</p>
+                    <p className="text-gray-400 text-xs mb-4">Start with a prompt above or open a studio.</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <Link href="/ai-image">
+                        <Button variant="outline" size="sm" className="rounded-full">
+                          AI Image
+                        </Button>
+                      </Link>
+                      <Link href="/ai-video">
+                        <Button variant="outline" size="sm" className="rounded-full">
+                          AI Video
+                        </Button>
+                      </Link>
+                      <Link href="/ai-music">
+                        <Button variant="outline" size="sm" className="rounded-full">
+                          AI Music
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="rounded-xl border border-gray-200 bg-white py-8 px-6 text-center">
+                  <p className="text-gray-600 text-sm mb-2">Sign in to see your creations</p>
+                  <p className="text-gray-400 text-xs mb-4">
+                    Your images, videos, and music will be saved here.
+                  </p>
+                  <Button
+                    onClick={() => signIn("google")}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-full px-5"
+                  >
+                    Sign in with Google
+                  </Button>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       </main>
     </div>

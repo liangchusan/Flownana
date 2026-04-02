@@ -32,6 +32,15 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* 隐藏滚动条（横向 Banner 使用） */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 }
 
 @keyframes gradient-flow {
@@ -41,6 +50,20 @@ body {
   50% {
     background-position: 100% center;
   }
+}
+
+/* Home banner subtle gradient flow */
+@keyframes banner-flow {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+.banner-gradient-flow {
+  background-size: 200% 200%;
+  animation: banner-flow 12s ease-in-out infinite;
 }
 
 

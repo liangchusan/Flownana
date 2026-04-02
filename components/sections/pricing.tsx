@@ -4,52 +4,32 @@ import { Check } from "lucide-react";
 
 const plans = [
   {
-    name: "Starter",
-    description: "Perfect for hobbyists and beginners",
-    monthlyPrice: 4.90,
-    yearlyPrice: 58.80,
-    credits: "6,000 credits/year",
+    name: "Pro",
+    description: "720P video output, perfect for steady creation",
+    monthlyPrice: 16,
+    yearlyPrice: 96,
+    credits: "200 credits/month",
     features: [
-      "500 credits/month",
-      "Up to 50 images/month",
-      "Flownana AI models",
-      "Standard generation speed",
+      "200 credits per month",
+      "720P output",
+      "Text & image to video",
+      "Credits expire after 30 days (FIFO)",
       "No watermarks",
-      "Customer support",
-      "Commercial license",
     ],
   },
   {
-    name: "Standard",
-    description: "Perfect for creators and professionals",
-    monthlyPrice: 9.90,
-    yearlyPrice: 118.80,
-    credits: "24,000 credits/year",
+    name: "Max",
+    description: "1080P output and higher monthly credits",
+    monthlyPrice: 50,
+    yearlyPrice: 300,
+    credits: "800 credits/month",
     popular: true,
     features: [
-      "2,000 credits/month",
-      "Up to 200 images/month",
-      "Flownana AI models",
-      "Priority generation queue",
+      "800 credits per month",
+      "1080P output",
+      "Text & image to video",
+      "Credits expire after 30 days (FIFO)",
       "No watermarks",
-      "Priority customer support",
-      "Commercial license",
-    ],
-  },
-  {
-    name: "Professional",
-    description: "Perfect for advanced users",
-    monthlyPrice: 19.90,
-    yearlyPrice: 238.80,
-    credits: "72,000 credits/year",
-    features: [
-      "6,000 credits/month",
-      "Up to 600 images/month",
-      "Flownana AI models",
-      "Fastest generation speed",
-      "No watermarks",
-      "Expert team support",
-      "Commercial license",
     ],
   },
 ];
@@ -67,7 +47,7 @@ export function Pricing() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {plans.map((plan, index) => (
             <div
               key={index}
@@ -111,12 +91,12 @@ export function Pricing() {
                 ))}
               </ul>
 
-              <Link href="/ai-image" className="block">
+              <Link href="/pricing" className="block">
                 <Button
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}
                 >
-                  Subscribe
+                  View plans
                 </Button>
               </Link>
             </div>

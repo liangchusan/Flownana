@@ -27,7 +27,7 @@ export function VideoCreationForm({
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
   const [model, setModel] = useState("veo3_fast");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [duration, setDuration] = useState(5);
+  const duration = 8;
 
   // 当外部传入初始值时更新
   useEffect(() => {
@@ -179,16 +179,9 @@ export function VideoCreationForm({
         </div>
 
         <div className="flex-1">
-          <select
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-          >
-            <option value="" disabled>Duration</option>
-            <option value={5}>5 s</option>
-            <option value={10}>10 s</option>
-            <option value={15}>15 s</option>
-          </select>
+          <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-xs text-gray-600">
+            Duration: 8 s
+          </div>
         </div>
       </div>
 

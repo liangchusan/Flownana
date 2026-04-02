@@ -39,11 +39,12 @@ export async function GET() {
           Authorization: `Bearer ${process.env.NANO_BANANA_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "google/nano-banana",
+          model: "nano-banana-2",
           input: {
             prompt: "test",
+            aspect_ratio: "1:1",
+            resolution: "1K",
             output_format: "png",
-            image_size: "1:1",
           },
         }),
       });

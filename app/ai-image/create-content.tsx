@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { ResultPanel } from "@/components/creation/result-panel";
@@ -12,7 +13,8 @@ import Link from "next/link";
 
 export function CreateContent({ mode }: { mode: "image" }) {
   const { data: session } = useSession();
-  
+  const searchParams = useSearchParams();
+
   // Image state
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -20,6 +22,14 @@ export function CreateContent({ mode }: { mode: "image" }) {
   const [currentPrompt, setCurrentPrompt] = useState<string | undefined>(undefined);
   const [similarPrompt, setSimilarPrompt] = useState<string | undefined>(undefined);
   const [similarImage, setSimilarImage] = useState<string | undefined>(undefined);
+
+  // Sync initial prompt/image from URL (?prompt=... & ?image=...)
+  useEffect(() => {
+    const q = searchParams.get("prompt");
+    const img = searchParams.get("image");
+    if (q) setSimilarPrompt(decodeURIComponent(q));
+    if (img) setSimilarImage(decodeURIComponent(img));
+  }, [searchParams]);
 
   return (
     <div className="flex h-screen overflow-hidden">

@@ -8,24 +8,39 @@ async function sleep(ms: number) {
 
 async function createNanoBananaTask(params: {
   prompt: string;
-  imageSize?: string;
-  outputFormat?: "png" | "jpeg";
+  aspectRatio?: string;
+  resolution?: string;
+  outputFormat?: "png" | "jpg" | "jpeg";
+  imageInput?: string[];
 }) {
-  const apiKey = process.env.NANO_BANANA_API_KEY;
+  const apiKey =
+    process.env.NANO_BANANA_API_KEY || process.env.KIE_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "NANO_BANANA_API_KEY environment variable is not configured. Please add it to .env and try again."
+      "NANO_BANANA_API_KEY or KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
+  const fmt =
+    params.outputFormat === "jpeg" || params.outputFormat === "jpg"
+      ? "jpg"
+      : "png";
+
+  const input: Record<string, unknown> = {
+    prompt: params.prompt,
+    aspect_ratio: params.aspectRatio?.trim() || "1:1",
+    resolution: params.resolution?.trim() || "1K",
+    output_format: fmt,
+  };
+
+  if (params.imageInput?.length) {
+    input.image_input = params.imageInput;
+  }
+
   const body = {
-    model: "google/nano-banana",
-    input: {
-      prompt: params.prompt,
-      output_format: params.outputFormat ?? "png",
-      image_size: params.imageSize ?? "1:1",
-    },
+    model: "nano-banana-2",
+    input,
   };
 
   const res = await fetch(`${NANO_BANANA_API_BASE}/api/v1/jobs/createTask`, {
@@ -58,11 +73,12 @@ async function createNanoBananaTask(params: {
 }
 
 async function pollNanoBananaResult(taskId: string) {
-  const apiKey = process.env.NANO_BANANA_API_KEY;
+  const apiKey =
+    process.env.NANO_BANANA_API_KEY || process.env.KIE_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "NANO_BANANA_API_KEY environment variable is not configured. Please add it to .env and try again."
+      "NANO_BANANA_API_KEY or KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -153,8 +169,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       prompt,
-      imageUrl: _imageUrl, // 目前 Nano Banana API 暂未开放图像编辑参数，这里预留
-      mode,
+      imageUrl,
       resolution,
       aspectRatio,
     } = body as {
@@ -172,21 +187,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 将前端传入的宽高比映射到 Nano Banana 的 image_size
-    const imageSize =
-      aspectRatio && aspectRatio.trim() !== "" ? aspectRatio : "1:1";
+    const ar = aspectRatio && aspectRatio.trim() !== "" ? aspectRatio : "1:1";
+    const res = resolution && resolution.trim() !== "" ? resolution : "1K";
 
-    // 未来如果官方支持图像编辑，可以根据 mode 和 imageUrl 扩展 input 参数
-    if (mode === "image-to-image") {
-      console.warn(
-        "Nano Banana official documentation does not currently provide image editing parameter support. Processing as text-to-image."
-      );
-    }
+    const imageInput =
+      imageUrl && String(imageUrl).trim() !== ""
+        ? [String(imageUrl).trim()]
+        : undefined;
 
     const taskId = await createNanoBananaTask({
       prompt,
-      imageSize,
+      aspectRatio: ar,
+      resolution: res,
       outputFormat: "png",
+      imageInput,
     });
 
     const generatedImageUrl = await pollNanoBananaResult(taskId);

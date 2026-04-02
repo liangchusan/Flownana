@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
-import { LogOut, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { LogOut, ChevronDown, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface UserMenuProps {
@@ -64,7 +65,15 @@ export function UserMenu({ user }: UserMenuProps) {
               <p className="text-sm text-gray-500 mt-1">{user.email}</p>
             )}
           </div>
-          <div className="px-2 py-1">
+          <div className="px-2 py-1 space-y-1">
+            <Link
+              href="/account/billing"
+              className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+              onClick={() => setIsOpen(false)}
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Billing & credits
+            </Link>
             <Button
               onClick={() => {
                 signOut();

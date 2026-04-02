@@ -28,6 +28,8 @@ async function createVeoTask(params: {
     imageUrls: params.imageUrls || [],
     model: params.model || "veo3_fast",
     aspectRatio: params.aspectRatio || "16:9",
+    // Keep duration in request body so the upstream API can apply it if supported.
+    duration: params.duration,
     watermark: params.watermark,
     callBackUrl: params.callBackUrl,
     enableTranslation: true,
