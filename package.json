@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prisma:generate": "DATABASE_URL='file:./prisma/dev.db' prisma generate",
+    "prisma:generate": "prisma generate",
     "postinstall": "npm run prisma:generate",
     "build": "next build",
     "start": "next start",
