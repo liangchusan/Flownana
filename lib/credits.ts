@@ -38,8 +38,8 @@ export async function getCreditSummary(userId: string): Promise<{
     orderBy: { expiresAt: "asc" },
   });
 
-  // Use a simple loop instead of `reduce` to avoid TS inference differences
-  // between local and Vercel builds.
+  // Sum credits with a plain loop to avoid any TypeScript inference quirks
+  // across different build environments.
   let total = 0;
   for (const b of batches) {
     total += b.remaining;
