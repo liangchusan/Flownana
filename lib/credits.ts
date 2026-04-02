@@ -38,11 +38,12 @@ export async function getCreditSummary(userId: string): Promise<{
     orderBy: { expiresAt: "asc" },
   });
 
-  // Strongly type reduce accumulator to avoid TS "implicit any" in stricter builds.
-  const total = batches.reduce<number>(
-    (s, b) => s + b.remaining,
-    0
-  );
+  // Use a simple loop instead of `reduce` to avoid TS inference differences
+  // between local and Vercel builds.
+  let total = 0;
+  for (const b of batches) {
+    total += b.remaining;
+  }
 
   const soon = batches[0];
   if (!soon) {
