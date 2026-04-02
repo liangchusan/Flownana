@@ -28,6 +28,77 @@ async function resolveUserId(
   return user?.id ?? null;
 }
 
+async function resolveUserIdFromInvoice(
+  stripe: ReturnType<typeof getStripe>,
+  invoice: Stripe.Invoice,
+  sub?: Stripe.Subscription
+): Promise<string | null> {
+  if (sub) {
+    const fromSub = await resolveUserId(stripe, sub);
+    if (fromSub) return fromSub;
+  }
+
+  const customerId =
+    typeof invoice.customer === "string"
+      ? invoice.customer
+      : invoice.customer?.id;
+  if (customerId) {
+    const userByCustomer = await prisma.user.findFirst({
+      where: { stripeCustomerId: customerId },
+    });
+    if (userByCustomer?.id) return userByCustomer.id;
+  }
+
+  const email =
+    invoice.customer_email ||
+    (invoice.customer &&
+    typeof invoice.customer === "object" &&
+    "email" in invoice.customer
+      ? invoice.customer.email
+      : null);
+  if (email) {
+    const userByEmail = await prisma.user.findUnique({ where: { email } });
+    if (userByEmail?.id) return userByEmail.id;
+  }
+
+  return null;
+}
+
+async function grantCreditsForCurrentPeriodIfNeeded(params: {
+  userId: string;
+  sub: Stripe.Subscription;
+  parsed: { plan: PlanKey; billing: "monthly" | "yearly" };
+  source: string;
+}) {
+  const grantKey = `grant_sub_${params.sub.id}_${params.sub.current_period_start}`;
+  const already = await prisma.processedStripeEvent.findUnique({
+    where: { id: grantKey },
+  });
+  if (already) return;
+
+  await grantCredits({
+    userId: params.userId,
+    planType: params.parsed.plan,
+    source: params.source,
+  });
+  await prisma.processedStripeEvent.create({
+    data: { id: grantKey, type: "subscription_period_grant" },
+  });
+
+  if (params.parsed.billing === "yearly") {
+    const next = addMonths(new Date(params.sub.current_period_start * 1000), 1);
+    await prisma.subscription.update({
+      where: { stripeSubscriptionId: params.sub.id },
+      data: { nextCreditAt: next },
+    });
+  } else {
+    await prisma.subscription.update({
+      where: { stripeSubscriptionId: params.sub.id },
+      data: { nextCreditAt: null },
+    });
+  }
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text();
   const sig = request.headers.get("stripe-signature");
@@ -80,12 +151,26 @@ export async function POST(request: Request) {
         const sub = await stripe.subscriptions.retrieve(subId);
         const priceId = sub.items.data[0]?.price?.id;
         if (!priceId) break;
+        const parsed = getPriceKeyFromStripePriceId(priceId);
+        if (!parsed) break;
 
         await upsertSubscriptionFromStripe({
           userId,
           stripeSubscription: sub,
           stripePriceId: priceId,
         });
+
+        if (
+          session.payment_status === "paid" &&
+          (sub.status === "active" || sub.status === "trialing")
+        ) {
+          await grantCreditsForCurrentPeriodIfNeeded({
+            userId,
+            sub,
+            parsed: { plan: parsed.plan as PlanKey, billing: parsed.billing },
+            source: "checkout_session_paid",
+          });
+        }
         break;
       }
 
@@ -118,7 +203,7 @@ export async function POST(request: Request) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId);
         if (sub.status !== "active" && sub.status !== "trialing") break;
 
-        const userId = await resolveUserId(stripe, sub);
+        const userId = await resolveUserIdFromInvoice(stripe, invoice, sub);
         if (!userId) break;
 
         const priceId = sub.items.data[0]?.price?.id;
@@ -133,33 +218,12 @@ export async function POST(request: Request) {
           stripePriceId: priceId,
         });
 
-        const grantKey = `grant_invoice_${invoice.id}`;
-        const already = await prisma.processedStripeEvent.findUnique({
-          where: { id: grantKey },
+        await grantCreditsForCurrentPeriodIfNeeded({
+          userId,
+          sub,
+          parsed: { plan: parsed.plan as PlanKey, billing: parsed.billing },
+          source: "invoice_paid",
         });
-        if (!already) {
-          await grantCredits({
-            userId,
-            planType: parsed.plan as PlanKey,
-            source: "invoice_paid",
-          });
-          await prisma.processedStripeEvent.create({
-            data: { id: grantKey, type: "invoice_grant" },
-          });
-
-          if (parsed.billing === "yearly") {
-            const next = addMonths(new Date(), 1);
-            await prisma.subscription.update({
-              where: { stripeSubscriptionId: sub.id },
-              data: { nextCreditAt: next },
-            });
-          } else {
-            await prisma.subscription.update({
-              where: { stripeSubscriptionId: sub.id },
-              data: { nextCreditAt: null },
-            });
-          }
-        }
         break;
       }
 
