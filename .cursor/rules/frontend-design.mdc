@@ -1,0 +1,46 @@
+---
+description: Next.js + Tailwind + shadcn/ui — SaaS 视觉一致性与交互规范
+alwaysApply: true
+---
+
+# 前端视觉与交互（本项目）
+
+## 审美与留白
+
+- **极简**：少用粗边框与满铺背景；用 **间距** 区分区块。
+- **呼吸感**：页面容器至少 `px-6 py-8` 或 `p-8`；区块之间优先 `gap-6` / `gap-8`；移动端同样保持舒适边距。
+
+## 色彩与层级（Slate / Zinc）
+
+- 基础中性色：**Slate 或 Zinc** 二选一贯穿全站，勿混用多套灰。
+- 浅色：主背景 `bg-white`；主标题 `text-slate-900`；正文 `text-slate-600`；辅助 `text-slate-400`。
+- 深色：主背景 `bg-[#09090b]`；边框暗色用 `border-white/10`。
+
+## 圆角与层次
+
+- 容器圆角统一 `rounded-xl`（12px）或 `rounded-2xl`（16px）。
+- 投影：默认 `shadow-sm`；悬停可 `hover:shadow-md`。
+- 边框：`border border-slate-200/60`（浅色）；暗色 `border-white/10`。
+
+## 微交互
+
+- 可点击元素：`transition-all duration-200`。
+- 按钮：悬停 `hover:opacity-90` 或 `hover:-translate-y-px`；点击 `active:scale-[0.98]`。
+- 卡片：`transition-all`；悬停时背景微亮或边框略加重（_subtle_）。
+
+## 加载态
+
+- 优先 **Skeleton**，避免仅放一个转圈作为整页主状态。
+
+## 组件与实现
+
+- **shadcn/ui 优先**：新 UI 优先复用 `@/components/ui`。
+- **禁止内联 `style={{}}`**；一律 Tailwind class。
+- 重复模式抽成小组件；主题 token 放 `globals.css` 的 CSS 变量。
+
+## 交付前自检
+
+1. 是否仍有拥挤感（间距不足）？
+2. 标题 / 正文 / 辅助字是否层级清晰？
+3. 小屏是否仍有合理 padding / gap？
+4. Hover / Active 是否齐全且不过分？
