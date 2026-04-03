@@ -3,7 +3,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Upload, X } from "lucide-react";
 import axios from "axios";
 import {
   VIDEO_MODEL_OPTION_MAP,
@@ -203,14 +206,14 @@ export function VideoCreationForm({
   };
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <div className="h-full flex flex-col gap-8">
       {/* Image Upload - Always visible, above Prompt */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-slate-900">
           Image
         </label>
         {uploadedImage ? (
-          <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-200/60 bg-slate-50 shadow-sm">
             <img
               src={uploadedImage}
               alt="Uploaded image"
@@ -218,7 +221,7 @@ export function VideoCreationForm({
             />
             <button
               onClick={() => setUploadedImage(null)}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-lg"
+              className="absolute top-2 right-2 rounded-full border border-slate-200/60 bg-white p-1.5 text-slate-600 shadow-sm transition-all duration-200 hover:text-slate-900 hover:shadow-md active:scale-[0.98]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -226,15 +229,15 @@ export function VideoCreationForm({
         ) : (
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50 ${
+            className={`aspect-video rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
               isDragActive
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-300 hover:border-gray-400"
+                ? "border-slate-500 bg-slate-100"
+                : "hover:border-slate-400 hover:bg-slate-100/60"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-10 w-10 text-gray-400 mb-3" />
-            <p className="text-gray-600 text-sm">
+            <Upload className="h-9 w-9 text-slate-400 mb-3" />
+            <p className="text-slate-600 text-sm">
               {isDragActive
                 ? "Drop image file"
                 : "Click or drop an image to upload"}
@@ -244,126 +247,116 @@ export function VideoCreationForm({
       </div>
 
       {/* Prompt Input */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-slate-900">
           Prompt
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the video you want to create..."
-          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm placeholder:text-sm"
+          className="h-36 w-full resize-none rounded-2xl border border-slate-200/60 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm transition-all duration-200 placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300"
           maxLength={500}
         />
       </div>
 
-      <div className="mt-auto space-y-3">
+      <div className="mt-auto rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm space-y-4">
         {/* Bottom Settings */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <select
+          <Select
             value={selectedModelName}
             onChange={(e) => setSelectedModelName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
             aria-label="Model"
+            menuLabel="Model"
           >
-            <option value="" disabled>
-              Model
-            </option>
             {modelNameOptions.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
-          </select>
+          </Select>
 
-          <select
+          <Select
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
             aria-label="Resolution"
+            menuLabel="Resolution"
           >
-            <option value="" disabled>
-              Resolution
-            </option>
             {resolutionOptions.map((value) => (
               <option key={value} value={value}>
                 {value}
               </option>
             ))}
-          </select>
+          </Select>
 
-          <select
+          <Select
             value={String(duration)}
             onChange={(e) =>
               setDuration(Number(e.target.value) as VideoModelOption["duration"])
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
             aria-label="Duration"
+            menuLabel="Duration"
           >
-            <option value="" disabled>
-              Duration
-            </option>
             {durationOptions.map((value) => (
               <option key={value} value={value}>
                 {value}s
               </option>
             ))}
-          </select>
+          </Select>
 
-          <select
+          <Select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
             aria-label="Ratio"
+            menuLabel="Ratio"
           >
-            <option value="" disabled>
-              Ratio
-            </option>
             <option value="16:9">16:9</option>
             <option value="9:16">9:16</option>
             <option value="1:1">1:1</option>
             <option value="4:3">4:3</option>
-          </select>
+          </Select>
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-          <span className="text-xs text-gray-500">Sound</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={hasAudio}
-            onClick={() => modelSupportsAudioToggle && setHasAudio(!hasAudio)}
+        <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-slate-50 px-3 py-2">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-slate-600">Sound</span>
+            <span className="text-xs text-slate-400">
+              {modelSupportsAudioToggle
+                ? hasAudio
+                  ? "Native Audio On"
+                  : "Native Audio Off"
+                : "Not available for this model"}
+            </span>
+          </div>
+          <Switch
+            checked={hasAudio}
+            onCheckedChange={(next) => {
+              if (modelSupportsAudioToggle) {
+                setHasAudio(next);
+              }
+            }}
             disabled={!modelSupportsAudioToggle}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-              hasAudio ? "bg-blue-500" : "bg-gray-300"
-            } ${!modelSupportsAudioToggle ? "opacity-40 cursor-not-allowed" : ""}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                hasAudio ? "translate-x-4" : "translate-x-0.5"
-              }`}
-            />
-          </button>
+          />
         </div>
 
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
           disabled={isGenerating || !prompt.trim() || !selectedOption}
-          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0"
+          className="w-full rounded-xl bg-slate-900 text-white border-0 transition-all duration-200 hover:opacity-90 hover:-translate-y-[1px] active:scale-[0.98]"
           size="lg"
         >
           {isGenerating ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Generating...
-            </>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-16 bg-white/30" />
+              <span>Generating</span>
+            </div>
           ) : (
             "Generate"
           )}
         </Button>
 
-        <p className="text-xs text-gray-500">
+        <p className="text-sm text-slate-600">
           This generation will cost {selectedOption?.credits ?? 0} credits.
         </p>
       </div>
