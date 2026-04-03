@@ -231,7 +231,7 @@ export default function Home() {
               Three Ways to Create
             </h2>
             <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
-              Choose your creative path. From videos to images to music, we've got you covered.
+              Choose your creative path. From videos to images to music, we&apos;ve got you covered.
             </p>
           </div>
 

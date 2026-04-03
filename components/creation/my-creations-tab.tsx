@@ -151,7 +151,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
             )}
           </div>
           <p className="text-gray-600 text-lg font-medium mb-2">
-            You haven't created anything yet
+            You haven&apos;t created anything yet
           </p>
           <p className="text-gray-500 text-sm">
             Start generating to see your creations here

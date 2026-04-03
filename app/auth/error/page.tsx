@@ -49,7 +49,7 @@ function ErrorContent() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <p className="text-sm font-semibold text-blue-900 mb-2">Troubleshooting Steps:</p>
             <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-              <li>Check terminal console for "NextAuth configuration check" output</li>
+              <li>Check terminal console for &quot;NextAuth configuration check&quot; output</li>
               <li>Verify .env file is in project root directory with correct content</li>
               <li>Verify redirect URI is added in Google Cloud Console: <code className="bg-blue-100 px-1 rounded">http://localhost:3000/api/auth/callback/google</code></li>
               <li>Restart development server (npm run dev)</li>

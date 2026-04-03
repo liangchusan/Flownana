@@ -33,7 +33,7 @@ export function Testimonials() {
             Trusted by Creators Worldwide
           </h2>
           <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
-            See how designers, photographers, and digital artists are using Flownana's revolutionary AI technology to transform their creative workflows.
+            See how designers, photographers, and digital artists are using Flownana&apos;s revolutionary AI technology to transform their creative workflows.
           </p>
         </div>
 
@@ -51,7 +51,7 @@ export function Testimonials() {
                   />
                 ))}
               </div>
-              <p className="text-gray-700 mb-6 italic leading-relaxed">"{testimonial.text}"</p>
+              <p className="text-gray-700 mb-6 italic leading-relaxed">&quot;{testimonial.text}&quot;</p>
               <div>
                 <p className="font-semibold text-gray-900">
                   {testimonial.author}
