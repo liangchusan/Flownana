@@ -22,16 +22,16 @@ export function ImagePreview({ imageUrl, isGenerating }: ImagePreviewProps) {
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Generated Result</h2>
+      <h2 className="text-2xl font-bold text-slate-900">Generated Result</h2>
       
       {isGenerating ? (
-        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-square bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-300">
           <Loader2 className="h-16 w-16 text-purple-500 animate-spin mb-6" />
-          <p className="text-gray-700 text-lg font-medium">Generating image, please wait...</p>
+          <p className="text-slate-700 text-lg font-medium">Generating image, please wait...</p>
         </div>
       ) : imageUrl ? (
         <div className="w-full max-w-2xl space-y-6">
-          <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden shadow-lg">
+          <div className="relative aspect-square bg-slate-100 rounded-xl overflow-hidden shadow-lg">
             <img
               src={imageUrl}
               alt="Generated image"
@@ -48,11 +48,11 @@ export function ImagePreview({ imageUrl, isGenerating }: ImagePreviewProps) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-dashed border-gray-300">
+        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-square bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-300">
           <div className="text-center">
-            <ImageIcon className="h-20 w-20 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 text-xl font-medium mb-2">Ready to Create</p>
-            <p className="text-gray-500 text-sm">
+            <ImageIcon className="h-20 w-20 text-slate-400 mx-auto mb-4" />
+            <p className="text-slate-600 text-xl font-medium mb-2">Ready to Create</p>
+            <p className="text-slate-500 text-sm">
               Upload an image and describe your edit
             </p>
           </div>

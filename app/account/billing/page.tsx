@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
-import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Summary = {
   subscription: {
@@ -91,8 +91,13 @@ export default function BillingPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="min-h-screen bg-slate-50 px-6 py-8">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <Skeleton className="h-14 w-full max-w-xs rounded-xl" />
+          <Skeleton className="h-10 w-2/3 rounded-lg" />
+          <Skeleton className="h-36 w-full rounded-2xl" />
+          <Skeleton className="h-44 w-full rounded-2xl" />
+        </div>
       </div>
     );
   }
@@ -100,7 +105,7 @@ export default function BillingPage() {
   if (!session) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
-        <p className="text-gray-700 mb-4">Sign in to view billing.</p>
+        <p className="text-slate-700 mb-4">Sign in to view billing.</p>
         <Link href="/api/auth/signin">
           <Button>Sign in</Button>
         </Link>
@@ -109,8 +114,8 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50">
+      <header className="flex items-center justify-between border-b border-slate-200/60 bg-white px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
           <Logo size="sm" />
         </Link>
@@ -122,8 +127,8 @@ export default function BillingPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
-        <p className="text-gray-600 mb-8">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">Billing</h1>
+        <p className="text-slate-600 mb-8">
           Manage subscription and view credits. Credits expire 30 days after
           each grant (FIFO usage).
         </p>
@@ -151,14 +156,17 @@ export default function BillingPage() {
         )}
 
         {!summary && !error && (
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          <div className="space-y-4">
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-36 w-full rounded-xl" />
+          </div>
         )}
 
         {summary && (
           <div className="space-y-8">
-            <section className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="font-semibold text-gray-900 mb-4">Credits</h2>
-              <p className="text-gray-800">
+            <section className="bg-white rounded-xl border border-slate-200/60 p-6">
+              <h2 className="font-semibold text-slate-900 mb-4">Credits</h2>
+              <p className="text-slate-800">
                 Current credits:{" "}
                 <strong>{summary.credits.current}</strong>
               </p>
@@ -176,22 +184,22 @@ export default function BillingPage() {
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="font-semibold text-gray-900 mb-4">Subscription</h2>
+            <section className="bg-white rounded-xl border border-slate-200/60 p-6">
+              <h2 className="font-semibold text-slate-900 mb-4">Subscription</h2>
               {summary.subscription ? (
                 <>
-                  <p className="text-gray-800">
+                  <p className="text-slate-800">
                     Plan:{" "}
                     <strong className="capitalize">
                       {summary.subscription.planType}
                     </strong>{" "}
                     ({summary.subscription.billingCycle})
                   </p>
-                  <p className="text-gray-600 text-sm mt-1">
+                  <p className="text-slate-600 text-sm mt-1">
                     Output: {summary.subscription.resolution} ·{" "}
                     {summary.subscription.creditsPerMonth} credits / month
                   </p>
-                  <p className="text-gray-600 text-sm mt-2">
+                  <p className="text-slate-600 text-sm mt-2">
                     Renews / period ends:{" "}
                     {new Date(
                       summary.subscription.currentPeriodEnd
@@ -203,7 +211,7 @@ export default function BillingPage() {
                     </p>
                   )}
                   {summary.subscription.nextPlan && (
-                    <p className="text-sm text-gray-600 mt-2">
+                    <p className="text-sm text-slate-600 mt-2">
                       Pending change: {summary.subscription.nextPlan}
                     </p>
                   )}
@@ -213,7 +221,7 @@ export default function BillingPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-gray-600 mb-4">No active subscription.</p>
+                  <p className="text-slate-600 mb-4">No active subscription.</p>
                   <Link href="/pricing">
                     <Button>View plans</Button>
                   </Link>
@@ -221,7 +229,7 @@ export default function BillingPage() {
               )}
             </section>
 
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-500">
               All payments are non-refundable. Yearly plans are prepaid; credits
               are issued each month.{" "}
               <Link href="/pricing" className="text-blue-600 underline">

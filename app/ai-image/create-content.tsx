@@ -39,7 +39,7 @@ export function CreateContent({ mode }: { mode: "image" }) {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto bg-white">
         {/* Top Bar with Logo and User Info - Full width, above sidebar */}
-        <div className="sticky top-0 z-20 bg-white px-8 py-2 flex items-center justify-between border-b border-gray-100">
+        <div className="sticky top-0 z-20 bg-white px-8 py-2 flex items-center justify-between border-b border-slate-200/60">
           <Link href="/" className="flex-shrink-0">
             <Logo size="md" />
           </Link>
@@ -55,7 +55,7 @@ export function CreateContent({ mode }: { mode: "image" }) {
             ) : (
               <Button
                 onClick={() => signIn("google")}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 text-sm px-4 py-1.5"
+                className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]"
                 size="sm"
               >
                 Start Free Now
@@ -67,8 +67,8 @@ export function CreateContent({ mode }: { mode: "image" }) {
         {/* Content area with left margin for sidebar */}
         <div className="flex h-[calc(100vh-73px)] ml-[70px]">
           {/* Left: Creation Form */}
-          <div className="w-[420px] overflow-y-auto bg-white border-r border-gray-100 p-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
+          <div className="w-[420px] overflow-y-auto bg-white border-r border-slate-200/60 p-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-8">
               AI Image
             </h1>
             <GenerateForm
@@ -86,7 +86,7 @@ export function CreateContent({ mode }: { mode: "image" }) {
           </div>
 
           {/* Right: Result Panel */}
-          <div className="flex-1 overflow-hidden bg-gray-50">
+          <div className="flex-1 overflow-hidden bg-slate-50">
             <ResultPanel
               mode="image"
               currentGeneration={{

@@ -45,13 +45,13 @@ export function Examples() {
   const currentExample = examples[currentIndex];
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
             Flownana Use Cases
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-slate-600 max-w-3xl mx-auto">
             Discover the versatility of Flownana - from style transformations to scene modifications, 
             this advanced AI delivers professional-quality editing results across various creative projects through sophisticated multi-image fusion capabilities.
           </p>
@@ -59,7 +59,7 @@ export function Examples() {
 
         <div className="bg-white rounded-lg shadow-xl p-8">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-2xl font-bold text-gray-900">
+            <h3 className="text-2xl font-bold text-slate-900">
               {currentExample.title}
             </h3>
             <div className="flex items-center space-x-2">
@@ -71,7 +71,7 @@ export function Examples() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-slate-600">
                 {currentIndex + 1} / {examples.length}
               </span>
               <Button
@@ -87,10 +87,10 @@ export function Examples() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
             <div>
-              <div className="bg-gray-100 rounded-lg p-2 mb-2">
-                <span className="text-sm font-semibold text-gray-700">Before</span>
+              <div className="bg-slate-100 rounded-lg p-2 mb-2">
+                <span className="text-sm font-semibold text-slate-700">Before</span>
               </div>
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
+              <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-200">
                 <img
                   src={currentExample.before}
                   alt="Before"
@@ -102,7 +102,7 @@ export function Examples() {
               <div className="bg-blue-100 rounded-lg p-2 mb-2">
                 <span className="text-sm font-semibold text-blue-700">After</span>
               </div>
-              <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
+              <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-200">
                 <img
                   src={currentExample.after}
                   alt="After"
@@ -112,8 +112,8 @@ export function Examples() {
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-gray-700">{currentExample.description}</p>
+          <div className="bg-slate-50 rounded-lg p-4">
+            <p className="text-slate-700">{currentExample.description}</p>
           </div>
         </div>
       </div>

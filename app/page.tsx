@@ -48,6 +48,41 @@ const heroVideos = [
   }
 ];
 
+/** 固定高度档 + 动画错开，避免内联 style，且保证 JIT 能扫描到类名 */
+const MUSIC_EQUALIZER_HEIGHTS = [
+  "h-[38%]",
+  "h-[62%]",
+  "h-[45%]",
+  "h-[71%]",
+  "h-[33%]",
+  "h-[55%]",
+  "h-[48%]",
+  "h-[66%]",
+  "h-[41%]",
+  "h-[59%]",
+  "h-[36%]",
+  "h-[64%]",
+  "h-[52%]",
+  "h-[44%]",
+  "h-[68%]",
+  "h-[39%]",
+  "h-[57%]",
+  "h-[46%]",
+  "h-[61%]",
+  "h-[35%]",
+] as const;
+
+const MUSIC_EQUALIZER_DELAYS = [
+  "delay-0",
+  "delay-75",
+  "delay-100",
+  "delay-150",
+  "delay-200",
+  "delay-300",
+  "delay-500",
+  "delay-700",
+] as const;
+
 export default function Home() {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -179,13 +214,13 @@ export default function Home() {
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
                 Create Anything with AI
               </h1>
-              <p className="text-xl md:text-2xl text-gray-200 mb-8 leading-relaxed max-w-2xl mx-auto">
+              <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed max-w-2xl mx-auto">
                 Transform your ideas into stunning videos, images, and music in seconds.
                 <span className="text-white font-semibold"> No design skills required.</span>
               </p>
 
               <Link href="/ai-image">
-                <Button size="lg" className="text-lg px-8 py-6 bg-white text-gray-900 hover:bg-gray-100 border-0 shadow-2xl">
+                <Button size="lg" className="text-lg px-8 py-6 bg-white text-slate-900 transition-all duration-200 hover:bg-slate-100 hover:opacity-90 active:scale-[0.98] border-0 shadow-2xl">
                   Start Creating Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -195,10 +230,10 @@ export default function Home() {
 
           {/* 底部：输入图片和Prompt信息（小尺寸，参考KlingAI） */}
           <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30">
-            <div className="bg-white/10 backdrop-blur-md rounded-lg p-4 border border-white/20 max-w-2xl mx-auto">
+            <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20 max-w-2xl mx-auto">
               <div className="flex items-center gap-4">
                 {/* 输入图片缩略图 */}
-                <div className="relative w-20 h-12 rounded overflow-hidden flex-shrink-0 border border-white/20">
+                <div className="relative w-20 h-12 rounded-xl overflow-hidden flex-shrink-0 border border-white/20">
                   <img
                     src={currentVideo.inputImage}
                     alt="Input"
@@ -227,10 +262,10 @@ export default function Home() {
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
               Three Ways to Create
             </h2>
-            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
               Choose your creative path. From videos to images to music, we&apos;ve got you covered.
             </p>
           </div>
@@ -238,7 +273,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {/* AI Video */}
             <Link href="/ai-video" className="group">
-              <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 shadow-lg hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-px">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
@@ -273,7 +308,7 @@ export default function Home() {
 
             {/* AI Image */}
             <Link href="/ai-image" className="group">
-              <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-px">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
@@ -300,7 +335,7 @@ export default function Home() {
 
             {/* AI Music */}
             <Link href="/ai-music" className="group">
-              <div className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-green-500 to-emerald-600 shadow-lg hover:shadow-xl transition-all duration-500 hover:-translate-y-1">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-px">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
@@ -319,14 +354,12 @@ export default function Home() {
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center opacity-20">
                   <div className="flex items-end gap-1 h-32">
-                    {[...Array(20)].map((_, i) => (
+                    {MUSIC_EQUALIZER_HEIGHTS.map((heightClass, i) => (
                       <div
                         key={i}
-                        className="w-2 bg-white rounded-full animate-pulse"
-                        style={{
-                          height: `${Math.random() * 60 + 20}%`,
-                          animationDelay: `${i * 0.1}s`,
-                        }}
+                        className={`w-2 bg-white rounded-full animate-pulse ${heightClass} ${
+                          MUSIC_EQUALIZER_DELAYS[i % MUSIC_EQUALIZER_DELAYS.length]
+                        }`}
                       />
                     ))}
                   </div>
@@ -353,7 +386,7 @@ export default function Home() {
           </p>
           <div className="flex justify-center">
             <Link href="/ai-image">
-              <Button size="lg" className="text-lg px-8 py-6 bg-white text-blue-600 hover:bg-gray-100 border-0 shadow-2xl">
+              <Button size="lg" className="text-lg px-8 py-6 bg-white text-blue-600 transition-all duration-200 hover:bg-slate-100 hover:opacity-90 active:scale-[0.98] border-0 shadow-2xl">
                 Start Creating Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

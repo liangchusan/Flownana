@@ -31,25 +31,25 @@ export function Header({ showBackground = false }: HeaderProps) {
         <nav className="hidden md:flex items-center space-x-8 ml-8">
           <Link 
             href="/ai-video" 
-            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
+            className="text-sm font-medium text-white transition-all duration-200 hover:text-white/80 hover:opacity-90"
           >
             AI Video
           </Link>
           <Link 
             href="/ai-image" 
-            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
+            className="text-sm font-medium text-white transition-all duration-200 hover:text-white/80 hover:opacity-90"
           >
             AI Image
           </Link>
           <Link 
             href="/ai-music" 
-            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
+            className="text-sm font-medium text-white transition-all duration-200 hover:text-white/80 hover:opacity-90"
           >
             AI Music
           </Link>
           <Link 
             href="/pricing" 
-            className="text-sm font-medium text-white hover:text-white/80 transition-colors"
+            className="text-sm font-medium text-white transition-all duration-200 hover:text-white/80 hover:opacity-90"
           >
             Pricing
           </Link>
@@ -68,7 +68,7 @@ export function Header({ showBackground = false }: HeaderProps) {
           ) : (
             <Button
               onClick={() => signIn("google")}
-              className="flex items-center space-x-2 transition-all bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              className="flex items-center space-x-2 transition-all duration-200 bg-white/10 hover:bg-white/20 hover:opacity-90 active:scale-[0.98] text-white border border-white/20"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path

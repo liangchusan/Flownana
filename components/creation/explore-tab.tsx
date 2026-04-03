@@ -542,7 +542,7 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
             {example.type === "image" ? (
               <div
                 onClick={() => handleImageClick(example.url)}
-                className="bg-gray-100 relative cursor-pointer"
+                className="bg-slate-100 relative cursor-pointer"
               >
                 <img
                   src={example.url}
@@ -554,7 +554,7 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
               </div>
             ) : (
               <div 
-                className="bg-gray-100 relative cursor-pointer"
+                className="bg-slate-100 relative cursor-pointer"
                 onClick={() => handleVideoClick(example.url)}
               >
                 {loadedVideos.has(example.id) ? (
@@ -602,12 +602,12 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                   >
                     {/* 视频封面占位 - 使用渐变背景 */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-gray-400 text-xs opacity-50">{example.model}</div>
+                      <div className="text-slate-400 text-xs opacity-50">{example.model}</div>
                     </div>
                     {/* 播放按钮指示 */}
                     <div className="absolute inset-0 flex items-center justify-center bg-black/5 group-hover:bg-black/10 transition-colors">
                       <div className="bg-white/90 rounded-full p-2 opacity-70 group-hover:opacity-100 transition-opacity">
-                        <svg className="w-4 h-4 text-gray-900 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-4 h-4 text-slate-900 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       </div>
@@ -620,8 +620,9 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
             {hoveredItem === example.id && onGenerateSimilar && (
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 to-transparent px-2 pb-2 pt-6">
                 <button
+                  type="button"
                   onClick={(e) => handleGenerateSimilar(e, example)}
-                  className="w-full bg-white/80 text-gray-700 text-[10px] font-normal py-1.5 px-2 rounded border border-white/60 hover:bg-white/90 hover:text-gray-900 transition-colors"
+                  className="w-full rounded-full border border-white/50 bg-white/90 py-2 px-3 text-[10px] font-medium text-slate-800 shadow-sm transition-all duration-200 hover:bg-white hover:shadow-md active:scale-[0.98]"
                 >
                   Generate Similar
                 </button>
@@ -634,7 +635,7 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
       {/* 加载更多触发器 */}
       {visibleCount < filteredExamples.length && (
         <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
-          <div className="text-gray-400 text-xs">Loading more...</div>
+          <div className="text-slate-400 text-xs">Loading more...</div>
         </div>
       )}
 

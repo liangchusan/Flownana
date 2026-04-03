@@ -60,14 +60,14 @@ export function VoiceCreationForm({
     <div className="space-y-6">
       {/* Prompt Input */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Prompt <span className="text-gray-500">({prompt.length}/500)</span>
+        <label className="block text-sm font-medium text-slate-700 mb-2">
+          Prompt <span className="text-slate-500">({prompt.length}/500)</span>
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the music or voice you want to generate..."
-          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          className="w-full h-32 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           maxLength={500}
         />
       </div>
@@ -75,7 +75,7 @@ export function VoiceCreationForm({
       {/* Optional Settings */}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
             Title (Optional)
           </label>
           <input
@@ -83,12 +83,12 @@ export function VoiceCreationForm({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Enter a title for your audio"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
             Tags (Optional)
           </label>
           <input
@@ -96,7 +96,7 @@ export function VoiceCreationForm({
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="rock, pop, electronic, etc."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
@@ -106,9 +106,9 @@ export function VoiceCreationForm({
             id="instrumental"
             checked={makeInstrumental}
             onChange={(e) => setMakeInstrumental(e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded"
           />
-          <label htmlFor="instrumental" className="ml-2 text-sm text-gray-700">
+          <label htmlFor="instrumental" className="ml-2 text-sm text-slate-700">
             Make instrumental (no vocals)
           </label>
         </div>
@@ -118,7 +118,7 @@ export function VoiceCreationForm({
       <Button
         onClick={handleGenerate}
         disabled={isGenerating || !prompt.trim()}
-        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0"
+        className="w-full rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
         size="lg"
       >
         {isGenerating ? (

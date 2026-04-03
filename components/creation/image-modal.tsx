@@ -37,7 +37,7 @@ export default function ImageModal({ imageUrl, onClose }: ImageModalProps) {
           onClick={onClose}
           className="absolute top-4 right-4 z-10 bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
         >
-          <X className="h-6 w-6 text-gray-900" />
+          <X className="h-6 w-6 text-slate-900" />
         </button>
         <img
           src={imageUrl}

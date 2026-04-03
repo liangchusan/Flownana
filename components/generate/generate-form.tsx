@@ -106,11 +106,11 @@ export function GenerateForm({
     <div className="space-y-6">
       {/* Image Upload - Always visible, above Prompt */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-slate-700 mb-2">
           Image
         </label>
         {uploadedImage ? (
-          <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-300">
+          <div className="relative w-full aspect-video bg-slate-100 rounded-lg overflow-hidden border-2 border-slate-300">
             <img
               src={uploadedImage}
               alt="Uploaded image"
@@ -126,15 +126,15 @@ export function GenerateForm({
         ) : (
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-50 ${
+            className={`border-2 border-dashed rounded-lg aspect-video flex flex-col items-center justify-center cursor-pointer transition-colors bg-slate-50 ${
               isDragActive
                 ? "border-blue-500 bg-blue-50"
-                : "border-gray-300 hover:border-gray-400"
+                : "border-slate-300 hover:border-slate-400"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="h-10 w-10 text-gray-400 mb-3" />
-            <p className="text-gray-600 text-sm">
+            <Upload className="h-10 w-10 text-slate-400 mb-3" />
+            <p className="text-slate-600 text-sm">
               {isDragActive
                 ? "Drop image file"
                 : "Click or drop an image to upload"}
@@ -144,14 +144,14 @@ export function GenerateForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-slate-700 mb-2">
           Prompt
         </label>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the image you want to generate or edit..."
-          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm placeholder:text-sm"
+          className="w-full h-32 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm placeholder:text-sm"
           maxLength={5000}
         />
       </div>
@@ -161,7 +161,7 @@ export function GenerateForm({
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Model</option>
             <option value="nano-banana-2">Nano Banana 2</option>
@@ -172,7 +172,7 @@ export function GenerateForm({
           <select
             value={resolution}
             onChange={(e) => setResolution(e.target.value as ImageResolutionKey)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Resolution</option>
             <option value="1K">1K</option>
@@ -185,7 +185,7 @@ export function GenerateForm({
           <select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Aspect Ratio</option>
             <option value="1:1">1:1</option>
@@ -200,7 +200,7 @@ export function GenerateForm({
       <Button
         onClick={handleGenerate}
         disabled={isGenerating || !prompt.trim()}
-        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0"
+        className="w-full rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
         size="lg"
       >
         {isGenerating ? (
@@ -213,7 +213,7 @@ export function GenerateForm({
         )}
       </Button>
 
-      <p className="text-xs text-gray-600">
+      <p className="text-xs text-slate-600">
         This generation will cost {IMAGE_RESOLUTION_CREDITS[resolution]} credits.
       </p>
     </div>

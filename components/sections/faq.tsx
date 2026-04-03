@@ -41,10 +41,10 @@ export function FAQ() {
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
             Frequently Asked Questions
           </h2>
-          <p className="text-lg md:text-xl text-gray-600">
+          <p className="text-lg md:text-xl text-slate-600">
             Find answers to common questions about Flownana AI content generation
           </p>
         </div>
@@ -53,24 +53,25 @@ export function FAQ() {
           {faqs.map((faq, index) => (
             <div
               key={index}
-              className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm"
+              className="border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-sm transition-all duration-200 hover:border-slate-300/80"
             >
               <button
+                type="button"
                 onClick={() => toggleFAQ(index)}
-                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-slate-50 transition-all duration-200 active:scale-[0.99]"
               >
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-slate-900">
                   {faq.question}
                 </span>
                 {openIndex === index ? (
-                  <ChevronUp className="h-5 w-5 text-gray-500" />
+                  <ChevronUp className="h-5 w-5 text-slate-500" />
                 ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-500" />
+                  <ChevronDown className="h-5 w-5 text-slate-500" />
                 )}
               </button>
               {openIndex === index && (
-                <div className="px-6 py-4 bg-gray-50">
-                  <p className="text-gray-700 leading-relaxed">{faq.answer}</p>
+                <div className="px-6 py-4 bg-slate-50">
+                  <p className="text-slate-700 leading-relaxed">{faq.answer}</p>
                 </div>
               )}
             </div>

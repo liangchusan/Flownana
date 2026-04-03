@@ -39,10 +39,10 @@ export function Pricing() {
     <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
             Pricing
           </h2>
-          <p className="text-xl text-gray-600">
+          <p className="text-xl text-slate-600">
             Choose the plan that works best for you. All plans include access to our core features.
           </p>
         </div>
@@ -54,7 +54,7 @@ export function Pricing() {
               className={`relative rounded-lg border-2 p-8 ${
                 plan.popular
                   ? "border-blue-500 shadow-xl scale-105"
-                  : "border-gray-200"
+                  : "border-slate-200/60"
               }`}
             >
               {plan.popular && (
@@ -65,19 +65,19 @@ export function Pricing() {
                 </div>
               )}
 
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              <h3 className="text-2xl font-bold text-slate-900 mb-2">
                 {plan.name}
               </h3>
-              <p className="text-gray-600 mb-6">{plan.description}</p>
+              <p className="text-slate-600 mb-6">{plan.description}</p>
 
               <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">
+                <span className="text-4xl font-bold text-slate-900">
                   ${plan.monthlyPrice}
                 </span>
-                <span className="text-gray-600">/month</span>
+                <span className="text-slate-600">/month</span>
               </div>
 
-              <div className="text-sm text-gray-600 mb-6">
+              <div className="text-sm text-slate-600 mb-6">
                 <div>${plan.yearlyPrice}/year</div>
                 <div>{plan.credits}</div>
               </div>
@@ -86,7 +86,7 @@ export function Pricing() {
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start">
                     <Check className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700">{feature}</span>
+                    <span className="text-slate-700">{feature}</span>
                   </li>
                 ))}
               </ul>

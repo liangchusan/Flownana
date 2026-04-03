@@ -31,10 +31,7 @@ export function Logo({ className = "", showText = true, size = "md", textColor }
       {/* Logo Icon - Banana emoji 🍌 lying down with water waves */}
       <div className={`${sizeClasses[size]} relative transition-all duration-300 hover:scale-110`}>
         {/* Banana emoji 🍌 - rotated to lie down */}
-        <div 
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ transform: 'rotate(-25deg)' }}
-        >
+        <div className="absolute inset-0 flex -rotate-[25deg] items-center justify-center">
           <span className={iconTextSizes[size]}>🍌</span>
         </div>
         
@@ -121,7 +118,7 @@ export function Logo({ className = "", showText = true, size = "md", textColor }
       </div>
       
       {showText && (
-        <span className={`font-bold ${textColor || "text-gray-900"} ${textSizes[size]}`}>
+        <span className={`font-bold ${textColor || "text-slate-900"} ${textSizes[size]}`}>
           Flownana
         </span>
       )}

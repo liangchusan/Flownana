@@ -5,8 +5,7 @@ import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Upload, X } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import axios from "axios";
 import {
   VIDEO_MODEL_OPTION_MAP,
@@ -260,9 +259,10 @@ export function VideoCreationForm({
         />
       </div>
 
-      <div className="mt-auto rounded-2xl border border-slate-200/60 bg-white p-4 shadow-sm space-y-4">
-        {/* Bottom Settings */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="mt-auto space-y-4">
+        {/* Bottom Settings — 与图片生成：同一行选项 + 蓝紫渐变主按钮 */}
+        <div className="flex flex-wrap gap-3">
+          <div className="min-w-[100px] flex-[1.25]">
           <Select
             value={selectedModelName}
             onChange={(e) => setSelectedModelName(e.target.value)}
@@ -275,7 +275,9 @@ export function VideoCreationForm({
               </option>
             ))}
           </Select>
+          </div>
 
+          <div className="min-w-[72px] flex-1">
           <Select
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
@@ -288,7 +290,9 @@ export function VideoCreationForm({
               </option>
             ))}
           </Select>
+          </div>
 
+          <div className="min-w-[72px] flex-1">
           <Select
             value={String(duration)}
             onChange={(e) =>
@@ -303,7 +307,9 @@ export function VideoCreationForm({
               </option>
             ))}
           </Select>
+          </div>
 
+          <div className="min-w-[72px] flex-1">
           <Select
             value={aspectRatio}
             onChange={(e) => setAspectRatio(e.target.value)}
@@ -315,12 +321,13 @@ export function VideoCreationForm({
             <option value="1:1">1:1</option>
             <option value="4:3">4:3</option>
           </Select>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between rounded-xl border border-slate-200/60 bg-slate-50 px-3 py-2">
-          <div className="flex flex-col">
-            <span className="text-xs font-medium text-slate-600">Sound</span>
-            <span className="text-xs text-slate-400">
+        <div className="flex items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-slate-700">Sound</span>
+            <span className="text-xs text-slate-500">
               {modelSupportsAudioToggle
                 ? hasAudio
                   ? "Native Audio On"
@@ -343,20 +350,20 @@ export function VideoCreationForm({
         <Button
           onClick={handleGenerate}
           disabled={isGenerating || !prompt.trim() || !selectedOption}
-          className="w-full rounded-xl bg-slate-900 text-white border-0 transition-all duration-200 hover:opacity-90 hover:-translate-y-[1px] active:scale-[0.98]"
+          className="w-full rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
           size="lg"
         >
           {isGenerating ? (
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-16 bg-white/30" />
-              <span>Generating</span>
-            </div>
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Generating...
+            </>
           ) : (
             "Generate"
           )}
         </Button>
 
-        <p className="text-sm text-slate-600">
+        <p className="text-xs text-slate-600">
           This generation will cost {selectedOption?.credits ?? 0} credits.
         </p>
       </div>

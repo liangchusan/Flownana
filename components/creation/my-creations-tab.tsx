@@ -117,7 +117,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
-          <div className="text-gray-400 mb-4">
+          <div className="text-slate-400 mb-4">
             {mode === "video" ? (
               <Video className="h-16 w-16 mx-auto" />
             ) : mode === "image" ? (
@@ -126,10 +126,10 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               <Music className="h-16 w-16 mx-auto" />
             )}
           </div>
-          <p className="text-gray-600 text-lg font-medium mb-2">
+          <p className="text-slate-600 text-lg font-medium mb-2">
             Sign in to view your creations
           </p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-slate-500 text-sm">
             Your generated content will appear here
           </p>
         </div>
@@ -141,7 +141,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
-          <div className="text-gray-400 mb-4">
+          <div className="text-slate-400 mb-4">
             {mode === "video" ? (
               <Video className="h-16 w-16 mx-auto" />
             ) : mode === "image" ? (
@@ -150,10 +150,10 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               <Music className="h-16 w-16 mx-auto" />
             )}
           </div>
-          <p className="text-gray-600 text-lg font-medium mb-2">
+          <p className="text-slate-600 text-lg font-medium mb-2">
             You haven&apos;t created anything yet
           </p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-slate-500 text-sm">
             Start generating to see your creations here
           </p>
         </div>
@@ -175,18 +175,18 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               className="group relative bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
             >
               {/* 封面 */}
-              <div className="aspect-video bg-gray-100 relative">
+              <div className="aspect-video bg-slate-100 relative">
                 {creation.status === "pending" || creation.status === "generating" ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50">
                     <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-slate-600">
                       {creation.status === "pending" ? "Queued" : "Generating..."}
                     </p>
                   </div>
                 ) : creation.status === "processing" ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 opacity-50">
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 opacity-50">
                     <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-                    <p className="text-xs text-gray-600">Processing...</p>
+                    <p className="text-xs text-slate-600">Processing...</p>
                   </div>
                 ) : creation.status === "failed" ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
@@ -216,8 +216,8 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                         controls
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                        <Music className="h-12 w-12 text-gray-400" />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+                        <Music className="h-12 w-12 text-slate-400" />
                       </div>
                     )}
                     {hasMultiple && (
@@ -237,7 +237,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                         className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
                         title="Preview"
                       >
-                        <Image className="h-4 w-4 text-gray-900" />
+                        <Image className="h-4 w-4 text-slate-900" />
                       </button>
                     )}
                     <button
@@ -245,14 +245,14 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                       className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
                       title="Download"
                     >
-                      <Download className="h-4 w-4 text-gray-900" />
+                      <Download className="h-4 w-4 text-slate-900" />
                     </button>
                     <button
                       onClick={() => handleDelete(creation.id)}
                       className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
                       title="Delete"
                     >
-                      <Trash2 className="h-4 w-4 text-gray-900" />
+                      <Trash2 className="h-4 w-4 text-slate-900" />
                     </button>
                   </div>
                 )}
@@ -298,7 +298,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               onClick={() => setExpandedTask(null)}
               className="absolute top-8 right-8 bg-white/90 hover:bg-white rounded-full p-2 transition-colors z-10"
             >
-              <X className="h-6 w-6 text-gray-900" />
+              <X className="h-6 w-6 text-slate-900" />
             </button>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-12">
               {creations

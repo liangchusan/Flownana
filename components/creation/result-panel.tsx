@@ -60,7 +60,7 @@ export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: Resu
   }, [currentGeneration?.taskId, session]);
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-slate-50">
       {/* Small Tab Buttons - Full Width, Subtle */}
       <div className="w-full px-6 pt-4 pb-2 flex gap-3">
         <button
@@ -68,7 +68,7 @@ export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: Resu
           className={`px-2 py-1 text-[10px] font-normal rounded transition-colors ${
             activeTab === "explore"
               ? "text-blue-600 bg-blue-50"
-              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           }`}
         >
           Explore
@@ -78,7 +78,7 @@ export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: Resu
           className={`px-2 py-1 text-[10px] font-normal rounded transition-colors ${
             activeTab === "creations"
               ? "text-blue-600 bg-blue-50"
-              : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           }`}
         >
           My Creations
