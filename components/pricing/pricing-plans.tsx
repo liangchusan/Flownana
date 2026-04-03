@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import type { PriceKey } from "@/lib/plans";
 import { UpgradeModal } from "@/components/billing/upgrade-modal";
-import { DowngradeModal } from "@/components/billing/downgrade-modal";
 
 const SHARED_FEATURES = [
   "Access to top-quality video models",
@@ -59,7 +58,9 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
     } | null;
   } | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [downgradeOpen, setDowngradeOpen] = useState(false);
+  const [upgradeKey, setUpgradeKey] = useState<PriceKey | null>(null);
+  const [upgradeChargeLine, setUpgradeChargeLine] = useState<string | null>(null);
+  const [loadingUpgradeQuote, setLoadingUpgradeQuote] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -113,12 +114,64 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upgrade failed");
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
       window.location.href = "/account/billing?upgrade=success";
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Upgrade failed");
     } finally {
       setLoading(null);
     }
+  };
+
+  const formatMoney = (amountCents: number, currency: string) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amountCents / 100);
+
+  const openUpgradeModal = async (pk: PriceKey) => {
+    setUpgradeKey(pk);
+    setUpgradeOpen(true);
+    setUpgradeChargeLine(null);
+    setLoadingUpgradeQuote(true);
+    try {
+      const res = await fetch(
+        `/api/stripe/change-plan/quote?priceKey=${encodeURIComponent(pk)}`
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to get upgrade quote");
+
+      const payable = formatMoney(data.payableAmountCents || 0, data.currency || "usd");
+      const credit = Number(data.creditAmountCents || 0);
+      const months = Number(data.remainingMonths || 0);
+
+      if (credit > 0) {
+        const creditText = formatMoney(credit, data.currency || "usd");
+        setUpgradeChargeLine(
+          `You will be charged ${payable} after applying ${creditText} credit (${months} remaining month${months === 1 ? "" : "s"}).`
+        );
+      } else {
+        setUpgradeChargeLine(`You will be charged ${payable}.`);
+      }
+    } catch (e: unknown) {
+      setUpgradeChargeLine(
+        e instanceof Error ? e.message : "Failed to get upgrade quote."
+      );
+    } finally {
+      setLoadingUpgradeQuote(false);
+    }
+  };
+
+  const allowedUpgrades: Record<PriceKey, PriceKey[]> = {
+    pro_monthly: ["pro_yearly", "max_yearly"],
+    pro_yearly: ["max_yearly"],
+    max_monthly: ["max_yearly"],
+    max_yearly: [],
   };
 
   const ctaForPlan = (plan: "pro" | "max") => {
@@ -131,34 +184,23 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         onClick: () => subscribe(pk),
       };
     }
-    const same =
-      sub.planType === plan &&
-      sub.billingCycle === (billing === "monthly" ? "monthly" : "yearly");
-    if (same) {
+
+    const currentKey = `${sub.planType}_${sub.billingCycle}` as PriceKey;
+    if (currentKey === pk) {
       return { label: "Current plan", disabled: true, onClick: () => {} };
     }
-    if (sub.planType === "pro" && plan === "max") {
+
+    if (allowedUpgrades[currentKey]?.includes(pk)) {
       return {
         label: "Upgrade",
         disabled: false,
-        onClick: () => setUpgradeOpen(true),
+        onClick: () => {
+          openUpgradeModal(pk);
+        },
       };
     }
-    if (sub.planType === "max" && plan === "pro") {
-      return {
-        label: "Downgrade",
-        disabled: false,
-        onClick: () => setDowngradeOpen(true),
-      };
-    }
-    if (sub.planType === plan) {
-      return {
-        label: billing === "monthly" ? "Switch to yearly (Portal)" : "Switch to monthly (Portal)",
-        disabled: false,
-        onClick: () => setDowngradeOpen(true),
-      };
-    }
-    return { label: "Subscribe", disabled: false, onClick: () => subscribe(pk) };
+
+    return { label: "Not supported", disabled: true, onClick: () => {} };
   };
 
   return (
@@ -265,22 +307,13 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       <UpgradeModal
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
+        isLoadingQuote={loadingUpgradeQuote}
+        chargeLine={upgradeChargeLine}
         onConfirm={() => {
           setUpgradeOpen(false);
-          upgradeNow(priceKeyFor("max", billing));
-        }}
-      />
-      <DowngradeModal
-        open={downgradeOpen}
-        onClose={() => setDowngradeOpen(false)}
-        onManage={() => {
-          setDowngradeOpen(false);
-          fetch("/api/stripe/portal", { method: "POST" })
-            .then((r) => r.json())
-            .then((d) => {
-              if (d.url) window.location.href = d.url;
-              else alert(d.error || "Portal unavailable");
-            });
+          if (upgradeKey) {
+            upgradeNow(upgradeKey);
+          }
         }}
       />
     </>

@@ -3,8 +3,13 @@
 import { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Upload, X, Loader2, Sparkles } from "lucide-react";
+import { Upload, X, Loader2 } from "lucide-react";
 import axios from "axios";
+import {
+  VIDEO_MODEL_OPTIONS,
+  VIDEO_MODEL_OPTION_MAP,
+  type VideoModelOptionId,
+} from "@/lib/generation-pricing";
 
 interface VideoCreationFormProps {
   onGenerate: (videoUrl: string, taskId?: string, prompt?: string) => void;
@@ -25,9 +30,9 @@ export function VideoCreationForm({
 }: VideoCreationFormProps) {
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
-  const [model, setModel] = useState("veo3_fast");
+  const [modelOptionId, setModelOptionId] = useState<VideoModelOptionId>("veo31_fast_8");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const duration = 8;
+  const selectedOption = VIDEO_MODEL_OPTION_MAP[modelOptionId];
 
   // 当外部传入初始值时更新
   useEffect(() => {
@@ -72,9 +77,8 @@ export function VideoCreationForm({
       const response = await axios.post("/api/veo/generate", {
         prompt,
         imageUrls,
-        model,
+        modelOptionId,
         aspectRatio,
-        duration,
       });
 
       if (response.data.success) {
@@ -154,13 +158,16 @@ export function VideoCreationForm({
       <div className="flex gap-3">
         <div className="flex-[1.5]">
           <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
+            value={modelOptionId}
+            onChange={(e) => setModelOptionId(e.target.value as VideoModelOptionId)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Model</option>
-            <option value="veo3_fast">VEO3 Fast</option>
-            <option value="veo3_quality">VEO3 Quality</option>
+            {VIDEO_MODEL_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label} · {option.credits} credits
+              </option>
+            ))}
           </select>
         </div>
 
@@ -180,10 +187,14 @@ export function VideoCreationForm({
 
         <div className="flex-1">
           <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-xs text-gray-600">
-            Duration: 8 s
+            Duration: {selectedOption.duration}s
           </div>
         </div>
       </div>
+
+      <p className="text-xs text-gray-600">
+        This generation will cost {selectedOption.credits} credits.
+      </p>
 
       {/* Generate Button */}
       <Button
@@ -204,4 +215,3 @@ export function VideoCreationForm({
     </div>
   );
 }
-

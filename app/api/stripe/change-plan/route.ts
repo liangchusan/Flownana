@@ -6,13 +6,14 @@ import { getStripe } from "@/lib/stripe";
 import {
   getPriceKeyFromStripePriceId,
   getStripePriceId,
-  PLAN_CREDITS,
-  type PlanKey,
   type PriceKey,
 } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
-import { grantCredits } from "@/lib/credits";
-import { upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { upsertAppUser } from "@/lib/user-sync";
+import {
+  buildUpgradeQuote,
+  isUpgradeAllowed,
+} from "@/lib/upgrade-logic";
 
 const VALID_KEYS: PriceKey[] = [
   "pro_monthly",
@@ -28,7 +29,7 @@ type ChangePlanBody = {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -37,6 +38,13 @@ export async function POST(request: Request) {
     if (!targetKey || !VALID_KEYS.includes(targetKey)) {
       return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });
     }
+
+    await upsertAppUser({
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+      image: session.user.image,
+    });
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -64,70 +72,100 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const targetPriceId = getStripePriceId(targetKey);
-    const targetParsed = getPriceKeyFromStripePriceId(targetPriceId);
-    if (!targetParsed) {
-      return NextResponse.json({ error: "Target price is not recognized." }, { status: 400 });
-    }
 
-    if (current.stripePriceId === targetPriceId) {
-      return NextResponse.json({ ok: true, unchanged: true });
-    }
-
-    const isUpgrade =
-      PLAN_CREDITS[targetParsed.plan] > PLAN_CREDITS[currentParsed.plan];
-    if (!isUpgrade) {
+    if (currentParsed.key === targetKey) {
       return NextResponse.json(
-        { error: "Downgrade or billing-cycle switch should be done in Stripe portal." },
+        { error: "Repeat purchase is not supported." },
+        { status: 400 }
+      );
+    }
+
+    if (!isUpgradeAllowed(currentParsed.key, targetKey)) {
+      return NextResponse.json(
+        { error: "This purchase is not supported. Downgrade purchases are disabled." },
         { status: 400 }
       );
     }
 
     const stripe = getStripe();
-    const sub = await stripe.subscriptions.retrieve(current.stripeSubscriptionId);
-    const itemId = sub.items.data[0]?.id;
-    if (!itemId) {
-      return NextResponse.json({ error: "Subscription item not found." }, { status: 400 });
-    }
+    const baseUrl = process.env.NEXTAUTH_URL || new URL(request.url).origin;
+    const targetPriceId = getStripePriceId(targetKey);
+    const currentStripeSub = await stripe.subscriptions.retrieve(
+      current.stripeSubscriptionId
+    );
 
-    const updated = await stripe.subscriptions.update(sub.id, {
-      items: [{ id: itemId, price: targetPriceId }],
-      proration_behavior: "always_invoice",
-      cancel_at_period_end: false,
+    const quote = await buildUpgradeQuote({
+      stripe,
+      currentKey: currentParsed.key,
+      currentStripePriceId: current.stripePriceId,
+      currentStripeSubscription: currentStripeSub,
+      targetKey,
+      targetPriceId,
+      nextCreditAt: current.nextCreditAt,
+      currentPeriodEnd: current.currentPeriodEnd,
+    });
+
+    const successQs = new URLSearchParams({
+      upgrade: "success",
+      from: currentParsed.key,
+      to: targetKey,
+      credit: String(quote.creditAmountCents),
+      payable: String(quote.payableAmountCents),
+      currency: quote.currency,
+      months: String(quote.remainingMonths),
+    });
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      mode: "subscription",
+      client_reference_id: session.user.id,
+      line_items: [{ price: targetPriceId, quantity: 1 }],
+      success_url: `${baseUrl}/account/billing?${successQs.toString()}`,
+      cancel_url: `${baseUrl}/pricing`,
       metadata: {
-        ...(sub.metadata || {}),
         userId: session.user.id,
         priceKey: targetKey,
+        upgradeFromSubscriptionId: current.stripeSubscriptionId,
+        upgradeFromPriceKey: currentParsed.key,
       },
-    });
+      subscription_data: {
+        metadata: {
+          userId: session.user.id,
+          priceKey: targetKey,
+          upgradeFromSubscriptionId: current.stripeSubscriptionId,
+          upgradeFromPriceKey: currentParsed.key,
+        },
+        proration_behavior: "none",
+        billing_cycle_anchor: Math.floor(Date.now() / 1000),
+      },
+    };
 
-    await upsertSubscriptionFromStripe({
-      userId: session.user.id,
-      stripeSubscription: updated,
-      stripePriceId: targetPriceId,
-    });
-
-    // Grant immediate upgrade credits once per subscription period + target plan.
-    const grantKey = `grant_upgrade_${updated.id}_${updated.current_period_start}_${targetParsed.plan}`;
-    const already = await prisma.processedStripeEvent.findUnique({
-      where: { id: grantKey },
-    });
-    if (!already) {
-      await grantCredits({
-        userId: session.user.id,
-        planType: targetParsed.plan as PlanKey,
-        source: "upgrade_immediate",
-      });
-      await prisma.processedStripeEvent.create({
-        data: { id: grantKey, type: "upgrade_credit_grant" },
-      });
+    if (user.stripeCustomerId) {
+      sessionParams.customer = user.stripeCustomerId;
+    } else {
+      sessionParams.customer_email = session.user.email;
     }
 
-    return NextResponse.json({ ok: true });
+    if (quote.creditAmountCents > 0) {
+      const coupon = await stripe.coupons.create({
+        duration: "once",
+        amount_off: quote.creditAmountCents,
+        currency: quote.currency,
+        name: `Pro yearly remaining credit (${quote.remainingMonths}m)`,
+      });
+      sessionParams.discounts = [{ coupon: coupon.id }];
+      sessionParams.metadata = {
+        ...sessionParams.metadata,
+        remainingMonthsCredit: String(quote.remainingMonths),
+        creditAmountCents: String(quote.creditAmountCents),
+        creditCouponId: coupon.id,
+      };
+    }
+
+    const checkoutSession = await stripe.checkout.sessions.create(sessionParams);
+    return NextResponse.json({ url: checkoutSession.url });
   } catch (e: unknown) {
     console.error("Stripe change plan error:", e);
     const message = e instanceof Error ? e.message : "Failed to change plan";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

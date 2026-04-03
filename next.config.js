@@ -8,11 +8,11 @@ if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['lh3.googleusercontent.com'],
+    domains: ["lh3.googleusercontent.com"],
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '**',
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
       },
     ],
   },
@@ -27,11 +27,10 @@ const nextConfig = {
   // 增加 API 路由超时时间
   experimental: {
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: "2mb",
     },
   },
-}
+};
 
-module.exports = nextConfig
-
+module.exports = nextConfig;
 

@@ -42,7 +42,24 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
+      include: {
+        subscriptions: {
+          where: { status: { in: ["active", "trialing"] } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
     });
+
+    if (user?.subscriptions?.[0]) {
+      return NextResponse.json(
+        {
+          error:
+            "You already have an active subscription. Use the upgrade flow on pricing page.",
+        },
+        { status: 400 }
+      );
+    }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",

@@ -29,6 +29,45 @@ export default function BillingPage() {
   const { data: session, status } = useSession();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [upgradeInfo, setUpgradeInfo] = useState<{
+    success: boolean;
+    from: string | null;
+    to: string | null;
+    creditCents: number;
+    payableCents: number;
+    currency: string;
+    months: number;
+  }>({
+    success: false,
+    from: null,
+    to: null,
+    creditCents: 0,
+    payableCents: 0,
+    currency: "USD",
+    months: 0,
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setUpgradeInfo({
+      success: params.get("upgrade") === "success",
+      from: params.get("from"),
+      to: params.get("to"),
+      creditCents: Number(params.get("credit") || "0"),
+      payableCents: Number(params.get("payable") || "0"),
+      currency: (params.get("currency") || "usd").toUpperCase(),
+      months: Number(params.get("months") || "0"),
+    });
+  }, []);
+
+  const formatMoney = (amountCents: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: upgradeInfo.currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amountCents / 100);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -88,6 +127,24 @@ export default function BillingPage() {
           Manage subscription and view credits. Credits expire 30 days after
           each grant (FIFO usage).
         </p>
+
+        {upgradeInfo.success && (
+          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm font-medium text-blue-900">
+              Upgrade successful: {upgradeInfo.from || "current"} to {upgradeInfo.to || "new"}.
+            </p>
+            <p className="text-sm text-blue-800 mt-1">
+              Paid {formatMoney(upgradeInfo.payableCents)}
+              {upgradeInfo.creditCents > 0
+                ? ` after ${formatMoney(upgradeInfo.creditCents)} credit${
+                    upgradeInfo.months > 0
+                      ? ` (${upgradeInfo.months} remaining month${upgradeInfo.months === 1 ? "" : "s"})`
+                      : ""
+                  }.`
+                : "."}
+            </p>
+          </div>
+        )}
 
         {error && (
           <p className="text-red-600 text-sm mb-4">{error}</p>

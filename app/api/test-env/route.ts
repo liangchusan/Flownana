@@ -5,6 +5,10 @@ import { NextResponse } from "next/server";
  * 访问: http://localhost:3000/api/test-env
  */
 export async function GET() {
+  if (process.env.NODE_ENV !== "development") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const env = {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || "❌ Not set",
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ? "✅ Set" : "❌ Not set",
@@ -24,40 +28,9 @@ export async function GET() {
         : "❌ Not set",
   };
 
-  // Test API connectivity
-  let apiTest = {
-    nanoBanana: "Not tested",
-    kie: "Not tested",
-  };
-
-  if (process.env.NANO_BANANA_API_KEY) {
-    try {
-      const testRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.NANO_BANANA_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "nano-banana-2",
-          input: {
-            prompt: "test",
-            aspect_ratio: "1:1",
-            resolution: "1K",
-            output_format: "png",
-          },
-        }),
-      });
-      apiTest.nanoBanana = testRes.ok ? "✅ API accessible" : `❌ API error: ${testRes.status}`;
-    } catch (error: any) {
-      apiTest.nanoBanana = `❌ Connection failed: ${error.message}`;
-    }
-  }
-
   return NextResponse.json({
     message: "Environment Variables Check",
     env,
-    apiTest,
     nodeEnv: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
   }, { 
@@ -66,5 +39,4 @@ export async function GET() {
     }
   });
 }
-
 

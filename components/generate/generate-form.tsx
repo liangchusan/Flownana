@@ -5,6 +5,10 @@ import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Upload, X, Loader2 } from "lucide-react";
 import axios from "axios";
+import {
+  IMAGE_RESOLUTION_CREDITS,
+  type ImageResolutionKey,
+} from "@/lib/generation-pricing";
 
 interface GenerateFormProps {
   onGenerate: (imageUrl: string, taskId?: string, prompt?: string) => void;
@@ -26,7 +30,7 @@ export function GenerateForm({
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
   const [model, setModel] = useState("nano-banana-2");
-  const [resolution, setResolution] = useState("1K");
+  const [resolution, setResolution] = useState<ImageResolutionKey>("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
   // 当外部传入初始值时更新
@@ -167,7 +171,7 @@ export function GenerateForm({
         <div className="flex-1">
           <select
             value={resolution}
-            onChange={(e) => setResolution(e.target.value)}
+            onChange={(e) => setResolution(e.target.value as ImageResolutionKey)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
           >
             <option value="" disabled>Resolution</option>
@@ -208,9 +212,11 @@ export function GenerateForm({
           "Generate"
         )}
       </Button>
+
+      <p className="text-xs text-gray-600">
+        This generation will cost {IMAGE_RESOLUTION_CREDITS[resolution]} credits.
+      </p>
     </div>
   );
 }
-
-
 

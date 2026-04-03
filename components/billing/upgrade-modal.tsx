@@ -6,10 +6,14 @@ export function UpgradeModal({
   open,
   onClose,
   onConfirm,
+  isLoadingQuote,
+  chargeLine,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  isLoadingQuote?: boolean;
+  chargeLine?: string | null;
 }) {
   if (!open) return null;
 
@@ -27,11 +31,19 @@ export function UpgradeModal({
           Upgrading will immediately grant new credits. Your current credits will
           not be affected.
         </p>
+        {isLoadingQuote && (
+          <p className="text-xs text-gray-500 mb-4">Calculating charge...</p>
+        )}
+        {!isLoadingQuote && chargeLine && (
+          <p className="text-sm text-blue-700 mb-4">{chargeLine}</p>
+        )}
         <div className="flex gap-3 justify-end">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onConfirm}>Confirm Upgrade</Button>
+          <Button onClick={onConfirm} disabled={!!isLoadingQuote}>
+            Confirm Upgrade
+          </Button>
         </div>
       </div>
     </div>

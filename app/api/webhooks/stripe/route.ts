@@ -1,15 +1,27 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { Prisma } from "@prisma/client";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import { grantCredits } from "@/lib/credits";
-import { getPriceKeyFromStripePriceId, type PlanKey } from "@/lib/plans";
+import {
+  getPriceKeyFromStripePriceId,
+  PLAN_CREDITS,
+  type PlanKey,
+} from "@/lib/plans";
 import {
   addMonths,
   upsertSubscriptionFromStripe,
 } from "@/lib/subscription-sync";
 
 export const dynamic = "force-dynamic";
+const MS_PER_DAY = 86_400_000;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 async function resolveUserId(
   stripe: ReturnType<typeof getStripe>,
@@ -71,31 +83,37 @@ async function grantCreditsForCurrentPeriodIfNeeded(params: {
   source: string;
 }) {
   const grantKey = `grant_sub_${params.sub.id}_${params.sub.current_period_start}`;
-  const already = await prisma.processedStripeEvent.findUnique({
-    where: { id: grantKey },
-  });
-  if (already) return;
+  const nextCreditAt =
+    params.parsed.billing === "yearly"
+      ? addMonths(new Date(params.sub.current_period_start * 1000), 1)
+      : null;
 
-  await grantCredits({
-    userId: params.userId,
-    planType: params.parsed.plan,
-    source: params.source,
-  });
-  await prisma.processedStripeEvent.create({
-    data: { id: grantKey, type: "subscription_period_grant" },
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.processedStripeEvent.create({
+        data: { id: grantKey, type: "subscription_period_grant" },
+      });
 
-  if (params.parsed.billing === "yearly") {
-    const next = addMonths(new Date(params.sub.current_period_start * 1000), 1);
-    await prisma.subscription.update({
-      where: { stripeSubscriptionId: params.sub.id },
-      data: { nextCreditAt: next },
+      const amount = PLAN_CREDITS[params.parsed.plan];
+      await tx.creditBatch.create({
+        data: {
+          userId: params.userId,
+          amount,
+          remaining: amount,
+          expiresAt: new Date(Date.now() + 30 * MS_PER_DAY),
+          source: params.source,
+        },
+      });
+
+      await tx.subscription.update({
+        where: { stripeSubscriptionId: params.sub.id },
+        data: { nextCreditAt },
+      });
     });
-  } else {
-    await prisma.subscription.update({
-      where: { stripeSubscriptionId: params.sub.id },
-      data: { nextCreditAt: null },
-    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
   }
 }
 
@@ -137,6 +155,7 @@ export async function POST(request: Request) {
           typeof session.subscription === "string"
             ? session.subscription
             : session.subscription?.id;
+        const upgradeFromSubId = session.metadata?.upgradeFromSubscriptionId || null;
 
         if (!userId || !customerId || !subId) {
           console.error("checkout.session.completed missing fields");
@@ -159,6 +178,28 @@ export async function POST(request: Request) {
           stripeSubscription: sub,
           stripePriceId: priceId,
         });
+
+        if (
+          session.payment_status === "paid" &&
+          upgradeFromSubId &&
+          upgradeFromSubId !== sub.id
+        ) {
+          try {
+            const canceled = await stripe.subscriptions.cancel(upgradeFromSubId, {
+              prorate: false,
+            });
+            const oldPriceId = canceled.items.data[0]?.price?.id;
+            if (oldPriceId) {
+              await upsertSubscriptionFromStripe({
+                userId,
+                stripeSubscription: canceled,
+                stripePriceId: oldPriceId,
+              });
+            }
+          } catch (cancelError) {
+            console.error("Failed to cancel previous subscription:", cancelError);
+          }
+        }
 
         if (
           session.payment_status === "paid" &&

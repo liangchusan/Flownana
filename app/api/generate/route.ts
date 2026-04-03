@@ -1,4 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-options";
+import {
+  InsufficientCreditsError,
+  consumeCreditsFIFO,
+  refundConsumedCredits,
+  type CreditConsumptionSnapshot,
+} from "@/lib/credit-consumption";
+import {
+  IMAGE_RESOLUTION_CREDITS,
+  type ImageResolutionKey,
+} from "@/lib/generation-pricing";
 
 const NANO_BANANA_API_BASE = "https://api.kie.ai";
 
@@ -165,7 +177,13 @@ async function pollNanoBananaResult(taskId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  let consumedCredits: CreditConsumptionSnapshot = [];
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       prompt,
@@ -188,7 +206,18 @@ export async function POST(request: NextRequest) {
     }
 
     const ar = aspectRatio && aspectRatio.trim() !== "" ? aspectRatio : "1:1";
-    const res = resolution && resolution.trim() !== "" ? resolution : "1K";
+    const res = (
+      resolution && resolution.trim() !== "" ? resolution : "1K"
+    ).toUpperCase() as ImageResolutionKey;
+    const cost = IMAGE_RESOLUTION_CREDITS[res];
+    if (!cost) {
+      return NextResponse.json(
+        { error: "Unsupported resolution." },
+        { status: 400 }
+      );
+    }
+
+    consumedCredits = await consumeCreditsFIFO(session.user.id, cost);
 
     const imageInput =
       imageUrl && String(imageUrl).trim() !== ""
@@ -210,9 +239,29 @@ export async function POST(request: NextRequest) {
       imageUrl: generatedImageUrl,
       prompt,
       taskId,
+      creditsCost: cost,
     });
   } catch (error: any) {
     console.error("Error generating image:", error);
+    if (consumedCredits.length > 0) {
+      try {
+        await refundConsumedCredits(consumedCredits);
+      } catch (refundError) {
+        console.error("Failed to refund image credits:", refundError);
+      }
+    }
+
+    if (error instanceof InsufficientCreditsError) {
+      return NextResponse.json(
+        {
+          error: `Insufficient credits. Required ${error.required}, available ${error.available}.`,
+          required: error.required,
+          available: error.available,
+        },
+        { status: 402 }
+      );
+    }
+
     const message =
       typeof error?.message === "string"
         ? error.message
