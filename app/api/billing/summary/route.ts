@@ -35,7 +35,6 @@ export async function GET() {
           creditsPerMonth: PLAN_CREDITS[sub.planType as "pro" | "max"],
           currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
           cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-          nextPlan: sub.nextPlan,
         }
       : null,
     credits: {

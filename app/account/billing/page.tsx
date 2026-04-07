@@ -16,7 +16,6 @@ type Summary = {
     creditsPerMonth: number;
     currentPeriodEnd: string;
     cancelAtPeriodEnd: boolean;
-    nextPlan: string | null;
   } | null;
   credits: {
     current: number;
@@ -208,11 +207,6 @@ export default function BillingPage() {
                   {summary.subscription.cancelAtPeriodEnd && (
                     <p className="text-amber-700 text-sm mt-2">
                       Cancellation scheduled at period end.
-                    </p>
-                  )}
-                  {summary.subscription.nextPlan && (
-                    <p className="text-sm text-slate-600 mt-2">
-                      Pending change: {summary.subscription.nextPlan}
                     </p>
                   )}
                   <Button className="mt-4" variant="outline" onClick={openPortal}>

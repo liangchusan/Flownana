@@ -28,6 +28,8 @@ export async function GET(request: Request) {
   });
 
   let granted = 0;
+  const failed: string[] = [];
+
   for (const sub of subs) {
     if (!sub.nextCreditAt) continue;
     if (sub.nextCreditAt >= sub.currentPeriodEnd) {
@@ -38,22 +40,29 @@ export async function GET(request: Request) {
       continue;
     }
 
-    await grantCredits({
-      userId: sub.userId,
-      planType: sub.planType as PlanKey,
-      source: "yearly_monthly_cron",
-    });
+    try {
+      await grantCredits({
+        userId: sub.userId,
+        planType: sub.planType as PlanKey,
+        source: "yearly_monthly_cron",
+      });
 
-    const next = addMonths(sub.nextCreditAt, 1);
-    const end = sub.currentPeriodEnd;
-    await prisma.subscription.update({
-      where: { id: sub.id },
-      data: {
-        nextCreditAt: next.getTime() >= end.getTime() ? null : next,
-      },
-    });
-    granted += 1;
+      // Only advance nextCreditAt after a confirmed successful grant.
+      const next = addMonths(sub.nextCreditAt, 1);
+      const end = sub.currentPeriodEnd;
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: {
+          nextCreditAt: next.getTime() >= end.getTime() ? null : next,
+        },
+      });
+      granted += 1;
+    } catch (err) {
+      // Grant failed: leave nextCreditAt unchanged so the next cron run retries.
+      console.error(`[cron/monthly-credits] Failed to grant for sub ${sub.id}:`, err);
+      failed.push(sub.id);
+    }
   }
 
-  return NextResponse.json({ ok: true, granted });
+  return NextResponse.json({ ok: true, granted, failed });
 }

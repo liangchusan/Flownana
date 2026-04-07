@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import type { PriceKey } from "@/lib/plans";
 
 export const ALLOWED_UPGRADES: Record<PriceKey, PriceKey[]> = {
-  pro_monthly: ["pro_yearly", "max_yearly"],
+  pro_monthly: ["pro_yearly", "max_monthly", "max_yearly"],
   pro_yearly: ["max_yearly"],
   max_monthly: ["max_yearly"],
   max_yearly: [],

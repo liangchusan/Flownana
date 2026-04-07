@@ -31,7 +31,6 @@ model Subscription {
   currentPeriodStart   DateTime
   currentPeriodEnd     DateTime
   cancelAtPeriodEnd    Boolean   @default(false)
-  nextPlan             String?
   /// Next scheduled monthly credit grant (yearly plans: months 2–12)
   nextCreditAt         DateTime?
   createdAt            DateTime  @default(now())

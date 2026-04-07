@@ -168,13 +168,25 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   };
 
   const allowedUpgrades: Record<PriceKey, PriceKey[]> = {
-    pro_monthly: ["pro_yearly", "max_yearly"],
+    pro_monthly: ["pro_yearly", "max_monthly", "max_yearly"],
     pro_yearly: ["max_yearly"],
     max_monthly: ["max_yearly"],
     max_yearly: [],
   };
 
-  const ctaForPlan = (plan: "pro" | "max") => {
+  const PLAN_RANK: Record<PriceKey, number> = {
+    pro_monthly: 1,
+    pro_yearly: 2,
+    max_monthly: 3,
+    max_yearly: 4,
+  };
+
+  const ctaForPlan = (plan: "pro" | "max"): {
+    label: string;
+    disabled: boolean;
+    note?: string;
+    onClick: () => void;
+  } => {
     const pk = priceKeyFor(plan, billing);
     const sub = summary?.subscription;
     if (!sub) {
@@ -194,13 +206,21 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       return {
         label: "Upgrade",
         disabled: false,
-        onClick: () => {
-          openUpgradeModal(pk);
-        },
+        onClick: () => openUpgradeModal(pk),
       };
     }
 
-    return { label: "Not supported", disabled: true, onClick: () => {} };
+    // Downgrade direction — inform user to use the billing portal
+    if (PLAN_RANK[pk] < PLAN_RANK[currentKey]) {
+      return {
+        label: "Downgrade not available",
+        disabled: true,
+        note: "To downgrade, use Manage subscription below.",
+        onClick: () => {},
+      };
+    }
+
+    return { label: "Not available", disabled: true, onClick: () => {} };
   };
 
   return (
@@ -293,6 +313,9 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
               >
                 {loading === pk ? "…" : cta.label}
               </Button>
+              {cta.note && (
+                <p className="mt-2 text-xs text-slate-500 text-center">{cta.note}</p>
+              )}
             </div>
           );
         })}
