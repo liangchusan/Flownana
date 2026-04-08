@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import ImageModal from "./image-modal";
 import VideoModal from "./video-modal";
 
@@ -443,8 +443,6 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_LOAD);
-  const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set());
-  const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -488,45 +486,22 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
     };
   }, [visibleCount, filteredExamples.length]);
 
-  // 视频懒加载：只加载可见区域的视频
-  const handleVideoIntersection = useCallback((id: string, containerElement: HTMLDivElement | null) => {
-    if (!containerElement || loadedVideos.has(id)) return;
-
-    const videoObserver = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          // 标记视频为已加载，触发重新渲染显示视频元素
-          setLoadedVideos((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(id);
-            return newSet;
-          });
-          videoObserver.disconnect();
-        }
-      },
-      { rootMargin: "200px" } // 提前 200px 加载视频
-    );
-
-    videoObserver.observe(containerElement);
-  }, [loadedVideos]);
-
   // 视频点击时打开模态框（视频在模态框中加载）
-  const handleVideoClick = useCallback((url: string) => {
+  const handleVideoClick = (url: string) => {
     setSelectedVideo(url);
-  }, []);
+  };
 
-  // 生成视频封面 URL（使用视频的第一帧或占位图）
-  const getVideoPoster = (videoUrl: string, prompt: string) => {
-    // 使用更美观的占位图，实际项目中可以从视频提取第一帧
-    // 这里使用渐变背景作为占位
-    const hash = videoUrl.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const colors = [
-      'from-blue-400/20 to-purple-400/20',
-      'from-green-400/20 to-blue-400/20',
-      'from-purple-400/20 to-pink-400/20',
-      'from-orange-400/20 to-red-400/20',
+  const getVideoCover = (videoUrl: string) => {
+    const seed = videoUrl
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const covers = [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&h=675&fit=crop",
+      "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&h=675&fit=crop",
+      "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=1200&h=675&fit=crop",
+      "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1200&h=675&fit=crop",
     ];
-    return colors[hash % colors.length];
+    return covers[seed % covers.length];
   };
 
   return (
@@ -557,63 +532,22 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                 className="bg-slate-100 relative cursor-pointer"
                 onClick={() => handleVideoClick(example.url)}
               >
-                {loadedVideos.has(example.id) ? (
-                  <video
-                    ref={(video) => {
-                      if (video && !videoRefs.current[example.id]) {
-                        videoRefs.current[example.id] = video;
-                        // 设置视频属性
-                        video.muted = true;
-                        video.loop = true;
-                        video.playsInline = true;
-                        // 尝试自动播放
-                        const tryPlay = async () => {
-                          try {
-                            await video.play();
-                          } catch (error) {
-                            // 如果自动播放失败，可能是浏览器策略限制
-                            console.debug("Video autoplay prevented:", error);
-                          }
-                        };
-                        // 如果视频已加载，直接播放；否则等待加载完成
-                        if (video.readyState >= 2) {
-                          tryPlay();
-                        } else {
-                          video.addEventListener('loadeddata', tryPlay, { once: true });
-                          video.addEventListener('canplay', tryPlay, { once: true });
-                        }
-                      }
-                    }}
-                    src={example.url}
-                    className="w-full h-auto"
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
+                <div className="relative w-full aspect-video">
+                  <img
+                    src={getVideoCover(example.url)}
+                    alt={example.prompt}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
-                ) : (
-                  <div 
-                    ref={(div) => {
-                      if (div) {
-                        handleVideoIntersection(example.id, div);
-                      }
-                    }}
-                    className={`relative w-full aspect-video bg-gradient-to-br ${getVideoPoster(example.url, example.prompt)}`}
-                  >
-                    {/* 视频封面占位 - 使用渐变背景 */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-slate-400 text-xs opacity-50">{example.model}</div>
-                    </div>
-                    {/* 播放按钮指示 */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/5 group-hover:bg-black/10 transition-colors">
-                      <div className="bg-white/90 rounded-full p-2 opacity-70 group-hover:opacity-100 transition-opacity">
-                        <svg className="w-4 h-4 text-slate-900 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                      </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+                    <div className="rounded-full bg-white/90 p-2 shadow-sm transition-all duration-200 group-hover:scale-105">
+                      <svg className="ml-0.5 h-4 w-4 text-slate-900" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             )}
             {/* Generate Similar Button */}

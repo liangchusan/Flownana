@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { Download, Trash2, RefreshCw, Loader2, Image, Video, Music, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ImageModal from "./image-modal";
+import VideoModal from "./video-modal";
 
 type CreationStatus = "pending" | "generating" | "processing" | "success" | "failed";
 
@@ -33,7 +34,10 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   const { data: session } = useSession();
   const [creations, setCreations] = useState<Creation[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
+  const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
+  const visibleCreations = creations.filter((creation) => creation.type === mode);
 
   // 从 localStorage 加载历史记录
   useEffect(() => {
@@ -137,7 +141,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     );
   }
 
-  if (creations.length === 0) {
+  if (visibleCreations.length === 0) {
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
@@ -164,10 +168,11 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   return (
     <div className="p-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {creations.map((creation) => {
+        {visibleCreations.map((creation) => {
           const isExpanded = expandedTask === creation.id;
           const displayUrl = creation.urls[0];
           const hasMultiple = creation.urls.length > 1;
+          const mediaFailed = failedMedia.has(creation.id);
 
           return (
             <div
@@ -196,25 +201,56 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                 ) : displayUrl ? (
                   <>
                     {creation.type === "image" ? (
-                      <img
-                        src={displayUrl}
-                        alt={creation.prompt}
-                        className="w-full h-full object-cover cursor-pointer"
-                        onClick={() => {
-                          if (hasMultiple) {
-                            setExpandedTask(isExpanded ? null : creation.id);
-                          } else {
-                            setSelectedImage(displayUrl);
+                      mediaFailed ? (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-100">
+                          <Image className="h-8 w-8 text-slate-400" />
+                        </div>
+                      ) : (
+                        <img
+                          src={displayUrl}
+                          alt={creation.prompt}
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => {
+                            if (hasMultiple) {
+                              setExpandedTask(isExpanded ? null : creation.id);
+                            } else {
+                              setSelectedImage(displayUrl);
+                            }
+                          }}
+                          onError={() =>
+                            setFailedMedia((prev) => new Set(prev).add(creation.id))
                           }
-                        }}
-                        loading="lazy"
-                      />
+                          loading="lazy"
+                        />
+                      )
                     ) : creation.type === "video" ? (
-                      <video
-                        src={displayUrl}
-                        className="w-full h-full object-cover"
-                        controls
-                      />
+                      mediaFailed ? (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-100">
+                          <Video className="h-8 w-8 text-slate-400" />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="relative h-full w-full cursor-pointer"
+                          onClick={() => setSelectedVideo(displayUrl)}
+                        >
+                          <video
+                            src={displayUrl}
+                            className="h-full w-full object-cover"
+                            muted
+                            playsInline
+                            preload="metadata"
+                            onError={() =>
+                              setFailedMedia((prev) => new Set(prev).add(creation.id))
+                            }
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                            <div className="rounded-full bg-white/90 p-2">
+                              <Video className="h-4 w-4 text-slate-900" />
+                            </div>
+                          </div>
+                        </button>
+                      )
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
                         <Music className="h-12 w-12 text-slate-400" />
@@ -238,6 +274,15 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                         title="Preview"
                       >
                         <Image className="h-4 w-4 text-slate-900" />
+                      </button>
+                    )}
+                    {creation.type === "video" && (
+                      <button
+                        onClick={() => setSelectedVideo(displayUrl)}
+                        className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+                        title="Preview"
+                      >
+                        <Video className="h-4 w-4 text-slate-900" />
                       </button>
                     )}
                     <button
@@ -323,6 +368,12 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
         <ImageModal
           imageUrl={selectedImage}
           onClose={() => setSelectedImage(null)}
+        />
+      )}
+      {selectedVideo && (
+        <VideoModal
+          videoUrl={selectedVideo}
+          onClose={() => setSelectedVideo(null)}
         />
       )}
     </div>

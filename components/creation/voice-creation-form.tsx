@@ -130,6 +130,10 @@ export function VoiceCreationForm({
           "Generate"
         )}
       </Button>
+
+      <p className="text-xs text-slate-600">
+        This generation will cost 10 credits.
+      </p>
     </div>
   );
 }

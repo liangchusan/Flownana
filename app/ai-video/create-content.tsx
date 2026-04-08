@@ -67,8 +67,8 @@ export function CreateContent({ mode }: { mode: "video" }) {
         {/* Content area with left margin for sidebar */}
         <div className="flex h-[calc(100vh-73px)] ml-[70px]">
           {/* Left: Creation Form */}
-          <div className="w-[440px] overflow-y-auto bg-white border-r border-slate-200/60 p-8">
-            <h1 className="text-3xl md:text-4xl font-semibold text-slate-900 mb-8">
+          <div className="w-[420px] overflow-y-auto bg-white border-r border-slate-200/60 p-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-8">
               AI Video
             </h1>
             <VideoCreationForm

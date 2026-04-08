@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import {
+  consumeCreditsFIFO,
+  refundConsumedCredits,
+  InsufficientCreditsError,
+  type CreditConsumptionSnapshot,
+} from "@/lib/credit-consumption";
+
+const MUSIC_CREDITS = 10;
 
 const KIE_API_BASE = "https://api.kie.ai";
 
@@ -134,6 +142,8 @@ async function pollSunoResult(taskId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  let consumedCredits: CreditConsumptionSnapshot = [];
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -160,6 +170,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Deduct credits before generation
+    consumedCredits = await consumeCreditsFIFO(session.user.id, MUSIC_CREDITS);
+
     const taskId = await createSunoTask({
       prompt,
       title,
@@ -176,6 +189,22 @@ export async function POST(request: NextRequest) {
       taskId,
     });
   } catch (error: any) {
+    // Refund credits on failure
+    if (consumedCredits.length > 0) {
+      try {
+        await refundConsumedCredits(consumedCredits);
+      } catch (refundErr) {
+        console.error("Error refunding credits after music generation failure:", refundErr);
+      }
+    }
+
+    if (error instanceof InsufficientCreditsError) {
+      return NextResponse.json(
+        { error: `Insufficient credits. Required: ${error.required}, available: ${error.available}.` },
+        { status: 402 }
+      );
+    }
+
     console.error("Error generating audio:", error);
     const message =
       typeof error?.message === "string"
