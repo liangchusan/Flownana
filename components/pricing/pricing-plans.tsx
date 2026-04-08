@@ -146,17 +146,21 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to get upgrade quote");
 
-      const payable = formatMoney(data.payableAmountCents || 0, data.currency || "usd");
+      const currency = data.currency || "usd";
+      const payable = formatMoney(data.payableAmountCents || 0, currency);
       const credit = Number(data.creditAmountCents || 0);
       const months = Number(data.remainingMonths || 0);
+      const newPlanTotal = formatMoney((data.payableAmountCents || 0) + (data.creditAmountCents || 0), currency);
 
       if (credit > 0) {
-        const creditText = formatMoney(credit, data.currency || "usd");
+        const creditText = formatMoney(credit, currency);
         setUpgradeChargeLine(
-          `You will be charged ${payable} after applying ${creditText} credit (${months} remaining month${months === 1 ? "" : "s"}).`
+          `Today's charge: ${payable}\n${newPlanTotal} (new plan) − ${creditText} credit (${months} unused month${months === 1 ? "" : "s"} remaining on current plan) = ${payable}\nNew subscription starts immediately. Current plan will be canceled.`
         );
       } else {
-        setUpgradeChargeLine(`You will be charged ${payable}.`);
+        setUpgradeChargeLine(
+          `Today's charge: ${payable}\nNew subscription starts immediately. Current plan will be canceled.`
+        );
       }
     } catch (e: unknown) {
       setUpgradeChargeLine(
@@ -210,12 +214,15 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       };
     }
 
-    // Downgrade direction — inform user to use the billing portal
-    if (PLAN_RANK[pk] < PLAN_RANK[currentKey]) {
+    // Downgrade or lateral — not supported via UI
+    if (PLAN_RANK[pk] <= PLAN_RANK[currentKey]) {
       return {
-        label: "Downgrade not available",
+        label: "Not available",
         disabled: true,
-        note: "To downgrade, use Manage subscription below.",
+        note:
+          PLAN_RANK[pk] < PLAN_RANK[currentKey]
+            ? "To downgrade, manage your subscription in the billing portal."
+            : undefined,
         onClick: () => {},
       };
     }

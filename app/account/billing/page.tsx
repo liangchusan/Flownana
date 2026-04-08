@@ -46,9 +46,12 @@ export default function BillingPage() {
     months: 0,
   });
 
+  const [isNewCheckout, setIsNewCheckout] = useState(false);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    setIsNewCheckout(params.get("checkout") === "success");
     setUpgradeInfo({
       success: params.get("upgrade") === "success",
       from: params.get("from"),
@@ -132,21 +135,52 @@ export default function BillingPage() {
           each grant (FIFO usage).
         </p>
 
+        {/* New subscription success */}
+        {isNewCheckout && (
+          <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-lg font-bold text-blue-900 mb-1">
+                  🎉 You're all set!
+                </p>
+                <p className="text-sm text-blue-700">
+                  Your subscription is now active. Credits have been added to your account — start creating right away.
+                </p>
+              </div>
+            </div>
+            <Link href="/ai-video" className="mt-4 inline-flex">
+              <Button className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]">
+                Start Creating →
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        {/* Upgrade success */}
         {upgradeInfo.success && (
-          <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <p className="text-sm font-medium text-blue-900">
-              Upgrade successful: {upgradeInfo.from || "current"} to {upgradeInfo.to || "new"}.
-            </p>
-            <p className="text-sm text-blue-800 mt-1">
-              Paid {formatMoney(upgradeInfo.payableCents)}
-              {upgradeInfo.creditCents > 0
-                ? ` after ${formatMoney(upgradeInfo.creditCents)} credit${
-                    upgradeInfo.months > 0
-                      ? ` (${upgradeInfo.months} remaining month${upgradeInfo.months === 1 ? "" : "s"})`
-                      : ""
-                  }.`
-                : "."}
-            </p>
+          <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-lg font-bold text-blue-900 mb-1">
+                  ✨ Plan upgraded!
+                </p>
+                <p className="text-sm text-blue-700">
+                  Upgraded to{" "}
+                  <span className="font-semibold capitalize">{upgradeInfo.to || "new plan"}</span>.
+                  {upgradeInfo.payableCents > 0 && (
+                    <> Paid {formatMoney(upgradeInfo.payableCents)}
+                    {upgradeInfo.creditCents > 0 ? ` (${formatMoney(upgradeInfo.creditCents)} credit applied)` : ""}.
+                    </>
+                  )}{" "}
+                  New credits have been added to your account.
+                </p>
+              </div>
+            </div>
+            <Link href="/ai-video" className="mt-4 inline-flex">
+              <Button className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]">
+                Start Creating →
+              </Button>
+            </Link>
           </div>
         )}
 
