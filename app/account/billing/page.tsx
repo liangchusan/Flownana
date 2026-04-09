@@ -141,14 +141,14 @@ export default function BillingPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-lg font-bold text-blue-900 mb-1">
-                  🎉 You're all set!
+                  🎉 You&apos;re all set!
                 </p>
                 <p className="text-sm text-blue-700">
                   Your subscription is now active. Credits have been added to your account — start creating right away.
                 </p>
               </div>
             </div>
-            <Link href="/ai-video" className="mt-4 inline-flex">
+            <Link href="/ai-image" className="mt-4 inline-flex">
               <Button className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]">
                 Start Creating →
               </Button>
@@ -176,7 +176,7 @@ export default function BillingPage() {
                 </p>
               </div>
             </div>
-            <Link href="/ai-video" className="mt-4 inline-flex">
+            <Link href="/ai-image" className="mt-4 inline-flex">
               <Button className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]">
                 Start Creating →
               </Button>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Download, Trash2, RefreshCw, Loader2, Image, Video, Music, X } from "lucide-react";
+import { Download, Trash2, RefreshCw, Loader2, Image as ImageIcon, Video, Music, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ImageModal from "./image-modal";
 import VideoModal from "./video-modal";
@@ -32,6 +33,7 @@ interface MyCreationsTabProps {
 
 export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const [creations, setCreations] = useState<Creation[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
@@ -91,9 +93,18 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
 
   // 保存到 localStorage
   useEffect(() => {
-    if (session?.user?.email && creations.length > 0) {
-      localStorage.setItem(`creations_${session.user.email}`, JSON.stringify(creations));
+    if (!session?.user?.email) {
+      return;
     }
+
+    const storageKey = `creations_${session.user.email}`;
+
+    if (creations.length > 0) {
+      localStorage.setItem(storageKey, JSON.stringify(creations));
+      return;
+    }
+
+    localStorage.removeItem(storageKey);
   }, [creations, session]);
 
   const handleDelete = (id: string) => {
@@ -103,8 +114,25 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   };
 
   const handleRetry = (creation: Creation) => {
-    // TODO: 实现重试逻辑
-    console.log("Retry creation:", creation);
+    const params = new URLSearchParams();
+
+    if (creation.prompt.trim()) {
+      params.set("prompt", creation.prompt);
+    }
+
+    if (creation.type !== "music" && creation.urls[0]) {
+      params.set("image", creation.urls[0]);
+    }
+
+    const basePath =
+      creation.type === "image"
+        ? "/ai-image"
+        : creation.type === "video"
+          ? "/ai-video"
+          : "/ai-music";
+
+    const query = params.toString();
+    router.push(query ? `${basePath}?${query}` : basePath);
   };
 
   const handleDownload = (url: string, type: string) => {
@@ -125,7 +153,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
             {mode === "video" ? (
               <Video className="h-16 w-16 mx-auto" />
             ) : mode === "image" ? (
-              <Image className="h-16 w-16 mx-auto" />
+              <ImageIcon className="h-16 w-16 mx-auto" />
             ) : (
               <Music className="h-16 w-16 mx-auto" />
             )}
@@ -149,7 +177,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
             {mode === "video" ? (
               <Video className="h-16 w-16 mx-auto" />
             ) : mode === "image" ? (
-              <Image className="h-16 w-16 mx-auto" />
+              <ImageIcon className="h-16 w-16 mx-auto" />
             ) : (
               <Music className="h-16 w-16 mx-auto" />
             )}
@@ -203,7 +231,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                     {creation.type === "image" ? (
                       mediaFailed ? (
                         <div className="flex h-full w-full items-center justify-center bg-slate-100">
-                          <Image className="h-8 w-8 text-slate-400" />
+                          <ImageIcon className="h-8 w-8 text-slate-400" />
                         </div>
                       ) : (
                         <img
@@ -273,7 +301,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                         className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
                         title="Preview"
                       >
-                        <Image className="h-4 w-4 text-slate-900" />
+                        <ImageIcon className="h-4 w-4 text-slate-900" />
                       </button>
                     )}
                     {creation.type === "video" && (
@@ -305,7 +333,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                 {/* 类型标识 */}
                 <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
                   {creation.type === "image" ? (
-                    <Image className="h-3 w-3" />
+                    <ImageIcon className="h-3 w-3" />
                   ) : creation.type === "video" ? (
                     <Video className="h-3 w-3" />
                   ) : (

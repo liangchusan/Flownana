@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
 import { ResultPanel } from "@/components/creation/result-panel";
@@ -12,12 +13,21 @@ import Link from "next/link";
 
 export function CreateContent({ mode }: { mode: "voice" }) {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
   
   // Voice state
   const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | undefined>(undefined);
   const [currentPrompt, setCurrentPrompt] = useState<string | undefined>(undefined);
+  const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const prompt = searchParams.get("prompt");
+    if (prompt) {
+      setInitialPrompt(decodeURIComponent(prompt));
+    }
+  }, [searchParams]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -68,6 +78,7 @@ export function CreateContent({ mode }: { mode: "voice" }) {
               isGenerating={isGeneratingVoice}
               setIsGenerating={setIsGeneratingVoice}
               onTaskIdChange={setCurrentTaskId}
+              initialPrompt={initialPrompt}
             />
           </div>
 

@@ -466,7 +466,8 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
 
   // 无限滚动：使用 Intersection Observer 检测底部元素
   useEffect(() => {
-    if (!loadMoreRef.current) return;
+    const loadMoreNode = loadMoreRef.current;
+    if (!loadMoreNode) return;
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
@@ -477,11 +478,11 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
       { rootMargin: "200px" } // 提前 200px 开始加载
     );
 
-    observerRef.current.observe(loadMoreRef.current);
+    observerRef.current.observe(loadMoreNode);
 
     return () => {
-      if (observerRef.current && loadMoreRef.current) {
-        observerRef.current.unobserve(loadMoreRef.current);
+      if (observerRef.current) {
+        observerRef.current.unobserve(loadMoreNode);
       }
     };
   }, [visibleCount, filteredExamples.length]);

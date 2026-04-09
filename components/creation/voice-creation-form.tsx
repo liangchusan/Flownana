@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Sparkles, Music } from "lucide-react";
 import axios from "axios";
@@ -10,6 +10,7 @@ interface VoiceCreationFormProps {
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
   onTaskIdChange?: (taskId: string) => void;
+  initialPrompt?: string;
 }
 
 export function VoiceCreationForm({
@@ -17,11 +18,18 @@ export function VoiceCreationForm({
   isGenerating,
   setIsGenerating,
   onTaskIdChange,
+  initialPrompt,
 }: VoiceCreationFormProps) {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt || "");
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
   const [makeInstrumental, setMakeInstrumental] = useState(false);
+
+  useEffect(() => {
+    if (initialPrompt !== undefined) {
+      setPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -137,4 +145,3 @@ export function VoiceCreationForm({
     </div>
   );
 }
-
