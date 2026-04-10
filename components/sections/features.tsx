@@ -35,13 +35,13 @@ const features = [
 
 export function Features() {
   return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="bg-[#FDFDF9] px-4 py-24 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+          <h2 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
             Why Choose Flownana?
           </h2>
-          <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
+          <p className="mx-auto max-w-3xl text-lg text-stone-600 md:text-xl">
             Discover Flownana, a breakthrough AI platform that revolutionizes how creators edit and generate content through unprecedented accuracy, world knowledge integration, and natural language control.
           </p>
         </div>
@@ -50,15 +50,15 @@ export function Features() {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="p-6 rounded-2xl border border-slate-200/60 bg-white shadow-sm hover:shadow-md transition-all duration-200 hover:border-slate-300/80"
+              className="rounded-2xl border border-stone-200/50 bg-white p-6 shadow-sm transition-all duration-300 hover:border-stone-300/80 hover:shadow-md"
             >
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 mb-4">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100 text-stone-600">
                 <feature.icon className="h-6 w-6" />
               </div>
-              <h3 className="text-xl font-semibold text-slate-900 mb-2">
+              <h3 className="mb-2 text-xl font-semibold text-stone-900">
                 {feature.title}
               </h3>
-              <p className="text-slate-600 leading-relaxed">{feature.description}</p>
+              <p className="leading-relaxed text-stone-600">{feature.description}</p>
             </div>
           ))}
         </div>

@@ -93,7 +93,7 @@ export default function BillingPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen bg-slate-50 px-6 py-8">
+      <div className="min-h-screen bg-[#FDFDF9] px-6 py-8">
         <div className="mx-auto max-w-2xl space-y-4">
           <Skeleton className="h-14 w-full max-w-xs rounded-xl" />
           <Skeleton className="h-10 w-2/3 rounded-lg" />
@@ -107,7 +107,7 @@ export default function BillingPage() {
   if (!session) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
-        <p className="text-slate-700 mb-4">Sign in to view billing.</p>
+        <p className="mb-4 text-stone-700">Sign in to view billing.</p>
         <Link href="/api/auth/signin">
           <Button>Sign in</Button>
         </Link>
@@ -116,8 +116,8 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200/60 bg-white px-6 py-4">
+    <div className="min-h-screen bg-[#FDFDF9]">
+      <header className="flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
           <Logo size="sm" />
         </Link>
@@ -129,27 +129,27 @@ export default function BillingPage() {
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Billing</h1>
-        <p className="text-slate-600 mb-8">
+        <h1 className="mb-2 text-3xl font-bold text-stone-900">Billing</h1>
+        <p className="mb-8 text-stone-600">
           Manage subscription and view credits. Credits expire 30 days after
           each grant (FIFO usage).
         </p>
 
         {/* New subscription success */}
         {isNewCheckout && (
-          <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+          <div className="mb-6 rounded-2xl border border-stone-200/50 bg-gradient-to-br from-stone-50 to-zinc-50 p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-bold text-blue-900 mb-1">
+                <p className="mb-1 text-lg font-bold text-stone-900">
                   🎉 You&apos;re all set!
                 </p>
-                <p className="text-sm text-blue-700">
+                <p className="text-sm text-stone-700">
                   Your subscription is now active. Credits have been added to your account — start creating right away.
                 </p>
               </div>
             </div>
             <Link href="/ai-image" className="mt-4 inline-flex">
-              <Button className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]">
+              <Button className="rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]">
                 Start Creating →
               </Button>
             </Link>
@@ -158,13 +158,13 @@ export default function BillingPage() {
 
         {/* Upgrade success */}
         {upgradeInfo.success && (
-          <div className="mb-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+          <div className="mb-6 rounded-2xl border border-stone-200/50 bg-gradient-to-br from-stone-50 to-zinc-50 p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-bold text-blue-900 mb-1">
+                <p className="mb-1 text-lg font-bold text-stone-900">
                   ✨ Plan upgraded!
                 </p>
-                <p className="text-sm text-blue-700">
+                <p className="text-sm text-stone-700">
                   Upgraded to{" "}
                   <span className="font-semibold capitalize">{upgradeInfo.to || "new plan"}</span>.
                   {upgradeInfo.payableCents > 0 && (
@@ -177,7 +177,7 @@ export default function BillingPage() {
               </div>
             </div>
             <Link href="/ai-image" className="mt-4 inline-flex">
-              <Button className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]">
+              <Button className="rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]">
                 Start Creating →
               </Button>
             </Link>
@@ -197,9 +197,9 @@ export default function BillingPage() {
 
         {summary && (
           <div className="space-y-8">
-            <section className="bg-white rounded-xl border border-slate-200/60 p-6">
-              <h2 className="font-semibold text-slate-900 mb-4">Credits</h2>
-              <p className="text-slate-800">
+            <section className="rounded-xl border border-stone-200/50 bg-white p-6">
+              <h2 className="mb-4 font-semibold text-stone-900">Credits</h2>
+              <p className="text-stone-800">
                 Current credits:{" "}
                 <strong>{summary.credits.current}</strong>
               </p>
@@ -211,28 +211,28 @@ export default function BillingPage() {
                   </p>
                 )}
               {summary.subscription?.planType === "pro" && (
-                <p className="text-sm text-blue-700 mt-4">
+                <p className="mt-4 text-sm text-stone-700">
                   Upgrade to Max to get 800 credits instantly
                 </p>
               )}
             </section>
 
-            <section className="bg-white rounded-xl border border-slate-200/60 p-6">
-              <h2 className="font-semibold text-slate-900 mb-4">Subscription</h2>
+            <section className="rounded-xl border border-stone-200/50 bg-white p-6">
+              <h2 className="mb-4 font-semibold text-stone-900">Subscription</h2>
               {summary.subscription ? (
                 <>
-                  <p className="text-slate-800">
+                  <p className="text-stone-800">
                     Plan:{" "}
                     <strong className="capitalize">
                       {summary.subscription.planType}
                     </strong>{" "}
                     ({summary.subscription.billingCycle})
                   </p>
-                  <p className="text-slate-600 text-sm mt-1">
+                  <p className="mt-1 text-sm text-stone-600">
                     Output: {summary.subscription.resolution} ·{" "}
                     {summary.subscription.creditsPerMonth} credits / month
                   </p>
-                  <p className="text-slate-600 text-sm mt-2">
+                  <p className="mt-2 text-sm text-stone-600">
                     Renews / period ends:{" "}
                     {new Date(
                       summary.subscription.currentPeriodEnd
@@ -249,7 +249,7 @@ export default function BillingPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-slate-600 mb-4">No active subscription.</p>
+                  <p className="mb-4 text-stone-600">No active subscription.</p>
                   <Link href="/pricing">
                     <Button>View plans</Button>
                   </Link>
@@ -257,10 +257,10 @@ export default function BillingPage() {
               )}
             </section>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-stone-500">
               All payments are non-refundable. Yearly plans are prepaid; credits
               are issued each month.{" "}
-              <Link href="/pricing" className="text-blue-600 underline">
+              <Link href="/pricing" className="text-stone-700 underline">
                 See pricing details
               </Link>
               .

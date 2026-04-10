@@ -118,7 +118,7 @@ export function Logo({ className = "", showText = true, size = "md", textColor }
       </div>
       
       {showText && (
-        <span className={`font-bold ${textColor || "text-slate-900"} ${textSizes[size]}`}>
+        <span className={`font-bold ${textColor || "text-stone-900"} ${textSizes[size]}`}>
           Flownana
         </span>
       )}

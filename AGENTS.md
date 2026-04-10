@@ -18,6 +18,16 @@ Working rules:
 - Do not claim tests passed unless they were actually run.
 - Do not deploy production without explicit approval.
 
+UI and frontend guardrails (cross-tool baseline):
+- Follow `.cursor/rules/frontend-design.mdc` as the source of truth for UI style and frontend architecture.
+- Visual tone: warm, trustworthy, minimal. Prefer Stone/Zinc palette; avoid Slate/Gray drift.
+- Prefer shadcn primitives in `@/components/ui/`; compose business sections in `@/components/blocks/`.
+- Keep `@/app/` page files focused on data + composition; avoid long page-level UI logic.
+- No inline `style={{}}`; use Tailwind classes only.
+- Mobile-first responsive layouts; avoid hard-coded fixed widths like `w-[800px]`.
+- Keep interaction consistency: `transition-all duration-300`, clear hover/active/focus states.
+- Use `lucide-react` icons with consistent sizing (`w-4 h-4` / `w-5 h-5`) and muted Stone tones.
+
 Before finishing any task:
 1. summarize what changed
 2. summarize what to test manually

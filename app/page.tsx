@@ -214,13 +214,13 @@ export default function Home() {
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
                 Create Anything with AI
               </h1>
-              <p className="text-xl md:text-2xl text-slate-200 mb-8 leading-relaxed max-w-2xl mx-auto">
+              <p className="mx-auto mb-8 max-w-2xl text-xl leading-relaxed text-stone-200 md:text-2xl">
                 Transform your ideas into stunning videos, images, and music in seconds.
                 <span className="text-white font-semibold"> No design skills required.</span>
               </p>
 
               <Link href="/ai-image">
-                <Button size="lg" className="text-lg px-8 py-6 bg-white text-slate-900 transition-all duration-200 hover:bg-slate-100 hover:opacity-90 active:scale-[0.98] border-0 shadow-2xl">
+                <Button size="lg" className="border-0 bg-white px-8 py-6 text-lg text-stone-900 shadow-2xl transition-all duration-300 hover:bg-stone-100 hover:opacity-90 active:scale-[0.98]">
                   Start Creating Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -262,10 +262,10 @@ export default function Home() {
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+            <h2 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
               Three Ways to Create
             </h2>
-            <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
+            <p className="mx-auto max-w-3xl text-lg text-stone-600 md:text-xl">
               Choose your creative path. From videos to images to music, we&apos;ve got you covered.
             </p>
           </div>
@@ -273,7 +273,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {/* AI Video */}
             <Link href="/ai-video" className="group">
-              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-px">
+              <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-stone-600 to-stone-800 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
@@ -281,7 +281,7 @@ export default function Home() {
                       <Video className="h-6 w-6" />
                     </div>
                     <h3 className="text-2xl md:text-3xl font-bold mb-2">AI Video</h3>
-                    <p className="text-blue-100/90 text-base md:text-lg">
+                    <p className="text-base text-stone-100/90 md:text-lg">
                       Create professional videos from text. Powered by VEO3.1
                     </p>
                   </div>
@@ -308,7 +308,7 @@ export default function Home() {
 
             {/* AI Image */}
             <Link href="/ai-image" className="group">
-              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-purple-500 to-pink-600 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-px">
+              <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-600 to-stone-700 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
@@ -335,7 +335,7 @@ export default function Home() {
 
             {/* AI Music */}
             <Link href="/ai-music" className="group">
-              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-px">
+              <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-stone-700 to-zinc-700 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
                   <div>
@@ -375,18 +375,18 @@ export default function Home() {
       <FAQ />
 
       {/* 最终 CTA Section */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative overflow-hidden">
+      <section className="relative overflow-hidden bg-gradient-to-r from-stone-700 via-zinc-700 to-stone-800 px-4 py-24 sm:px-6 lg:px-8">
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
         <div className="relative max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
             Ready to Create Something Amazing?
           </h2>
-          <p className="text-xl text-blue-50 mb-8">
+          <p className="mb-8 text-xl text-stone-100">
             Join 50,000+ creators using Flownana to bring their ideas to life. Start free today.
           </p>
           <div className="flex justify-center">
             <Link href="/ai-image">
-              <Button size="lg" className="text-lg px-8 py-6 bg-white text-blue-600 transition-all duration-200 hover:bg-slate-100 hover:opacity-90 active:scale-[0.98] border-0 shadow-2xl">
+              <Button size="lg" className="border-0 bg-white px-8 py-6 text-lg text-stone-700 shadow-2xl transition-all duration-300 hover:bg-stone-100 hover:opacity-90 active:scale-[0.98]">
                 Start Creating Free
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>

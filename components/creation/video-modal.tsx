@@ -42,15 +42,15 @@ export default function VideoModal({ videoUrl, onClose }: VideoModalProps) {
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+          className="absolute right-4 top-4 z-10 rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
         >
-          <X className="h-6 w-6 text-slate-900" />
+          <X className="h-6 w-6 text-stone-900" />
         </button>
         <video
           ref={videoRef}
           src={videoUrl}
           controls
-          className="max-w-full max-h-full object-contain rounded-lg"
+          className="max-h-full max-w-full rounded-xl object-contain"
           autoPlay
         />
       </div>

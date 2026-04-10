@@ -28,31 +28,31 @@ function ErrorContent() {
   const error = searchParams.get("error") || "Default";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6 py-8">
-      <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200/60 shadow-sm p-8">
-        <div className="flex items-center justify-center mb-6">
-          <div className="bg-red-100 rounded-full p-3">
+    <div className="flex min-h-screen items-center justify-center bg-[#FDFDF9] px-6 py-8">
+      <div className="w-full max-w-md rounded-2xl border border-stone-200/50 bg-white p-8 shadow-sm">
+        <div className="mb-6 flex items-center justify-center">
+          <div className="rounded-full bg-red-100 p-3">
             <AlertCircle className="h-8 w-8 text-red-600" />
           </div>
         </div>
         
-        <h1 className="text-2xl font-bold text-slate-900 text-center mb-4">
+        <h1 className="mb-4 text-center text-2xl font-bold text-stone-900">
           Sign In Failed
         </h1>
         
-        <div className="bg-red-50 border border-red-200/80 rounded-xl p-4 mb-6">
+        <div className="mb-6 rounded-xl border border-red-200/80 bg-red-50 p-4">
           <p className="text-sm text-red-800 whitespace-pre-line">
             {errorMessages[error] || errorMessages.Default}
           </p>
         </div>
 
         {error === "OAuthSignin" && (
-          <div className="bg-blue-50 border border-blue-200/80 rounded-xl p-4 mb-6">
-            <p className="text-sm font-semibold text-blue-900 mb-2">Troubleshooting Steps:</p>
-            <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+          <div className="mb-6 rounded-xl border border-stone-200/80 bg-stone-50 p-4">
+            <p className="mb-2 text-sm font-semibold text-stone-900">Troubleshooting Steps:</p>
+            <ol className="list-inside list-decimal space-y-1 text-sm text-stone-700">
               <li>Check terminal console for &quot;NextAuth configuration check&quot; output</li>
               <li>Verify .env file is in project root directory with correct content</li>
-              <li>Verify redirect URI is added in Google Cloud Console: <code className="bg-blue-100 px-1 rounded">http://localhost:3000/api/auth/callback/google</code></li>
+              <li>Verify redirect URI is added in Google Cloud Console: <code className="rounded bg-stone-100 px-1">http://localhost:3000/api/auth/callback/google</code></li>
               <li>Restart development server (npm run dev)</li>
             </ol>
           </div>
@@ -79,7 +79,7 @@ export default function AuthErrorPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6 py-8">
+        <div className="flex min-h-screen items-center justify-center bg-[#FDFDF9] px-6 py-8">
           <Skeleton className="h-64 w-full max-w-md rounded-2xl" />
         </div>
       }

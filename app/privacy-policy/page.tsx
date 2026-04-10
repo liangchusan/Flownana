@@ -9,19 +9,19 @@ export default function PrivacyPolicyPage() {
   const lastUpdated = "January 20, 2026";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#FDFDF9]">
       <Header showBackground />
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="mb-10">
-          <div className="inline-flex items-center rounded-full border border-slate-200/60 px-3 py-1 text-xs text-slate-600">
+          <div className="inline-flex items-center rounded-xl border border-stone-200/50 px-3 py-1 text-xs text-stone-600">
             Legal
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mt-4 mb-3">Privacy Policy</h1>
-          <p className="text-sm text-slate-500">Last updated: {lastUpdated}</p>
+          <h1 className="mb-3 mt-4 text-4xl font-bold text-stone-900 md:text-5xl">Privacy Policy</h1>
+          <p className="text-sm text-stone-500">Last updated: {lastUpdated}</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/60 bg-white p-6 sm:p-8">
+        <div className="rounded-2xl border border-stone-200/50 bg-white p-6 sm:p-8">
           <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
           <p>
             This Privacy Policy explains how Flownana (“Flownana”, “we”, “us”, “our”) collects, uses, shares, and

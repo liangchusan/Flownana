@@ -37,9 +37,9 @@ export function CreateContent({ mode }: { mode: "image" }) {
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-white">
+      <main className="flex-1 overflow-y-auto bg-[#FDFDF9]">
         {/* Top Bar with Logo and User Info - Full width, above sidebar */}
-        <div className="sticky top-0 z-20 bg-white px-8 py-2 flex items-center justify-between border-b border-slate-200/60">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-8 py-2">
           <Link href="/" className="flex-shrink-0">
             <Logo size="md" />
           </Link>
@@ -55,7 +55,7 @@ export function CreateContent({ mode }: { mode: "image" }) {
             ) : (
               <Button
                 onClick={() => signIn("google")}
-                className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]"
+                className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
                 size="sm"
               >
                 Start Free Now
@@ -65,10 +65,10 @@ export function CreateContent({ mode }: { mode: "image" }) {
         </div>
 
         {/* Content area with left margin for sidebar */}
-        <div className="flex h-[calc(100vh-73px)] ml-[70px]">
+        <div className="ml-16 flex h-[calc(100vh-73px)]">
           {/* Left: Creation Form */}
-          <div className="w-[420px] overflow-y-auto bg-white border-r border-slate-200/60 p-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-8">
+          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-stone-200/50 bg-[#FDFDF9] p-8">
+            <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">
               AI Image
             </h1>
             <GenerateForm
@@ -86,7 +86,7 @@ export function CreateContent({ mode }: { mode: "image" }) {
           </div>
 
           {/* Right: Result Panel */}
-          <div className="flex-1 overflow-hidden bg-slate-50">
+          <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
             <ResultPanel
               mode="image"
               currentGeneration={{

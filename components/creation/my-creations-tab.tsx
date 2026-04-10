@@ -149,7 +149,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
-          <div className="text-slate-400 mb-4">
+          <div className="mb-4 text-stone-400">
             {mode === "video" ? (
               <Video className="h-16 w-16 mx-auto" />
             ) : mode === "image" ? (
@@ -158,10 +158,10 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               <Music className="h-16 w-16 mx-auto" />
             )}
           </div>
-          <p className="text-slate-600 text-lg font-medium mb-2">
+          <p className="mb-2 text-lg font-medium text-stone-600">
             Sign in to view your creations
           </p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-sm text-stone-500">
             Your generated content will appear here
           </p>
         </div>
@@ -173,7 +173,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     return (
       <div className="flex items-center justify-center h-full p-8">
         <div className="text-center">
-          <div className="text-slate-400 mb-4">
+          <div className="mb-4 text-stone-400">
             {mode === "video" ? (
               <Video className="h-16 w-16 mx-auto" />
             ) : mode === "image" ? (
@@ -182,10 +182,10 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               <Music className="h-16 w-16 mx-auto" />
             )}
           </div>
-          <p className="text-slate-600 text-lg font-medium mb-2">
+          <p className="mb-2 text-lg font-medium text-stone-600">
             You haven&apos;t created anything yet
           </p>
-          <p className="text-slate-500 text-sm">
+          <p className="text-sm text-stone-500">
             Start generating to see your creations here
           </p>
         </div>
@@ -205,21 +205,21 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
           return (
             <div
               key={creation.id}
-              className="group relative bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+              className="group relative overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {/* 封面 */}
-              <div className="aspect-video bg-slate-100 relative">
+              <div className="relative aspect-video bg-stone-100">
                 {creation.status === "pending" || creation.status === "generating" ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50">
-                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-                    <p className="text-xs text-slate-600">
+                  <div className="flex h-full w-full flex-col items-center justify-center bg-stone-50">
+                    <Loader2 className="mb-2 h-8 w-8 animate-spin text-stone-500" />
+                    <p className="text-xs text-stone-600">
                       {creation.status === "pending" ? "Queued" : "Generating..."}
                     </p>
                   </div>
                 ) : creation.status === "processing" ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 opacity-50">
-                    <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-                    <p className="text-xs text-slate-600">Processing...</p>
+                  <div className="flex h-full w-full flex-col items-center justify-center bg-stone-50 opacity-50">
+                    <Loader2 className="mb-2 h-8 w-8 animate-spin text-stone-500" />
+                    <p className="text-xs text-stone-600">Processing...</p>
                   </div>
                 ) : creation.status === "failed" ? (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
@@ -230,8 +230,8 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                   <>
                     {creation.type === "image" ? (
                       mediaFailed ? (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-100">
-                          <ImageIcon className="h-8 w-8 text-slate-400" />
+                        <div className="flex h-full w-full items-center justify-center bg-stone-100">
+                          <ImageIcon className="h-8 w-8 text-stone-400" />
                         </div>
                       ) : (
                         <img
@@ -253,8 +253,8 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                       )
                     ) : creation.type === "video" ? (
                       mediaFailed ? (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-100">
-                          <Video className="h-8 w-8 text-slate-400" />
+                        <div className="flex h-full w-full items-center justify-center bg-stone-100">
+                          <Video className="h-8 w-8 text-stone-400" />
                         </div>
                       ) : (
                         <button
@@ -274,14 +274,14 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                           />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                             <div className="rounded-full bg-white/90 p-2">
-                              <Video className="h-4 w-4 text-slate-900" />
+                              <Video className="h-4 w-4 text-stone-900" />
                             </div>
                           </div>
                         </button>
                       )
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-                        <Music className="h-12 w-12 text-slate-400" />
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-stone-50 to-stone-100">
+                        <Music className="h-12 w-12 text-stone-400" />
                       </div>
                     )}
                     {hasMultiple && (
@@ -294,38 +294,38 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
 
                 {/* Hover 操作按钮 */}
                 {creation.status === "success" && displayUrl && (
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all duration-300 group-hover:bg-black/40 group-hover:opacity-100">
                     {creation.type === "image" && (
                       <button
                         onClick={() => setSelectedImage(displayUrl)}
-                        className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+                        className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
                         title="Preview"
                       >
-                        <ImageIcon className="h-4 w-4 text-slate-900" />
+                        <ImageIcon className="h-4 w-4 text-stone-900" />
                       </button>
                     )}
                     {creation.type === "video" && (
                       <button
                         onClick={() => setSelectedVideo(displayUrl)}
-                        className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+                        className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
                         title="Preview"
                       >
-                        <Video className="h-4 w-4 text-slate-900" />
+                        <Video className="h-4 w-4 text-stone-900" />
                       </button>
                     )}
                     <button
                       onClick={() => handleDownload(displayUrl, creation.type)}
-                      className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+                      className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
                       title="Download"
                     >
-                      <Download className="h-4 w-4 text-slate-900" />
+                      <Download className="h-4 w-4 text-stone-900" />
                     </button>
                     <button
                       onClick={() => handleDelete(creation.id)}
-                      className="bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+                      className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
                       title="Delete"
                     >
-                      <Trash2 className="h-4 w-4 text-slate-900" />
+                      <Trash2 className="h-4 w-4 text-stone-900" />
                     </button>
                   </div>
                 )}
@@ -369,15 +369,15 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
           <div className="max-w-7xl mx-auto">
             <button
               onClick={() => setExpandedTask(null)}
-              className="absolute top-8 right-8 bg-white/90 hover:bg-white rounded-full p-2 transition-colors z-10"
+              className="absolute right-8 top-8 z-10 rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
             >
-              <X className="h-6 w-6 text-slate-900" />
+              <X className="h-6 w-6 text-stone-900" />
             </button>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-12">
               {creations
                 .find((c) => c.id === expandedTask)
                 ?.urls.map((url, idx) => (
-                  <div key={idx} className="bg-white rounded-lg overflow-hidden">
+                  <div key={idx} className="overflow-hidden rounded-xl border border-stone-200/50 bg-white">
                     <img
                       src={url}
                       alt={`Creation ${idx + 1}`}

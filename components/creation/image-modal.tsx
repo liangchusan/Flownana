@@ -35,14 +35,14 @@ export default function ImageModal({ imageUrl, onClose }: ImageModalProps) {
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+          className="absolute right-4 top-4 z-10 rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
         >
-          <X className="h-6 w-6 text-slate-900" />
+          <X className="h-6 w-6 text-stone-900" />
         </button>
         <img
           src={imageUrl}
           alt="Preview"
-          className="w-full h-full object-contain rounded-lg"
+          className="h-full w-full rounded-xl object-contain"
         />
       </div>
     </div>

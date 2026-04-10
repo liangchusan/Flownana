@@ -232,15 +232,15 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
 
   return (
     <>
-      <div className="flex justify-center mb-10">
-        <div className="inline-flex rounded-lg border border-slate-200/60 p-1 bg-slate-50">
+      <div className="mb-10 flex justify-center">
+        <div className="inline-flex rounded-xl border border-stone-200/50 bg-stone-50 p-1">
           <button
             type="button"
             onClick={() => setBilling("monthly")}
-            className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`rounded-lg px-6 py-2 text-sm font-medium transition-all duration-300 ${
               billing === "monthly"
-                ? "bg-white shadow text-slate-900"
-                : "text-slate-600"
+                ? "bg-white text-stone-900 shadow-sm"
+                : "text-stone-600"
             }`}
           >
             Monthly
@@ -248,14 +248,14 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
           <button
             type="button"
             onClick={() => setBilling("yearly")}
-            className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`rounded-lg px-6 py-2 text-sm font-medium transition-all duration-300 ${
               billing === "yearly"
-                ? "bg-white shadow text-slate-900"
-                : "text-slate-600"
+                ? "bg-white text-stone-900 shadow-sm"
+                : "text-stone-600"
             }`}
           >
             Yearly{" "}
-            <span className="text-green-600 text-xs ml-1">50% off</span>
+            <span className="ml-1 text-xs text-stone-700">50% off</span>
           </button>
         </div>
       </div>
@@ -270,44 +270,44 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
               key={plan.name}
               className={`relative rounded-2xl border-2 p-8 ${
                 plan.popular
-                  ? "border-blue-500 shadow-xl bg-white"
-                  : "border-slate-200/60 bg-white"
+                  ? "border-stone-700 bg-white shadow-xl"
+                  : "border-stone-200/50 bg-white"
               }`}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                  <span className="rounded-full bg-stone-700 px-3 py-1 text-xs font-semibold text-white">
                     Popular
                   </span>
                 </div>
               )}
-              <h3 className="text-2xl font-bold text-slate-900 mb-1">
+              <h3 className="mb-1 text-2xl font-bold text-stone-900">
                 {plan.name}
               </h3>
-              <p className="text-slate-600 text-sm mb-6">
+              <p className="mb-6 text-sm text-stone-600">
                 {plan.resolution} output · {plan.credits} credits / month
               </p>
               <div className="mb-2">
-                <span className="text-4xl font-bold text-slate-900">
+                <span className="text-4xl font-bold text-stone-900">
                   ${billing === "monthly" ? plan.monthly : (plan.yearly / 12).toFixed(0)}
                 </span>
-                <span className="text-slate-600">/month</span>
+                <span className="text-stone-600">/month</span>
               </div>
               {billing === "yearly" && (
-                <p className="text-sm text-slate-500 mb-4">
+                <p className="mb-4 text-sm text-stone-500">
                   Billed ${plan.yearly}/year. Credits issued monthly. Unused
                   credits expire after 30 days.
                 </p>
               )}
               {billing === "monthly" && (
-                <p className="text-sm text-slate-500 mb-4">${plan.monthly}/month billed monthly.</p>
+                <p className="mb-4 text-sm text-stone-500">${plan.monthly}/month billed monthly.</p>
               )}
 
               <ul className="space-y-2 mb-8 text-sm">
                 {SHARED_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">{f}</span>
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-stone-600" />
+                    <span className="text-stone-700">{f}</span>
                   </li>
                 ))}
               </ul>
@@ -321,14 +321,14 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
                 {loading === pk ? "…" : cta.label}
               </Button>
               {cta.note && (
-                <p className="mt-2 text-xs text-slate-500 text-center">{cta.note}</p>
+                <p className="mt-2 text-center text-xs text-stone-500">{cta.note}</p>
               )}
             </div>
           );
         })}
       </div>
 
-      <p className="text-center text-xs text-slate-500 mt-10 max-w-2xl mx-auto">
+      <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-stone-500">
         Credits are issued monthly, not all at once on yearly plans. All payments
         are non-refundable. Upgrading grants new credits immediately; existing
         credits stay valid until they expire.

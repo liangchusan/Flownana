@@ -26,13 +26,13 @@ const testimonials = [
 
 export function Testimonials() {
   return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
+    <section className="bg-stone-50 px-4 py-24 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+          <h2 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
             Trusted by Creators Worldwide
           </h2>
-          <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto">
+          <p className="mx-auto max-w-3xl text-lg text-stone-600 md:text-xl">
             See how designers, photographers, and digital artists are using Flownana&apos;s revolutionary AI technology to transform their creative workflows.
           </p>
         </div>
@@ -41,7 +41,7 @@ export function Testimonials() {
           {testimonials.map((testimonial, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6 hover:shadow-md transition-all duration-200 hover:border-slate-300/80"
+              className="rounded-2xl border border-stone-200/50 bg-white p-6 shadow-sm transition-all duration-300 hover:border-stone-300/80 hover:shadow-md"
             >
               <div className="flex items-center mb-4">
                 {[...Array(testimonial.rating)].map((_, i) => (
@@ -51,15 +51,15 @@ export function Testimonials() {
                   />
                 ))}
               </div>
-              <p className="text-slate-700 mb-6 italic leading-relaxed">&quot;{testimonial.text}&quot;</p>
+              <p className="mb-6 italic leading-relaxed text-stone-700">&quot;{testimonial.text}&quot;</p>
               <div>
-                <p className="font-semibold text-slate-900">
+                <p className="font-semibold text-stone-900">
                   {testimonial.author}
                 </p>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-stone-600">
                   {testimonial.role}
                 </p>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-stone-500">
                   {testimonial.company}
                 </p>
               </div>

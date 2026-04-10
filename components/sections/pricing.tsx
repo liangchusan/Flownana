@@ -36,13 +36,13 @@ const plans = [
 
 export function Pricing() {
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="bg-[#FDFDF9] px-4 py-20 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+          <h2 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
             Pricing
           </h2>
-          <p className="text-xl text-slate-600">
+          <p className="text-xl text-stone-600">
             Choose the plan that works best for you. All plans include access to our core features.
           </p>
         </div>
@@ -51,33 +51,33 @@ export function Pricing() {
           {plans.map((plan, index) => (
             <div
               key={index}
-              className={`relative rounded-lg border-2 p-8 ${
+              className={`relative rounded-xl border-2 p-8 ${
                 plan.popular
-                  ? "border-blue-500 shadow-xl scale-105"
-                  : "border-slate-200/60"
+                  ? "scale-105 border-stone-700 shadow-xl"
+                  : "border-stone-200/50"
               }`}
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                  <span className="rounded-full bg-stone-700 px-4 py-1 text-sm font-semibold text-white">
                     Most Popular
                   </span>
                 </div>
               )}
 
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">
+              <h3 className="mb-2 text-2xl font-bold text-stone-900">
                 {plan.name}
               </h3>
-              <p className="text-slate-600 mb-6">{plan.description}</p>
+              <p className="mb-6 text-stone-600">{plan.description}</p>
 
               <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">
+                <span className="text-4xl font-bold text-stone-900">
                   ${plan.monthlyPrice}
                 </span>
-                <span className="text-slate-600">/month</span>
+                <span className="text-stone-600">/month</span>
               </div>
 
-              <div className="text-sm text-slate-600 mb-6">
+              <div className="mb-6 text-sm text-stone-600">
                 <div>${plan.yearlyPrice}/year</div>
                 <div>{plan.credits}</div>
               </div>
@@ -85,8 +85,8 @@ export function Pricing() {
               <ul className="space-y-3 mb-8">
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start">
-                    <Check className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-slate-700">{feature}</span>
+                    <Check className="mr-2 mt-0.5 h-5 w-5 flex-shrink-0 text-stone-600" />
+                    <span className="text-stone-700">{feature}</span>
                   </li>
                 ))}
               </ul>

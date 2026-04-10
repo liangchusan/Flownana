@@ -171,9 +171,9 @@ export function CreateContent() {
   return (
     <div className="flex h-screen overflow-hidden">
       <CreationSidebar />
-      <main className="flex-1 overflow-y-auto bg-white">
+      <main className="flex-1 overflow-y-auto bg-[#FDFDF9]">
         {/* Top Bar */}
-        <div className="sticky top-0 z-20 bg-white px-8 py-2 flex items-center justify-between border-b border-slate-200/60">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-8 py-2">
           <Link href="/" className="flex-shrink-0">
             <Logo size="md" />
           </Link>
@@ -189,7 +189,7 @@ export function CreateContent() {
             ) : (
               <Button
                 onClick={() => signIn("google")}
-                className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]"
+                className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
                 size="sm"
               >
                 Start Free Now
@@ -198,13 +198,13 @@ export function CreateContent() {
           </div>
         </div>
 
-        <div className="ml-[70px] min-h-[calc(100vh-73px)]">
+        <div className="ml-16 min-h-[calc(100vh-73px)]">
           {/* ---------- 模块1: 顶部大 Banner 卡片（图片/视频，横向滑动） ---------- */}
-          <section className="border-b border-slate-100 banner-gradient-flow bg-gradient-to-r from-slate-50 via-blue-50/60 to-purple-50/60">
+          <section className="banner-gradient-flow border-b border-stone-100 bg-gradient-to-r from-stone-50 via-zinc-50/60 to-stone-100/70">
             <div className="w-full px-6 py-8 md:py-10">
               <div className="flex items-center justify-between mb-4 md:mb-6 gap-3">
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <Sparkles className="h-5 w-5 text-amber-500" />
+                <div className="flex items-center gap-2 text-sm text-stone-600">
+                  <Sparkles className="h-5 w-5 text-stone-500" />
                   <span className="font-medium">Featured capabilities</span>
                 </div>
               </div>
@@ -218,7 +218,7 @@ export function CreateContent() {
                     <div
                       key={banner.id}
                       data-banner-card
-                      className="shrink-0 w-[260px] sm:w-[320px] md:w-[380px] lg:w-[420px] flex flex-col gap-2"
+                      className="flex w-[85vw] max-w-lg shrink-0 flex-col gap-2"
                     >
                       {/* 媒体区域：图片 / 视频，16:9 比例 */}
                       <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-black">
@@ -243,10 +243,10 @@ export function CreateContent() {
                       </div>
                       {/* 文本区域：标题和描述放在图片下方（无白色背景，不与上半部分连在一起） */}
                       <div className="px-1 sm:px-1.5">
-                        <h2 className="text-sm sm:text-base font-semibold leading-snug mb-1 text-slate-900">
+                        <h2 className="mb-1 text-sm font-semibold leading-snug text-stone-900 sm:text-base">
                           {banner.title}
                         </h2>
-                        <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2">
+                        <p className="line-clamp-2 text-[11px] text-stone-500 sm:text-xs">
                           {banner.description}
                         </p>
                       </div>
@@ -255,11 +255,11 @@ export function CreateContent() {
                 </div>
 
                 {/* 左右滑动箭头：尽量对齐图片/视频区域中线，鼠标移入时显示 */}
-                <div className="pointer-events-none absolute top-1 bottom-16 left-0 right-0 hidden md:flex items-center justify-between px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="pointer-events-none absolute bottom-16 left-0 right-0 top-1 hidden items-center justify-between px-1 opacity-0 transition-all duration-300 group-hover:opacity-100 md:flex">
                   <button
                     type="button"
                     onClick={() => scrollBanners("left")}
-                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/70 bg-white/80 text-slate-500 hover:bg-white hover:border-slate-300 hover:text-slate-700 transition-colors backdrop-blur-sm"
+                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200/70 bg-white/80 text-stone-500 backdrop-blur-sm transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-700"
                     aria-label="Previous"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -267,7 +267,7 @@ export function CreateContent() {
                   <button
                     type="button"
                     onClick={() => scrollBanners("right")}
-                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200/70 bg-white/80 text-slate-500 hover:bg-white hover:border-slate-300 hover:text-slate-700 transition-colors backdrop-blur-sm"
+                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200/70 bg-white/80 text-stone-500 backdrop-blur-sm transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-700"
                     aria-label="Next"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -278,9 +278,9 @@ export function CreateContent() {
           </section>
 
           {/* ---------- 模块2: 引导创作入口 ---------- */}
-          <section className="bg-gradient-to-b from-white via-slate-50/30 to-white py-10 px-6">
+          <section className="bg-gradient-to-b from-[#FDFDF9] via-stone-50/50 to-[#FDFDF9] px-6 py-10">
             <div className="max-w-2xl mx-auto">
-              <h1 className="text-3xl md:text-4xl font-bold text-center mb-6 bg-gradient-to-r from-slate-800 via-blue-800 to-purple-800 bg-clip-text text-transparent">
+              <h1 className="mb-6 bg-gradient-to-r from-stone-800 via-zinc-800 to-stone-900 bg-clip-text text-center text-3xl font-bold text-transparent md:text-4xl">
                 What will you create today?
               </h1>
 
@@ -295,10 +295,10 @@ export function CreateContent() {
                     key={id}
                     type="button"
                     onClick={() => setCreationMode(id)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all duration-300 ${
                       creationMode === id
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                        : "bg-white text-slate-600 border-slate-200/60 hover:border-slate-300 hover:bg-slate-50"
+                        ? "border-stone-800 bg-stone-800 text-white shadow-sm"
+                        : "border-stone-200/50 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -308,22 +308,22 @@ export function CreateContent() {
               </div>
 
               {/* 主输入框 */}
-              <div className="relative rounded-2xl border border-slate-200/60 bg-white shadow-sm shadow-slate-200/50 focus-within:border-indigo-300 focus-within:shadow-md focus-within:shadow-indigo-100/50 transition-all">
+              <div className="relative rounded-2xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 focus-within:border-stone-300 focus-within:shadow-md">
                 <div className="flex items-center px-4 py-3 gap-3">
-                  <Search className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                  <Search className="h-5 w-5 flex-shrink-0 text-stone-400" />
                   <input
                     type="text"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleStartCreating()}
                     placeholder="Enter your prompt to get started..."
-                    className="flex-1 min-w-0 bg-transparent text-slate-900 placeholder:text-slate-400 outline-none text-base"
+                    className="min-w-0 flex-1 bg-transparent text-base text-stone-900 outline-none placeholder:text-stone-400"
                   />
                 </div>
                 <div className="px-4 pb-3 pt-0 flex justify-end">
                   <Button
                     onClick={handleStartCreating}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-5 py-2 text-sm font-medium"
+                    className="rounded-xl bg-stone-800 px-5 py-2 text-sm font-medium text-white transition-all duration-300 hover:bg-stone-800/90"
                   >
                     Start creating
                     <ChevronRight className="h-4 w-4 ml-1 inline" />
@@ -332,14 +332,14 @@ export function CreateContent() {
               </div>
 
               {/* 提示词案例 */}
-              <p className="text-xs text-slate-500 mt-3 mb-2 text-left">Try a prompt example</p>
+              <p className="mb-2 mt-3 text-left text-xs text-stone-500">Try a prompt example</p>
               <div className="flex flex-wrap justify-start gap-2">
                 {promptExamples.slice(0, 6).map((example) => (
                   <button
                     key={example}
                     type="button"
                     onClick={() => setPrompt(example)}
-                    className="px-3 py-1.5 rounded-full text-xs text-slate-600 bg-white border border-slate-200/60 hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-700 transition-colors line-clamp-1 max-w-[220px]"
+                    className="line-clamp-1 max-w-xs rounded-xl border border-stone-200/50 bg-white px-3 py-1.5 text-xs text-stone-600 transition-all duration-300 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800"
                   >
                     {example}
                   </button>
@@ -349,10 +349,10 @@ export function CreateContent() {
           </section>
 
           {/* ---------- 模块3: 用户创作记录 ---------- */}
-          <section className="border-t border-slate-100 py-8 px-6 bg-slate-50/50">
+          <section className="border-t border-stone-100 bg-stone-50/60 px-6 py-8">
             <div className="w-full">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                <History className="h-5 w-5 text-slate-500" />
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-stone-900">
+                <History className="h-5 w-5 text-stone-500" />
                 Recent creations
               </h2>
 
@@ -369,9 +369,9 @@ export function CreateContent() {
                               ? "/ai-video"
                               : "/ai-music"
                         }
-                        className="group rounded-xl border border-slate-200/60 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
+                        className="group overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md"
                       >
-                        <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
+                        <div className="flex aspect-square items-center justify-center overflow-hidden bg-stone-100">
                           {c.urls?.[0] ? (
                             c.type === "video" ? (
                               <video
@@ -389,36 +389,36 @@ export function CreateContent() {
                               />
                             )
                           ) : (
-                            <span className="text-slate-300">
+                            <span className="text-stone-300">
                               {c.type === "image" && <ImageIcon className="h-10 w-10" />}
                               {c.type === "video" && <Video className="h-10 w-10" />}
                               {c.type === "music" && <Music className="h-10 w-10" />}
                             </span>
                           )}
                         </div>
-                        <p className="p-2 text-xs text-slate-500 truncate border-t border-slate-100 group-hover:text-slate-700">
+                        <p className="truncate border-t border-stone-100 p-2 text-xs text-stone-500 group-hover:text-stone-700">
                           {c.prompt || "Untitled"}
                         </p>
                       </Link>
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200/60 bg-white/50 py-10 text-center">
-                    <p className="text-slate-500 text-sm mb-2">No creations yet</p>
-                    <p className="text-slate-400 text-xs mb-4">Start with a prompt above or open a studio.</p>
+                  <div className="rounded-xl border border-dashed border-stone-200/50 bg-white/50 py-10 text-center">
+                    <p className="mb-2 text-sm text-stone-500">No creations yet</p>
+                    <p className="mb-4 text-xs text-stone-400">Start with a prompt above or open a studio.</p>
                     <div className="flex flex-wrap justify-center gap-2">
                       <Link href="/ai-image">
-                        <Button variant="outline" size="sm" className="rounded-full">
+                        <Button variant="outline" size="sm" className="rounded-xl">
                           AI Image
                         </Button>
                       </Link>
                       <Link href="/ai-video">
-                        <Button variant="outline" size="sm" className="rounded-full">
+                        <Button variant="outline" size="sm" className="rounded-xl">
                           AI Video
                         </Button>
                       </Link>
                       <Link href="/ai-music">
-                        <Button variant="outline" size="sm" className="rounded-full">
+                        <Button variant="outline" size="sm" className="rounded-xl">
                           AI Music
                         </Button>
                       </Link>
@@ -426,14 +426,14 @@ export function CreateContent() {
                   </div>
                 )
               ) : (
-                <div className="rounded-xl border border-slate-200/60 bg-white py-8 px-6 text-center">
-                  <p className="text-slate-600 text-sm mb-2">Sign in to see your creations</p>
-                  <p className="text-slate-400 text-xs mb-4">
+                <div className="rounded-xl border border-stone-200/50 bg-white px-6 py-8 text-center">
+                  <p className="mb-2 text-sm text-stone-600">Sign in to see your creations</p>
+                  <p className="mb-4 text-xs text-stone-400">
                     Your images, videos, and music will be saved here.
                   </p>
                   <Button
                     onClick={() => signIn("google")}
-                    className="rounded-full border-0 bg-gradient-to-r from-blue-600 to-blue-700 px-5 text-white shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:opacity-90 active:scale-[0.98]"
+                    className="rounded-xl border-0 bg-stone-800 px-5 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
                   >
                     Sign in with Google
                   </Button>

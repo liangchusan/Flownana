@@ -21,18 +21,18 @@ export function VoicePreview({ audioUrl, isGenerating }: VoicePreviewProps) {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center space-y-6">
-      <h2 className="text-2xl font-bold text-slate-900">Generated Audio</h2>
+    <div className="flex h-full w-full flex-col items-center justify-center space-y-6">
+      <h2 className="text-2xl font-bold text-stone-900">Generated Audio</h2>
       
       {isGenerating ? (
-        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-video bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-300">
-          <Loader2 className="h-16 w-16 text-green-500 animate-spin mb-6" />
-          <p className="text-slate-700 text-lg font-medium">Generating audio, please wait...</p>
-          <p className="text-sm text-slate-500 mt-2">This may take a few minutes</p>
+        <div className="flex aspect-video w-full max-w-2xl flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-300 bg-gradient-to-br from-stone-50 to-zinc-100">
+          <Loader2 className="mb-6 h-16 w-16 animate-spin text-stone-500" />
+          <p className="text-lg font-medium text-stone-700">Generating audio, please wait...</p>
+          <p className="mt-2 text-sm text-stone-500">This may take a few minutes</p>
         </div>
       ) : audioUrl ? (
         <div className="w-full max-w-2xl space-y-6">
-          <div className="relative bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-12 shadow-lg">
+          <div className="relative rounded-xl bg-gradient-to-br from-stone-50 to-zinc-100 p-12 shadow-lg">
             <audio
               src={audioUrl}
               controls
@@ -49,11 +49,11 @@ export function VoicePreview({ audioUrl, isGenerating }: VoicePreviewProps) {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center w-full max-w-2xl aspect-video bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border-2 border-dashed border-slate-300">
+        <div className="flex aspect-video w-full max-w-2xl flex-col items-center justify-center rounded-xl border-2 border-dashed border-stone-300 bg-gradient-to-br from-stone-50 to-zinc-100">
           <div className="text-center">
-            <Mic className="h-20 w-20 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-600 text-xl font-medium mb-2">Ready to Create</p>
-            <p className="text-slate-500 text-sm">
+            <Mic className="mx-auto mb-4 h-20 w-20 text-stone-400" />
+            <p className="mb-2 text-xl font-medium text-stone-600">Ready to Create</p>
+            <p className="text-sm text-stone-500">
               Enter a prompt and generate your audio
             </p>
           </div>

@@ -38,13 +38,13 @@ export function FAQ() {
   };
 
   return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
+    <section className="bg-[#FDFDF9] px-4 py-24 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+          <h2 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
             Frequently Asked Questions
           </h2>
-          <p className="text-lg md:text-xl text-slate-600">
+          <p className="text-lg text-stone-600 md:text-xl">
             Find answers to common questions about Flownana AI content generation
           </p>
         </div>
@@ -53,25 +53,25 @@ export function FAQ() {
           {faqs.map((faq, index) => (
             <div
               key={index}
-              className="border border-slate-200/60 rounded-2xl overflow-hidden bg-white shadow-sm transition-all duration-200 hover:border-slate-300/80"
+              className="overflow-hidden rounded-2xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:border-stone-300/80"
             >
               <button
                 type="button"
                 onClick={() => toggleFAQ(index)}
-                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-slate-50 transition-all duration-200 active:scale-[0.99]"
+                className="flex w-full items-center justify-between px-6 py-4 text-left transition-all duration-300 hover:bg-stone-50 active:scale-[0.99]"
               >
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-stone-900">
                   {faq.question}
                 </span>
                 {openIndex === index ? (
-                  <ChevronUp className="h-5 w-5 text-slate-500" />
+                  <ChevronUp className="h-5 w-5 text-stone-500" />
                 ) : (
-                  <ChevronDown className="h-5 w-5 text-slate-500" />
+                  <ChevronDown className="h-5 w-5 text-stone-500" />
                 )}
               </button>
               {openIndex === index && (
-                <div className="px-6 py-4 bg-slate-50">
-                  <p className="text-slate-700 leading-relaxed">{faq.answer}</p>
+                <div className="bg-stone-50 px-6 py-4">
+                  <p className="leading-relaxed text-stone-700">{faq.answer}</p>
                 </div>
               )}
             </div>

@@ -14,14 +14,14 @@ export function DowngradeModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Manage plan in Stripe</h2>
-        <p className="text-sm text-slate-700 mb-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <h2 className="mb-4 text-xl font-bold text-stone-900">Manage plan in Stripe</h2>
+        <p className="mb-4 text-sm text-stone-700">
           Downgrades and billing-cycle switches are managed in Stripe Billing
           Portal.
         </p>
-        <p className="text-sm text-slate-700 mb-6">
+        <p className="mb-6 text-sm text-stone-700">
           Changes to a lower price typically take effect at the end of your
           current billing period.
         </p>

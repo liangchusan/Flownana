@@ -61,26 +61,26 @@ export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: Resu
   }, [currentGeneration?.taskId, session]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className="flex h-full flex-col bg-[#FDFDF9]">
       {/* Tab bar + Credits widget */}
-      <div className="w-full px-6 pt-4 pb-2 flex items-center justify-between">
+      <div className="flex w-full items-center justify-between px-6 pb-2 pt-4">
         <div className="flex gap-3">
           <button
             onClick={() => setActiveTab("explore")}
-            className={`px-2 py-1 text-[10px] font-normal rounded transition-colors ${
+            className={`rounded-xl px-2 py-1 text-[10px] font-normal transition-all duration-300 ${
               activeTab === "explore"
-                ? "text-blue-600 bg-blue-50"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                ? "bg-stone-100 text-stone-700"
+                : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
             }`}
           >
             Explore
           </button>
           <button
             onClick={() => setActiveTab("creations")}
-            className={`px-2 py-1 text-[10px] font-normal rounded transition-colors ${
+            className={`rounded-xl px-2 py-1 text-[10px] font-normal transition-all duration-300 ${
               activeTab === "creations"
-                ? "text-blue-600 bg-blue-50"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                ? "bg-stone-100 text-stone-700"
+                : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
             }`}
           >
             My Creations

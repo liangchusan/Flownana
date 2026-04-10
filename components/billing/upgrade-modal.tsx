@@ -21,40 +21,40 @@ export function UpgradeModal({
   const [amountLine, formulaLine, noteLine] = (chargeLine ?? "").split("\n");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-        <h2 className="text-xl font-bold text-slate-900 mb-5">Confirm Upgrade</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <h2 className="mb-5 text-xl font-bold text-stone-900">Confirm Upgrade</h2>
 
         {isLoadingQuote && (
-          <p className="text-sm text-slate-500 mb-5">Calculating charge…</p>
+          <p className="mb-5 text-sm text-stone-500">Calculating charge…</p>
         )}
 
         {!isLoadingQuote && chargeLine && (
-          <div className="rounded-xl border border-slate-200/60 bg-slate-50 px-4 py-4 mb-5 space-y-2">
+          <div className="mb-5 space-y-2 rounded-xl border border-stone-200/50 bg-stone-50 px-4 py-4">
             {/* Prominent amount */}
-            <p className="text-lg font-bold text-slate-900">{amountLine}</p>
+            <p className="text-lg font-bold text-stone-900">{amountLine}</p>
             {/* Formula */}
             {formulaLine && (
-              <p className="text-xs text-slate-500">{formulaLine}</p>
+              <p className="text-xs text-stone-500">{formulaLine}</p>
             )}
             {/* Note */}
             {noteLine && (
-              <p className="text-xs text-slate-400">{noteLine}</p>
+              <p className="text-xs text-stone-400">{noteLine}</p>
             )}
           </div>
         )}
 
-        <ul className="text-sm text-slate-600 space-y-1.5 mb-6">
+        <ul className="mb-6 space-y-1.5 text-sm text-stone-600">
           <li className="flex items-start gap-2">
-            <span className="text-blue-500 shrink-0">•</span>
+            <span className="shrink-0 text-stone-500">•</span>
             New plan credits granted immediately
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-blue-500 shrink-0">•</span>
+            <span className="shrink-0 text-stone-500">•</span>
             Existing credits remain valid until they expire
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-blue-500 shrink-0">•</span>
+            <span className="shrink-0 text-stone-500">•</span>
             Unused credits expire after 30 days
           </li>
         </ul>

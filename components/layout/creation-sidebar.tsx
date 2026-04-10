@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Logo } from "@/components/ui/logo";
 import { Video, Image as ImageIcon, Music, Home } from "lucide-react";
 
 function SidebarContent() {
@@ -25,16 +24,16 @@ function SidebarContent() {
   const isHome = pathname === "/home";
 
   return (
-    <aside className="w-[70px] bg-white fixed left-0 top-12 h-[calc(100vh-3rem)] overflow-y-auto">
+    <aside className="fixed left-0 top-12 h-[calc(100vh-3rem)] w-16 overflow-y-auto bg-[#FDFDF9]">
       <div className="pb-4 pt-4">
         {/* Navigation */}
         <nav className="space-y-4 px-2">
           <Link
             href="/home"
-            className={`group flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${
+            className={`group flex flex-col items-center gap-1 rounded-xl py-2 transition-all duration-300 ${
               isHome
-                ? "bg-slate-100 text-blue-600"
-                : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                ? "bg-stone-100 text-stone-700"
+                : "text-stone-700 hover:bg-stone-50 hover:text-stone-900"
             }`}
           >
             <Home className="h-5 w-5" />
@@ -48,10 +47,10 @@ function SidebarContent() {
               <Link
                 key={item.id}
                 href={item.href}
-                className={`group flex flex-col items-center gap-1 py-2 rounded-lg transition-colors ${
+                className={`group flex flex-col items-center gap-1 rounded-xl py-2 transition-all duration-300 ${
                   isActive
-                    ? "bg-slate-100 text-blue-600"
-                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-stone-100 text-stone-700"
+                    : "text-stone-700 hover:bg-stone-50 hover:text-stone-900"
                 }`}
               >
                 <Icon className="h-5 w-5" />
@@ -62,7 +61,7 @@ function SidebarContent() {
         </nav>
       </div>
       {/* Border line on the right */}
-      <div className="absolute right-0 top-0 bottom-0 w-px bg-slate-100"></div>
+      <div className="absolute bottom-0 right-0 top-0 w-px bg-stone-200/50"></div>
     </aside>
   );
 }
@@ -70,15 +69,15 @@ function SidebarContent() {
 export function CreationSidebar() {
   return (
     <Suspense fallback={
-      <aside className="w-[70px] bg-white fixed left-0 top-12 h-[calc(100vh-3rem)]">
+      <aside className="fixed left-0 top-12 h-[calc(100vh-3rem)] w-16 bg-[#FDFDF9]">
         <div className="pb-4 pt-4">
           <div className="space-y-4 px-2">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-16 bg-slate-200 rounded-lg"></div>
+              <div key={i} className="h-16 rounded-xl bg-stone-200"></div>
             ))}
           </div>
         </div>
-        <div className="absolute right-0 top-0 bottom-0 w-px bg-slate-100"></div>
+        <div className="absolute bottom-0 right-0 top-0 w-px bg-stone-200/50"></div>
       </aside>
     }>
       <SidebarContent />

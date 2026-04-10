@@ -13,15 +13,15 @@ export default function PricingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-[#FDFDF9] to-stone-50">
       <Header showBackground />
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+            <h1 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
               Video subscription & credits
             </h1>
-            <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+            <p className="mx-auto max-w-2xl text-xl text-stone-600">
               Subscribe for monthly credits. Pro outputs 720P; Max outputs 1080P.
             </p>
             {!stripeEnabled && (

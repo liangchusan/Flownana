@@ -511,14 +511,14 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
         {visibleExamples.map((example) => (
           <div
             key={example.id}
-            className="group relative bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow mb-4 break-inside-avoid"
+            className="group relative mb-4 break-inside-avoid overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
             onMouseEnter={() => setHoveredItem(example.id)}
             onMouseLeave={() => setHoveredItem(null)}
           >
             {example.type === "image" ? (
               <div
                 onClick={() => handleImageClick(example.url)}
-                className="bg-slate-100 relative cursor-pointer"
+                className="relative cursor-pointer bg-stone-100"
               >
                 <img
                   src={example.url}
@@ -530,7 +530,7 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
               </div>
             ) : (
               <div 
-                className="bg-slate-100 relative cursor-pointer"
+                className="relative cursor-pointer bg-stone-100"
                 onClick={() => handleVideoClick(example.url)}
               >
                 <div className="relative w-full aspect-video">
@@ -542,8 +542,8 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                     decoding="async"
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
-                    <div className="rounded-full bg-white/90 p-2 shadow-sm transition-all duration-200 group-hover:scale-105">
-                      <svg className="ml-0.5 h-4 w-4 text-slate-900" fill="currentColor" viewBox="0 0 20 20">
+                    <div className="rounded-full bg-white/90 p-2 shadow-sm transition-all duration-300 group-hover:scale-105">
+                      <svg className="ml-0.5 h-4 w-4 text-stone-900" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                       </svg>
                     </div>
@@ -557,7 +557,7 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
                 <button
                   type="button"
                   onClick={(e) => handleGenerateSimilar(e, example)}
-                  className="w-full rounded-full border border-white/50 bg-white/90 py-2 px-3 text-[10px] font-medium text-slate-800 shadow-sm transition-all duration-200 hover:bg-white hover:shadow-md active:scale-[0.98]"
+                  className="w-full rounded-xl border border-white/50 bg-white/90 px-3 py-2 text-[10px] font-medium text-stone-800 shadow-sm transition-all duration-300 hover:bg-white hover:shadow-md active:scale-[0.98]"
                 >
                   Generate Similar
                 </button>
@@ -570,7 +570,7 @@ export function ExploreTab({ mode, onGenerateSimilar }: ExploreTabProps) {
       {/* 加载更多触发器 */}
       {visibleCount < filteredExamples.length && (
         <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
-          <div className="text-slate-400 text-xs">Loading more...</div>
+          <div className="text-xs text-stone-400">Loading more...</div>
         </div>
       )}
 
