@@ -21,6 +21,53 @@ interface Creation {
   error?: string;
 }
 
+const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
+
+function isCreationStatus(value: unknown): value is CreationStatus {
+  return typeof value === "string" && VALID_STATUS.includes(value as CreationStatus);
+}
+
+function isValidMediaUrl(url: unknown): url is string {
+  return typeof url === "string" && url.trim().length > 0;
+}
+
+function normalizeCreation(raw: unknown): Creation | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const candidate = raw as Partial<Creation>;
+  const type = candidate.type;
+  if (type !== "image" && type !== "video" && type !== "music") return null;
+  if (typeof candidate.id !== "string" || candidate.id.trim().length === 0) return null;
+
+  const urls = Array.isArray(candidate.urls)
+    ? candidate.urls.filter(isValidMediaUrl)
+    : [];
+  const status = isCreationStatus(candidate.status) ? candidate.status : "failed";
+  const normalizedStatus =
+    status === "success" && (type === "image" || type === "video") && urls.length === 0
+      ? "failed"
+      : status;
+
+  return {
+    id: candidate.id,
+    type,
+    status: normalizedStatus,
+    urls,
+    prompt: typeof candidate.prompt === "string" ? candidate.prompt : "",
+    createdAt:
+      typeof candidate.createdAt === "string" && candidate.createdAt.trim().length > 0
+        ? candidate.createdAt
+        : new Date().toISOString(),
+    taskId: typeof candidate.taskId === "string" ? candidate.taskId : undefined,
+    error:
+      normalizedStatus === "failed"
+        ? typeof candidate.error === "string" && candidate.error.trim().length > 0
+          ? candidate.error
+          : "Media not available"
+        : undefined,
+  };
+}
+
 interface MyCreationsTabProps {
   mode: "video" | "image" | "music";
   currentGeneration?: {
@@ -48,7 +95,15 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          setCreations(parsed);
+          const normalized = Array.isArray(parsed)
+            ? parsed
+                .map((item) => normalizeCreation(item))
+                .filter((item): item is Creation => !!item)
+            : [];
+          const deduped = normalized.filter(
+            (item, idx, arr) => arr.findIndex((c) => c.id === item.id) === idx
+          );
+          setCreations(deduped);
         } catch (error) {
           console.error("Error parsing stored creations:", error);
         }
@@ -110,6 +165,12 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this creation?")) {
       setCreations((prev) => prev.filter((c) => c.id !== id));
+      setFailedMedia((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -290,7 +351,20 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                       </div>
                     )}
                   </>
-                ) : null}
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center bg-stone-50">
+                    {creation.type === "image" ? (
+                      <ImageIcon className="mb-2 h-8 w-8 text-stone-400" />
+                    ) : creation.type === "video" ? (
+                      <Video className="mb-2 h-8 w-8 text-stone-400" />
+                    ) : (
+                      <Music className="mb-2 h-8 w-8 text-stone-400" />
+                    )}
+                    <p className="px-2 text-center text-[11px] text-stone-500">
+                      Media unavailable
+                    </p>
+                  </div>
+                )}
 
                 {/* Hover 操作按钮 */}
                 {creation.status === "success" && displayUrl && (

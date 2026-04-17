@@ -16,6 +16,7 @@ import {
 import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/layout/user-menu";
+import { CreditsWidget } from "@/components/creation/credits-widget";
 import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
 
@@ -38,6 +39,7 @@ interface HeroBanner {
   id: string;
   type: BannerType;
   mediaUrl: string;
+  posterUrl?: string;
   title: string;
   description: string;
   tag: string;
@@ -49,6 +51,8 @@ const heroBanners: HeroBanner[] = [
     type: "video",
     mediaUrl:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    posterUrl:
+      "https://images.unsplash.com/photo-1517821099601-8ccf4a767a87?w=1200&auto=format&fit=crop&q=80",
     title: "Cinematic AI Video with VEO 3.1",
     description: "Turn storyboards and prompts into film‑style motion in seconds.",
     tag: "VEO 3.1",
@@ -67,6 +71,8 @@ const heroBanners: HeroBanner[] = [
     type: "video",
     mediaUrl:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+    posterUrl:
+      "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&auto=format&fit=crop&q=80",
     title: "Original Soundtracks with Suno",
     description: "Create music beds and hooks that sync with your visuals.",
     tag: "Suno",
@@ -104,6 +110,7 @@ export function CreateContent() {
   const [recentCreations, setRecentCreations] = useState<Creation[]>([]);
   const bannerScrollRef = useRef<HTMLDivElement | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [videoFallbackMap, setVideoFallbackMap] = useState<Record<string, boolean>>({});
 
   // 模块1: Banner 精确滚动到指定卡片
   const scrollToBanner = (index: number) => {
@@ -179,13 +186,16 @@ export function CreateContent() {
           </Link>
           <div>
             {session ? (
-              <UserMenu
-                user={{
-                  name: session.user?.name,
-                  email: session.user?.email,
-                  image: session.user?.image,
-                }}
-              />
+              <div className="flex items-center gap-2">
+                <CreditsWidget />
+                <UserMenu
+                  user={{
+                    name: session.user?.name,
+                    email: session.user?.email,
+                    image: session.user?.image,
+                  }}
+                />
+              </div>
             ) : (
               <Button
                 onClick={() => signIn("google")}
@@ -222,7 +232,7 @@ export function CreateContent() {
                     >
                       {/* 媒体区域：图片 / 视频，16:9 比例 */}
                       <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-black">
-                        {banner.type === "video" ? (
+                        {banner.type === "video" && !videoFallbackMap[banner.id] ? (
                           <video
                             src={banner.mediaUrl}
                             className="h-full w-full object-cover"
@@ -230,10 +240,15 @@ export function CreateContent() {
                             loop
                             muted
                             playsInline
+                            preload="metadata"
+                            poster={banner.posterUrl}
+                            onError={() =>
+                              setVideoFallbackMap((prev) => ({ ...prev, [banner.id]: true }))
+                            }
                           />
                         ) : (
                           <img
-                            src={banner.mediaUrl}
+                            src={banner.posterUrl ?? banner.mediaUrl}
                             alt={banner.title}
                             className="h-full w-full object-cover"
                             loading="lazy"
