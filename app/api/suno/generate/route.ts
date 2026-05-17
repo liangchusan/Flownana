@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { prisma } from "@/lib/prisma";
 import {
   consumeCreditsFIFO,
   refundConsumedCredits,
@@ -143,12 +144,16 @@ async function pollSunoResult(taskId: string) {
 
 export async function POST(request: NextRequest) {
   let consumedCredits: CreditConsumptionSnapshot = [];
+  let taskId: string | undefined;
+  let userId: string | undefined;
+  let promptForPersistence = "Untitled prompt";
 
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    userId = session.user.id;
 
     const body = await request.json();
     const {
@@ -169,11 +174,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    promptForPersistence = prompt;
 
     // Deduct credits before generation
-    consumedCredits = await consumeCreditsFIFO(session.user.id, MUSIC_CREDITS);
+    consumedCredits = await consumeCreditsFIFO(userId, MUSIC_CREDITS);
 
-    const taskId = await createSunoTask({
+    taskId = await createSunoTask({
       prompt,
       title,
       tags,
@@ -182,6 +188,25 @@ export async function POST(request: NextRequest) {
 
     const audioUrl = await pollSunoResult(taskId);
 
+    await prisma.generation.upsert({
+      where: { taskId },
+      update: {
+        type: "music",
+        status: "success",
+        urls: [audioUrl],
+        prompt,
+        error: null,
+      },
+      create: {
+        userId,
+        type: "music",
+        status: "success",
+        urls: [audioUrl],
+        prompt,
+        taskId,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       audioUrl,
@@ -189,6 +214,36 @@ export async function POST(request: NextRequest) {
       taskId,
     });
   } catch (error: any) {
+    if (taskId && userId) {
+      try {
+        await prisma.generation.upsert({
+          where: { taskId },
+          update: {
+            type: "music",
+            status: "failed",
+            error:
+              typeof error?.message === "string"
+                ? error.message
+                : "Generation failed.",
+          },
+          create: {
+            userId,
+            type: "music",
+            status: "failed",
+            urls: [],
+            prompt: promptForPersistence,
+            taskId,
+            error:
+              typeof error?.message === "string"
+                ? error.message
+                : "Generation failed.",
+          },
+        });
+      } catch (persistErr) {
+        console.error("Failed to persist music generation failure:", persistErr);
+      }
+    }
+
     // Refund credits on failure
     if (consumedCredits.length > 0) {
       try {

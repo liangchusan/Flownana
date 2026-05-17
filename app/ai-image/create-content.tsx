@@ -8,6 +8,7 @@ import { ResultPanel } from "@/components/creation/result-panel";
 import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/layout/user-menu";
+import { CreditsWidget } from "@/components/creation/credits-widget";
 import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
 
@@ -45,13 +46,16 @@ export function CreateContent({ mode }: { mode: "image" }) {
           </Link>
           <div>
             {session ? (
-              <UserMenu
-                user={{
-                  name: session.user?.name,
-                  email: session.user?.email,
-                  image: session.user?.image,
-                }}
-              />
+              <div className="flex items-center gap-2">
+                <CreditsWidget />
+                <UserMenu
+                  user={{
+                    name: session.user?.name,
+                    email: session.user?.email,
+                    image: session.user?.image,
+                  }}
+                />
+              </div>
             ) : (
               <Button
                 onClick={() => signIn("google")}

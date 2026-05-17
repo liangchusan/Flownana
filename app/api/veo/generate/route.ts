@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { prisma } from "@/lib/prisma";
 import {
   InsufficientCreditsError,
   consumeCreditsFIFO,
@@ -265,11 +266,15 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   let consumedCredits: CreditConsumptionSnapshot = [];
+  let taskId: string | undefined;
+  let userId: string | undefined;
+  let promptForPersistence = "Untitled prompt";
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    userId = session.user.id;
 
     const body = await request.json();
     const {
@@ -294,6 +299,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    promptForPersistence = prompt;
 
     const option = resolveVideoOption({ modelOptionId, model });
     if (!option) {
@@ -305,7 +311,7 @@ export async function POST(request: NextRequest) {
 
     consumedCredits = await consumeCreditsFIFO(session.user.id, option.credits);
 
-    const taskId = await createVideoTask({
+    taskId = await createVideoTask({
       prompt,
       imageUrls,
       aspectRatio,
@@ -314,6 +320,25 @@ export async function POST(request: NextRequest) {
     });
 
     const videoUrl = await pollVideoResult(taskId, option);
+
+    await prisma.generation.upsert({
+      where: { taskId },
+      update: {
+        type: "video",
+        status: "success",
+        urls: [videoUrl],
+        prompt,
+        error: null,
+      },
+      create: {
+        userId,
+        type: "video",
+        status: "success",
+        urls: [videoUrl],
+        prompt,
+        taskId,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -325,6 +350,35 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error generating video:", error);
+    if (taskId && userId) {
+      try {
+        await prisma.generation.upsert({
+          where: { taskId },
+          update: {
+            type: "video",
+            status: "failed",
+            error:
+              typeof error?.message === "string"
+                ? error.message
+                : "Generation failed.",
+          },
+          create: {
+            userId,
+            type: "video",
+            status: "failed",
+            urls: [],
+            prompt: promptForPersistence,
+            taskId,
+            error:
+              typeof error?.message === "string"
+                ? error.message
+                : "Generation failed.",
+          },
+        });
+      } catch (persistErr) {
+        console.error("Failed to persist video generation failure:", persistErr);
+      }
+    }
     if (consumedCredits.length > 0) {
       try {
         await refundConsumedCredits(consumedCredits);

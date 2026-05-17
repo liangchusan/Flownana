@@ -17,6 +17,7 @@ model User {
   updatedAt        DateTime       @updatedAt
   subscriptions    Subscription[]
   creditBatches    CreditBatch[]
+  generations      Generation[]
 }
 
 model Subscription {
@@ -58,4 +59,21 @@ model ProcessedStripeEvent {
   id          String   @id
   type        String
   processedAt DateTime @default(now())
+}
+
+model Generation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  status    String
+  urls      String[] @default([])
+  prompt    String
+  taskId    String?  @unique
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
 }

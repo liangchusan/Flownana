@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { AlertCircle, Zap } from "lucide-react";
 
 type Summary = {
   subscription: {
@@ -18,70 +18,140 @@ type Summary = {
   };
 };
 
+const SUMMARY_CACHE_TTL_MS = 60_000;
+const SUMMARY_STORAGE_KEY = "flownana_billing_summary_cache_v1";
+let summaryCache: Summary | null = null;
+let summaryCacheAt = 0;
+
+function readPersistedSummary(): { summary: Summary | null; cachedAt: number } {
+  if (typeof window === "undefined") {
+    return { summary: null, cachedAt: 0 };
+  }
+  try {
+    const raw = window.localStorage.getItem(SUMMARY_STORAGE_KEY);
+    if (!raw) return { summary: null, cachedAt: 0 };
+    const parsed = JSON.parse(raw) as { summary?: Summary; cachedAt?: number };
+    return {
+      summary: parsed.summary ?? null,
+      cachedAt: parsed.cachedAt ?? 0,
+    };
+  } catch {
+    return { summary: null, cachedAt: 0 };
+  }
+}
+
+function persistSummary(summary: Summary | null, cachedAt: number) {
+  if (typeof window === "undefined") return;
+  if (!summary) {
+    window.localStorage.removeItem(SUMMARY_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(
+    SUMMARY_STORAGE_KEY,
+    JSON.stringify({ summary, cachedAt })
+  );
+}
+
 const PLAN_LABEL: Record<string, string> = {
+  free: "Free",
   pro: "Pro",
   max: "Max",
 };
 
 const PLAN_COLOR: Record<string, string> = {
+  free: "border-stone-200 bg-stone-50 text-stone-700",
   pro: "border-stone-300 bg-stone-100 text-stone-700",
   max: "border-zinc-300 bg-zinc-100 text-zinc-700",
 };
 
 export function CreditsWidget() {
   const { data: session, status } = useSession();
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(() => {
+    if (summaryCache) return summaryCache;
+    const persisted = readPersistedSummary();
+    if (!persisted.summary) return null;
+    summaryCache = persisted.summary;
+    summaryCacheAt = persisted.cachedAt;
+    return persisted.summary;
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (status === "unauthenticated") {
+      setSummary(null);
+      summaryCache = null;
+      summaryCacheAt = 0;
+      persistSummary(null, 0);
+      return;
+    }
     if (status !== "authenticated") return;
-    setLoading(true);
+
+    const hasFreshCache =
+      summaryCache && Date.now() - summaryCacheAt < SUMMARY_CACHE_TTL_MS;
+    if (hasFreshCache) {
+      setSummary(summaryCache);
+    } else if (!summaryCache) {
+      setLoading(true);
+    }
+
     fetch("/api/billing/summary")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => setSummary(d))
-      .catch(() => setSummary(null))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        setSummary(d);
+        summaryCache = d;
+        summaryCacheAt = Date.now();
+        persistSummary(d, summaryCacheAt);
+      })
+      .catch(() => {
+        if (!summaryCache) {
+          setSummary(null);
+        }
+      })
       .finally(() => setLoading(false));
   }, [status]);
 
-  // Not signed in or loading — show nothing
-  if (status === "loading" || loading) return null;
-  if (!session) return null;
+  if ((status === "loading" || loading) && !summary) {
+    return (
+      <div className="h-8 w-28 animate-pulse rounded-xl border border-stone-200/50 bg-stone-100" />
+    );
+  }
+  if (!session && status !== "loading") return null;
 
   const plan = summary?.subscription?.planType;
   const credits = summary?.credits?.current ?? 0;
   const hasSub = !!summary?.subscription;
+  const isExhausted = credits <= 0;
+  const normalizedPlan = hasSub && plan ? plan : "free";
+  const planLabel = PLAN_LABEL[normalizedPlan] ?? "Free";
+  const planCls =
+    PLAN_COLOR[normalizedPlan] ?? "border-stone-200 bg-stone-100 text-stone-700";
+  const href = hasSub ? "/account/billing" : "/pricing";
+  const wrapperCls = isExhausted
+    ? "border-amber-300/70 bg-amber-50/80 text-amber-900 hover:border-amber-400/70"
+    : "border-stone-200/50 bg-white text-stone-700 hover:border-stone-300";
 
-  // ── Subscriber ────────────────────────────────────────────────────────────
-  if (hasSub && plan) {
-    const planLabel = PLAN_LABEL[plan] ?? plan;
-    const planCls = PLAN_COLOR[plan] ?? "border-stone-200 bg-stone-100 text-stone-700";
-
-    return (
-      <Link
-        href="/account/billing"
-        className="flex items-center gap-2 rounded-xl border border-stone-200/50 bg-white px-3 py-1.5 text-xs shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md"
-      >
-        {/* Plan badge */}
-        <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${planCls}`}>
-          {planLabel}
-        </span>
-        {/* Credits */}
-        <span className="flex items-center gap-1 font-medium text-stone-700">
-          <Zap className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />
-          {credits.toLocaleString()}
-        </span>
-      </Link>
-    );
-  }
-
-  // ── No subscription — CTA ─────────────────────────────────────────────────
   return (
     <Link
-      href="/pricing"
-      className="flex items-center gap-1.5 rounded-xl border border-stone-200/50 bg-gradient-to-r from-stone-50 to-zinc-50 px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md hover:from-stone-100 hover:to-zinc-100"
+      href={href}
+      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs shadow-sm transition-all duration-300 hover:shadow-md ${wrapperCls}`}
+      aria-label={`${planLabel} plan with ${credits} credits`}
     >
-      <Zap className="h-3.5 w-3.5 fill-stone-600 text-stone-600" />
-      Upgrade to Pro
+      <span
+        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${planCls}`}
+      >
+        {planLabel}
+      </span>
+      {isExhausted ? (
+        <span className="flex items-center gap-1 font-medium text-amber-800">
+          <AlertCircle className="h-3.5 w-3.5" />
+          0 credits
+        </span>
+      ) : (
+        <span className="flex items-center gap-1 font-medium text-stone-700">
+          <Zap className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          {credits.toLocaleString()}
+        </span>
+      )}
     </Link>
   );
 }

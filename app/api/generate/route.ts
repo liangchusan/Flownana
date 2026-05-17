@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { prisma } from "@/lib/prisma";
 import {
   InsufficientCreditsError,
   consumeCreditsFIFO,
@@ -178,11 +179,15 @@ async function pollNanoBananaResult(taskId: string) {
 
 export async function POST(request: NextRequest) {
   let consumedCredits: CreditConsumptionSnapshot = [];
+  let taskId: string | undefined;
+  let userId: string | undefined;
+  let promptForPersistence = "Untitled prompt";
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    userId = session.user.id;
 
     const body = await request.json();
     const {
@@ -204,6 +209,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    promptForPersistence = prompt;
 
     const ar = aspectRatio && aspectRatio.trim() !== "" ? aspectRatio : "1:1";
     const res = (
@@ -224,7 +230,7 @@ export async function POST(request: NextRequest) {
         ? [String(imageUrl).trim()]
         : undefined;
 
-    const taskId = await createNanoBananaTask({
+    taskId = await createNanoBananaTask({
       prompt,
       aspectRatio: ar,
       resolution: res,
@@ -233,6 +239,25 @@ export async function POST(request: NextRequest) {
     });
 
     const generatedImageUrl = await pollNanoBananaResult(taskId);
+
+    await prisma.generation.upsert({
+      where: { taskId },
+      update: {
+        type: "image",
+        status: "success",
+        urls: [generatedImageUrl],
+        prompt,
+        error: null,
+      },
+      create: {
+        userId,
+        type: "image",
+        status: "success",
+        urls: [generatedImageUrl],
+        prompt,
+        taskId,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -243,6 +268,36 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error generating image:", error);
+    if (taskId && userId) {
+      try {
+        await prisma.generation.upsert({
+          where: { taskId },
+          update: {
+            type: "image",
+            status: "failed",
+            error:
+              typeof error?.message === "string"
+                ? error.message
+                : "Generation failed.",
+          },
+          create: {
+            userId,
+            type: "image",
+            status: "failed",
+            urls: [],
+            prompt: promptForPersistence,
+            taskId,
+            error:
+              typeof error?.message === "string"
+                ? error.message
+                : "Generation failed.",
+          },
+        });
+      } catch (persistErr) {
+        console.error("Failed to persist image generation failure:", persistErr);
+      }
+    }
+
     if (consumedCredits.length > 0) {
       try {
         await refundConsumedCredits(consumedCredits);

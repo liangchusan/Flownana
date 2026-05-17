@@ -22,6 +22,11 @@ interface Creation {
 }
 
 const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
+const LEGACY_STATUS_MAP: Record<string, CreationStatus> = {
+  completed: "success",
+  done: "success",
+  error: "failed",
+};
 
 function isCreationStatus(value: unknown): value is CreationStatus {
   return typeof value === "string" && VALID_STATUS.includes(value as CreationStatus);
@@ -34,15 +39,38 @@ function isValidMediaUrl(url: unknown): url is string {
 function normalizeCreation(raw: unknown): Creation | null {
   if (!raw || typeof raw !== "object") return null;
 
-  const candidate = raw as Partial<Creation>;
+  const candidate = raw as Partial<Creation> & {
+    url?: unknown;
+    imageUrl?: unknown;
+    videoUrl?: unknown;
+    audioUrl?: unknown;
+    outputUrl?: unknown;
+    resultUrl?: unknown;
+  };
   const type = candidate.type;
   if (type !== "image" && type !== "video" && type !== "music") return null;
   if (typeof candidate.id !== "string" || candidate.id.trim().length === 0) return null;
 
-  const urls = Array.isArray(candidate.urls)
+  const urlsFromArray = Array.isArray(candidate.urls)
     ? candidate.urls.filter(isValidMediaUrl)
     : [];
-  const status = isCreationStatus(candidate.status) ? candidate.status : "failed";
+  const urlsFromLegacy = [
+    candidate.url,
+    candidate.imageUrl,
+    candidate.videoUrl,
+    candidate.audioUrl,
+    candidate.outputUrl,
+    candidate.resultUrl,
+  ].filter(isValidMediaUrl);
+  const urls = [...urlsFromArray, ...urlsFromLegacy].filter(
+    (url, index, list) => list.indexOf(url) === index
+  );
+
+  const rawStatus = typeof candidate.status === "string" ? candidate.status.toLowerCase() : "";
+  const mappedStatus = LEGACY_STATUS_MAP[rawStatus];
+  const status = isCreationStatus(candidate.status)
+    ? candidate.status
+    : mappedStatus || "failed";
   const normalizedStatus =
     status === "success" && (type === "image" || type === "video") && urls.length === 0
       ? "failed"
@@ -68,6 +96,25 @@ function normalizeCreation(raw: unknown): Creation | null {
   };
 }
 
+function mergeCreations(primary: Creation[], secondary: Creation[]): Creation[] {
+  const map = new Map<string, Creation>();
+  for (const item of [...primary, ...secondary]) {
+    const existed = map.get(item.id);
+    if (!existed) {
+      map.set(item.id, item);
+      continue;
+    }
+    const pick =
+      new Date(item.createdAt).getTime() >= new Date(existed.createdAt).getTime()
+        ? item
+        : existed;
+    map.set(item.id, pick);
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 interface MyCreationsTabProps {
   mode: "video" | "image" | "music";
   currentGeneration?: {
@@ -88,11 +135,20 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
   const visibleCreations = creations.filter((creation) => creation.type === mode);
 
-  // 从 localStorage 加载历史记录
+  // 优先从后端拉取历史，并兼容迁移老 localStorage 数据
   useEffect(() => {
-    if (session?.user?.email) {
-      const stored = localStorage.getItem(`creations_${session.user.email}`);
-      if (stored) {
+    if (!session?.user?.id) return;
+
+    const storageKeys = [
+      `creations_${session.user.id}`,
+      session.user.email ? `creations_${session.user.email}` : null,
+    ].filter((item): item is string => !!item);
+
+    const readLocal = () => {
+      const parsedAll: Creation[] = [];
+      for (const key of storageKeys) {
+        const stored = localStorage.getItem(key);
+        if (!stored) continue;
         try {
           const parsed = JSON.parse(stored);
           const normalized = Array.isArray(parsed)
@@ -100,20 +156,38 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                 .map((item) => normalizeCreation(item))
                 .filter((item): item is Creation => !!item)
             : [];
-          const deduped = normalized.filter(
-            (item, idx, arr) => arr.findIndex((c) => c.id === item.id) === idx
-          );
-          setCreations(deduped);
+          parsedAll.push(...normalized);
         } catch (error) {
           console.error("Error parsing stored creations:", error);
         }
       }
+      return mergeCreations(parsedAll, []);
+    };
+
+    const localCreations = readLocal();
+    if (localCreations.length > 0) {
+      setCreations(localCreations);
     }
-  }, [session]);
+
+    fetch(`/api/creations?type=${mode}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const fromApi = Array.isArray(data?.creations)
+          ? data.creations
+              .map((item: unknown) => normalizeCreation(item))
+              .filter((item: Creation | null): item is Creation => !!item)
+          : [];
+        const merged = mergeCreations(fromApi, localCreations);
+        setCreations(merged);
+      })
+      .catch((error) => {
+        console.error("Error fetching creations:", error);
+      });
+  }, [mode, session]);
 
   // 处理新的生成任务
   useEffect(() => {
-    if (currentGeneration?.taskId && session?.user?.email) {
+    if (currentGeneration?.taskId && session?.user?.id) {
       const taskId = currentGeneration.taskId;
       setCreations((prev) => {
         // 检查是否已存在
@@ -148,11 +222,11 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
 
   // 保存到 localStorage
   useEffect(() => {
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return;
     }
 
-    const storageKey = `creations_${session.user.email}`;
+    const storageKey = `creations_${session.user.id}`;
 
     if (creations.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(creations));
@@ -170,6 +244,11 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
         const next = new Set(prev);
         next.delete(id);
         return next;
+      });
+      fetch(`/api/creations?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }).catch((error) => {
+        console.error("Error deleting creation:", error);
       });
     }
   };
