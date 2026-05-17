@@ -146,10 +146,13 @@ export async function POST(request: Request) {
     }
 
     if (quote.creditAmountCents > 0) {
+      const redeemBy = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour
       const coupon = await stripe.coupons.create({
         duration: "once",
         amount_off: quote.creditAmountCents,
         currency: quote.currency,
+        max_redemptions: 1,
+        redeem_by: redeemBy,
         name: `Pro yearly remaining credit (${quote.remainingMonths}m)`,
       });
       sessionParams.discounts = [{ coupon: coupon.id }];
@@ -158,6 +161,7 @@ export async function POST(request: Request) {
         remainingMonthsCredit: String(quote.remainingMonths),
         creditAmountCents: String(quote.creditAmountCents),
         creditCouponId: coupon.id,
+        creditCouponRedeemBy: String(redeemBy),
       };
     }
 

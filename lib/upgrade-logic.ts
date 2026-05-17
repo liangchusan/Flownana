@@ -14,14 +14,21 @@ export function isUpgradeAllowed(currentKey: PriceKey, targetKey: PriceKey): boo
 
 export function countRemainingMonths(
   nextCreditAt: Date | null,
-  currentPeriodEnd: Date
+  currentPeriodEnd: Date,
+  now: Date = new Date()
 ): number {
-  if (!nextCreditAt || nextCreditAt >= currentPeriodEnd) {
+  if (!nextCreditAt) {
     return 0;
   }
 
   let count = 0;
-  let cursor = new Date(nextCreditAt.getTime());
+  // Use the later of nextCreditAt and now to avoid crediting already-past months.
+  const effectiveStartMs = Math.max(nextCreditAt.getTime(), now.getTime());
+  if (effectiveStartMs >= currentPeriodEnd.getTime()) {
+    return 0;
+  }
+
+  let cursor = new Date(effectiveStartMs);
   while (cursor < currentPeriodEnd) {
     count += 1;
     const day = cursor.getDate();

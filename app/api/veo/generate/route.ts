@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import {
+  CreditConsumptionConflictError,
   InsufficientCreditsError,
   consumeCreditsFIFO,
   refundConsumedCredits,
@@ -395,6 +396,13 @@ export async function POST(request: NextRequest) {
           available: error.available,
         },
         { status: 402 }
+      );
+    }
+
+    if (error instanceof CreditConsumptionConflictError) {
+      return NextResponse.json(
+        { error: "Credit balance changed. Please retry generation." },
+        { status: 409 }
       );
     }
 

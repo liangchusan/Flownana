@@ -5,16 +5,17 @@ import { NextResponse } from "next/server";
  * 访问: http://localhost:3000/api/test-env
  */
 export async function GET() {
-  if (process.env.NODE_ENV !== "development") {
+  if (
+    process.env.NODE_ENV !== "development" ||
+    process.env.ENABLE_TEST_ENV_ROUTE !== "true"
+  ) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const env = {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL || "❌ Not set",
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ? "✅ Set" : "❌ Not set",
-    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID 
-      ? `✅ Set (${process.env.GOOGLE_CLIENT_ID.substring(0, 30)}...)` 
-      : "❌ Not set",
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? "✅ Set" : "❌ Not set",
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET 
       ? "✅ Set" 
       : "❌ Not set",
@@ -39,4 +40,3 @@ export async function GET() {
     }
   });
 }
-
