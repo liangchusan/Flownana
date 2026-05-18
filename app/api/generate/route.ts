@@ -13,8 +13,11 @@ import {
   IMAGE_RESOLUTION_CREDITS,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
+import { persistGeneratedMedia } from "@/lib/media-storage";
 
 const NANO_BANANA_API_BASE = "https://api.kie.ai";
+
+export const maxDuration = 300;
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -96,7 +99,7 @@ async function pollNanoBananaResult(taskId: string) {
     );
   }
 
-  const maxWaitMs = 60_000; // 最长等待 60 秒
+  const maxWaitMs = 300_000; // 最长等待 5 分钟
   const intervalMs = 2_000; // 每 2 秒轮询一次
   const start = Date.now();
 
@@ -239,7 +242,13 @@ export async function POST(request: NextRequest) {
       imageInput,
     });
 
-    const generatedImageUrl = await pollNanoBananaResult(taskId);
+    const providerImageUrl = await pollNanoBananaResult(taskId);
+    const generatedImageUrl = await persistGeneratedMedia({
+      sourceUrl: providerImageUrl,
+      userId: session.user.id,
+      taskId,
+      kind: "image",
+    });
 
     await prisma.generation.upsert({
       where: { taskId },

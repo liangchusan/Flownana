@@ -20,11 +20,13 @@ import {
   Pause
 } from "lucide-react";
 
+const HOME_DEMO_VIDEO_URL = "/videos/flownana-home-demo.mp4";
+
 // Hero 视频轮播内容 - 包含输入图片和prompt
 const heroVideos = [
   {
     id: 1,
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+    videoUrl: HOME_DEMO_VIDEO_URL,
     inputImage: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
     prompt: "A peaceful forest scene with sunlight filtering through trees, cinematic quality, 4K",
     model: "VEO3.1",
@@ -32,7 +34,7 @@ const heroVideos = [
   },
   {
     id: 2,
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    videoUrl: HOME_DEMO_VIDEO_URL,
     inputImage: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&h=600&fit=crop",
     prompt: "Urban cityscape at night with neon lights, futuristic atmosphere, cinematic",
     model: "VEO3.1",
@@ -40,7 +42,7 @@ const heroVideos = [
   },
   {
     id: 3,
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    videoUrl: HOME_DEMO_VIDEO_URL,
     inputImage: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&h=600&fit=crop",
     prompt: "Ocean waves crashing on rocky shore, golden hour lighting, epic cinematic",
     model: "VEO3.1",
@@ -292,7 +294,7 @@ export default function Home() {
                 </div>
                 <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
                   <video
-                    src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+                    src={HOME_DEMO_VIDEO_URL}
                     className="w-full h-full object-cover"
                     muted
                     loop

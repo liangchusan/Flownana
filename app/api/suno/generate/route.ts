@@ -8,6 +8,7 @@ import {
   InsufficientCreditsError,
   type CreditConsumptionSnapshot,
 } from "@/lib/credit-consumption";
+import { persistGeneratedMedia } from "@/lib/media-storage";
 
 const MUSIC_CREDITS = 10;
 
@@ -186,7 +187,13 @@ export async function POST(request: NextRequest) {
       makeInstrumental,
     });
 
-    const audioUrl = await pollSunoResult(taskId);
+    const providerAudioUrl = await pollSunoResult(taskId);
+    const audioUrl = await persistGeneratedMedia({
+      sourceUrl: providerAudioUrl,
+      userId: session.user.id,
+      taskId,
+      kind: "music",
+    });
 
     await prisma.generation.upsert({
       where: { taskId },

@@ -15,6 +15,7 @@ import {
   type VideoModelOption,
   type VideoModelOptionId,
 } from "@/lib/generation-pricing";
+import { persistGeneratedMedia } from "@/lib/media-storage";
 
 const KIE_API_BASE = "https://api.kie.ai";
 
@@ -320,7 +321,13 @@ export async function POST(request: NextRequest) {
       option,
     });
 
-    const videoUrl = await pollVideoResult(taskId, option);
+    const providerVideoUrl = await pollVideoResult(taskId, option);
+    const videoUrl = await persistGeneratedMedia({
+      sourceUrl: providerVideoUrl,
+      userId: session.user.id,
+      taskId,
+      kind: "video",
+    });
 
     await prisma.generation.upsert({
       where: { taskId },

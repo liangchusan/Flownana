@@ -25,6 +25,9 @@ The broader brand message may include video / image / music, but current MVP pri
 - failed generation should refund consumed credits
 - subscriptions and credit batches exist in the data model
 - Stripe event deduplication exists in the data model
+- new generated image/video/music media is downloaded server-side and uploaded to Vercel Blob before saving `Generation.urls`
+- older generation history may still contain external provider media URLs; UI attempts to refresh KIE media URLs via `/api/creations/media-url` when direct media loading fails
+- generation history display de-duplicates local optimistic items and persisted database rows by `taskId`
 
 ## Subscription Upgrade Rules (as of 2026-04-07)
 Allowed upgrade paths (old sub cancelled, new sub starts immediately with first credits):
@@ -40,7 +43,7 @@ Downgrades are disabled in code. UI shows a disabled button with note to use bil
 ## Credit Issuance Rules
 - First month: granted via webhook `checkout.session.completed` or `invoice.paid`
 - Monthly plans: each month's invoice triggers `invoice.paid` → grant credits
-- Yearly plans month 2–12: cron `/api/cron/monthly-credits` (catch-up loop; grants all overdue months in one run if cron was delayed)
+- Yearly plans month 2–12: Vercel Cron calls `/api/cron/monthly-credits` daily at 08:00 UTC with `CRON_SECRET`; catch-up loop grants all overdue months in one run if cron was delayed
 - Each credit batch expires 30 days after grant; consumed FIFO by expiry
 
 ## Schema
@@ -98,6 +101,10 @@ Must track at minimum:
 2. stabilize image generation funnel
 3. add GA4 on core funnel
 4. improve launch readiness for paid traffic validation
+
+## TODO
+- Replace the temporary homepage demo video with Flownana-owned video assets hosted on the website.
+- Backfill older provider-hosted generation media into Vercel Blob where still recoverable.
 
 ## Decisions
 - Lite agent system only

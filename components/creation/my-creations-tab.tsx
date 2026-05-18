@@ -96,19 +96,63 @@ function normalizeCreation(raw: unknown): Creation | null {
   };
 }
 
+function creationIdentity(creation: Creation): string {
+  return creation.taskId || creation.id;
+}
+
+function statusRank(status: CreationStatus): number {
+  switch (status) {
+    case "success":
+      return 5;
+    case "failed":
+      return 4;
+    case "processing":
+      return 3;
+    case "generating":
+      return 2;
+    case "pending":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function isPersistedCreation(creation: Creation): boolean {
+  return !creation.taskId || creation.id !== creation.taskId;
+}
+
+function pickPreferredCreation(candidate: Creation, current: Creation): Creation {
+  const candidateStatusRank = statusRank(candidate.status);
+  const currentStatusRank = statusRank(current.status);
+  if (candidateStatusRank !== currentStatusRank) {
+    return candidateStatusRank > currentStatusRank ? candidate : current;
+  }
+
+  if (candidate.urls.length !== current.urls.length) {
+    return candidate.urls.length > current.urls.length ? candidate : current;
+  }
+
+  const candidatePersisted = isPersistedCreation(candidate);
+  const currentPersisted = isPersistedCreation(current);
+  if (candidatePersisted !== currentPersisted) {
+    return candidatePersisted ? candidate : current;
+  }
+
+  return new Date(candidate.createdAt).getTime() >= new Date(current.createdAt).getTime()
+    ? candidate
+    : current;
+}
+
 function mergeCreations(primary: Creation[], secondary: Creation[]): Creation[] {
   const map = new Map<string, Creation>();
   for (const item of [...primary, ...secondary]) {
-    const existed = map.get(item.id);
+    const key = creationIdentity(item);
+    const existed = map.get(key);
     if (!existed) {
-      map.set(item.id, item);
+      map.set(key, item);
       continue;
     }
-    const pick =
-      new Date(item.createdAt).getTime() >= new Date(existed.createdAt).getTime()
-        ? item
-        : existed;
-    map.set(item.id, pick);
+    map.set(key, pickPreferredCreation(item, existed));
   }
   return Array.from(map.values()).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -133,7 +177,9 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
-  const visibleCreations = creations.filter((creation) => creation.type === mode);
+  const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
+  const [refreshingMedia, setRefreshingMedia] = useState<Set<string>>(new Set());
+  const visibleCreations = mergeCreations(creations, []).filter((creation) => creation.type === mode);
 
   // 优先从后端拉取历史，并兼容迁移老 localStorage 数据
   useEffect(() => {
@@ -190,20 +236,20 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     if (currentGeneration?.taskId && session?.user?.id) {
       const taskId = currentGeneration.taskId;
       setCreations((prev) => {
-        // 检查是否已存在
-        const exists = prev.find((c) => c.id === taskId);
+        const exists = prev.find((c) => creationIdentity(c) === taskId);
         if (exists) {
           const updated = prev.map((c) =>
-            c.id === taskId
+            creationIdentity(c) === taskId
               ? {
                   ...c,
                   status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
                   urls: currentGeneration.url ? [currentGeneration.url] : c.urls,
                   prompt: currentGeneration.prompt || c.prompt,
+                  taskId: c.taskId || taskId,
                 }
               : c
           );
-          return updated;
+          return mergeCreations(updated, []);
         } else {
           const newCreation: Creation = {
             id: taskId,
@@ -214,7 +260,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
             createdAt: new Date().toISOString(),
             taskId: taskId,
           };
-          return [newCreation, ...prev];
+          return mergeCreations([newCreation], prev);
         }
       });
     }
@@ -227,9 +273,10 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     }
 
     const storageKey = `creations_${session.user.id}`;
+    const normalizedCreations = mergeCreations(creations, []);
 
-    if (creations.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(creations));
+    if (normalizedCreations.length > 0) {
+      localStorage.setItem(storageKey, JSON.stringify(normalizedCreations));
       return;
     }
 
@@ -238,11 +285,17 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
 
   const handleDelete = (id: string) => {
     if (confirm("Are you sure you want to delete this creation?")) {
-      setCreations((prev) => prev.filter((c) => c.id !== id));
+      const target = creations.find((c) => c.id === id || c.taskId === id);
+      const targetIdentity = target ? creationIdentity(target) : id;
+
+      setCreations((prev) =>
+        prev.filter((c) => c.id !== id && c.taskId !== id && creationIdentity(c) !== targetIdentity)
+      );
       setFailedMedia((prev) => {
-        if (!prev.has(id)) return prev;
+        if (!prev.has(id) && !prev.has(targetIdentity)) return prev;
         const next = new Set(prev);
         next.delete(id);
+        next.delete(targetIdentity);
         return next;
       });
       fetch(`/api/creations?id=${encodeURIComponent(id)}`, {
@@ -282,6 +335,50 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleMediaError = async (creation: Creation, originalUrl: string) => {
+    const key = creationIdentity(creation);
+    if (!originalUrl || refreshingMedia.has(key)) return;
+
+    if (resolvedMediaUrls[key]) {
+      setFailedMedia((prev) => new Set(prev).add(key));
+      return;
+    }
+
+    setRefreshingMedia((prev) => new Set(prev).add(key));
+    try {
+      const res = await fetch("/api/creations/media-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          creationId: creation.id,
+          url: originalUrl,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        url?: string;
+      } | null;
+
+      const refreshedUrl = data?.url;
+      if (!res.ok || typeof refreshedUrl !== "string" || refreshedUrl.trim().length === 0) {
+        throw new Error("Media refresh failed");
+      }
+
+      setResolvedMediaUrls((prev) => ({
+        ...prev,
+        [key]: refreshedUrl,
+      }));
+    } catch (error) {
+      console.error("Error refreshing media URL:", error);
+      setFailedMedia((prev) => new Set(prev).add(key));
+    } finally {
+      setRefreshingMedia((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   };
 
   // 空状态
@@ -337,14 +434,17 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     <div className="p-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {visibleCreations.map((creation) => {
-          const isExpanded = expandedTask === creation.id;
-          const displayUrl = creation.urls[0];
+          const key = creationIdentity(creation);
+          const isExpanded = expandedTask === key;
+          const originalDisplayUrl = creation.urls[0];
+          const displayUrl = resolvedMediaUrls[key] || originalDisplayUrl;
           const hasMultiple = creation.urls.length > 1;
-          const mediaFailed = failedMedia.has(creation.id);
+          const mediaFailed = failedMedia.has(key);
+          const isRefreshingMedia = refreshingMedia.has(key);
 
           return (
             <div
-              key={creation.id}
+              key={key}
               className="group relative overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {/* 封面 */}
@@ -370,31 +470,42 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                   <>
                     {creation.type === "image" ? (
                       mediaFailed ? (
-                        <div className="flex h-full w-full items-center justify-center bg-stone-100">
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-stone-100 px-3 text-center">
                           <ImageIcon className="h-8 w-8 text-stone-400" />
+                          <p className="mt-2 text-[11px] text-stone-500">
+                            Media expired
+                          </p>
                         </div>
                       ) : (
-                        <img
-                          src={displayUrl}
-                          alt={creation.prompt}
-                          className="w-full h-full object-cover cursor-pointer"
-                          onClick={() => {
-                            if (hasMultiple) {
-                              setExpandedTask(isExpanded ? null : creation.id);
-                            } else {
-                              setSelectedImage(displayUrl);
-                            }
-                          }}
-                          onError={() =>
-                            setFailedMedia((prev) => new Set(prev).add(creation.id))
-                          }
-                          loading="lazy"
-                        />
+                        <>
+                          <img
+                            src={displayUrl}
+                            alt={creation.prompt}
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => {
+                              if (hasMultiple) {
+                                setExpandedTask(isExpanded ? null : key);
+                              } else {
+                                setSelectedImage(displayUrl);
+                              }
+                            }}
+                            onError={() => handleMediaError(creation, originalDisplayUrl)}
+                            loading="lazy"
+                          />
+                          {isRefreshingMedia && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-stone-100/80">
+                              <Loader2 className="h-6 w-6 animate-spin text-stone-500" />
+                            </div>
+                          )}
+                        </>
                       )
                     ) : creation.type === "video" ? (
                       mediaFailed ? (
-                        <div className="flex h-full w-full items-center justify-center bg-stone-100">
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-stone-100 px-3 text-center">
                           <Video className="h-8 w-8 text-stone-400" />
+                          <p className="mt-2 text-[11px] text-stone-500">
+                            Media expired
+                          </p>
                         </div>
                       ) : (
                         <button
@@ -408,15 +519,18 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                             muted
                             playsInline
                             preload="metadata"
-                            onError={() =>
-                              setFailedMedia((prev) => new Set(prev).add(creation.id))
-                            }
+                            onError={() => handleMediaError(creation, originalDisplayUrl)}
                           />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                             <div className="rounded-full bg-white/90 p-2">
                               <Video className="h-4 w-4 text-stone-900" />
                             </div>
                           </div>
+                          {isRefreshingMedia && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-stone-100/80">
+                              <Loader2 className="h-6 w-6 animate-spin text-stone-500" />
+                            </div>
+                          )}
                         </button>
                       )
                     ) : (
@@ -528,7 +642,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
             </button>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-12">
               {creations
-                .find((c) => c.id === expandedTask)
+                .find((c) => creationIdentity(c) === expandedTask)
                 ?.urls.map((url, idx) => (
                   <div key={idx} className="overflow-hidden rounded-xl border border-stone-200/50 bg-white">
                     <img

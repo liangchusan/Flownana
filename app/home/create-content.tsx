@@ -45,12 +45,13 @@ interface HeroBanner {
   tag: string;
 }
 
+const HOME_DEMO_VIDEO_URL = "/videos/flownana-home-demo.mp4";
+
 const heroBanners: HeroBanner[] = [
   {
     id: "veo",
     type: "video",
-    mediaUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    mediaUrl: HOME_DEMO_VIDEO_URL,
     posterUrl:
       "https://images.unsplash.com/photo-1517821099601-8ccf4a767a87?w=1200&auto=format&fit=crop&q=80",
     title: "Cinematic AI Video with VEO 3.1",
@@ -69,8 +70,7 @@ const heroBanners: HeroBanner[] = [
   {
     id: "suno",
     type: "video",
-    mediaUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+    mediaUrl: HOME_DEMO_VIDEO_URL,
     posterUrl:
       "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&auto=format&fit=crop&q=80",
     title: "Original Soundtracks with Suno",

@@ -31,32 +31,29 @@ export async function GET(request: Request) {
   const failed: string[] = [];
 
   for (const sub of subs) {
-    if (!sub.nextCreditAt) continue;
-    if (sub.nextCreditAt >= sub.currentPeriodEnd) {
-      await prisma.subscription.update({
-        where: { id: sub.id },
-        data: { nextCreditAt: null },
-      });
-      continue;
-    }
+    let nextCreditAt = sub.nextCreditAt;
+    if (!nextCreditAt) continue;
 
     try {
-      await grantCredits({
-        userId: sub.userId,
-        planType: sub.planType as PlanKey,
-        source: "yearly_monthly_cron",
-      });
+      while (nextCreditAt <= now && nextCreditAt < sub.currentPeriodEnd) {
+        await grantCredits({
+          userId: sub.userId,
+          planType: sub.planType as PlanKey,
+          source: "yearly_monthly_cron",
+        });
+        granted += 1;
+        nextCreditAt = addMonths(nextCreditAt, 1);
+      }
 
-      // Only advance nextCreditAt after a confirmed successful grant.
-      const next = addMonths(sub.nextCreditAt, 1);
-      const end = sub.currentPeriodEnd;
       await prisma.subscription.update({
         where: { id: sub.id },
         data: {
-          nextCreditAt: next.getTime() >= end.getTime() ? null : next,
+          nextCreditAt:
+            nextCreditAt.getTime() >= sub.currentPeriodEnd.getTime()
+              ? null
+              : nextCreditAt,
         },
       });
-      granted += 1;
     } catch (err) {
       // Grant failed: leave nextCreditAt unchanged so the next cron run retries.
       console.error(`[cron/monthly-credits] Failed to grant for sub ${sub.id}:`, err);

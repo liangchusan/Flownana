@@ -58,8 +58,8 @@ export async function DELETE(request: Request) {
 
     await prisma.generation.deleteMany({
       where: {
-        id,
         userId: session.user.id,
+        OR: [{ id }, { taskId: id }],
       },
     });
 
