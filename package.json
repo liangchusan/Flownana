@@ -8,7 +8,9 @@
     "postinstall": "npm run prisma:generate",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --test --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/*.test.ts",
+    "smoke:prod": "bash scripts/smoke-prod.sh"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",

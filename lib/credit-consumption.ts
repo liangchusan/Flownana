@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  planCreditConsumption,
+  sumRemainingCredits,
+} from "@/lib/credit-consumption-plan";
 
 export class InsufficientCreditsError extends Error {
   constructor(public required: number, public available: number) {
@@ -39,44 +43,29 @@ export async function consumeCreditsFIFO(
       orderBy: { expiresAt: "asc" },
     });
 
-    let available = 0;
-    for (const b of batches) {
-      available += b.remaining;
-    }
+    const available = sumRemainingCredits(batches);
     if (available < amount) {
       throw new InsufficientCreditsError(amount, available);
     }
 
-    let need = amount;
-    const consumed: CreditConsumptionSnapshot = [];
+    const consumed = planCreditConsumption(batches, amount);
 
     try {
       await prisma.$transaction(async (tx) => {
-        for (const batch of batches) {
-          if (need <= 0) break;
-          const take = Math.min(need, batch.remaining);
-          if (take <= 0) continue;
-
+        for (const item of consumed) {
           const updated = await tx.creditBatch.updateMany({
             where: {
-              id: batch.id,
-              remaining: { gte: take },
+              id: item.batchId,
+              remaining: { gte: item.amount },
             },
             data: {
-              remaining: { decrement: take },
+              remaining: { decrement: item.amount },
             },
           });
 
           if (updated.count !== 1) {
             throw new CreditConsumptionConflictError();
           }
-
-          consumed.push({ batchId: batch.id, amount: take });
-          need -= take;
-        }
-
-        if (need > 0) {
-          throw new CreditConsumptionConflictError();
         }
       });
       return consumed;

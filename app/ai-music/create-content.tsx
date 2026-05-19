@@ -11,6 +11,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { CreditsWidget } from "@/components/creation/credits-widget";
 import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
 
 export function CreateContent({ mode }: { mode: "voice" }) {
   const { data: session } = useSession();
@@ -56,7 +57,10 @@ export function CreateContent({ mode }: { mode: "voice" }) {
               </div>
             ) : (
               <Button
-                onClick={() => signIn("google")}
+                onClick={() => {
+                  trackEvent("signup_started", { source: "ai_music_topbar" });
+                  signIn("google");
+                }}
                 className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
                 size="sm"
               >

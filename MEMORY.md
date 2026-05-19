@@ -48,6 +48,7 @@ Downgrades are disabled in code. UI shows a disabled button with note to use bil
 
 ## Schema
 - `Subscription.nextPlan` field removed (was unused); migration: 20260407000000_remove_next_plan
+- Production Supabase Prisma migration history was baselined on 2026-05-19 via Supabase migration `baseline_prisma_migration_history`; `_prisma_migrations` now records the four local Prisma migrations as applied.
 
 ## MVP Scope (Current)
 Must support:
@@ -90,6 +91,13 @@ Must track at minimum:
 - main landing CTA leads users into the correct flow
 - core conversion events are trackable
 - no major blocking bug on landing / auth / checkout / generation / result path
+
+## Release Verification
+- Before production deploy: run `npm run lint`, `npm run test`, and `npm run build`.
+- After production deploy: run `npm run smoke:prod`.
+- Production deploy still requires explicit approval.
+- Business logic changes should include focused tests for pure credit, subscription, generation pricing, or history-display rules where practical.
+- GA4 is loaded only when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is configured; core funnel events are emitted from landing, pricing, checkout, auth, generation, failure, insufficient-credit, purchase-success, and download surfaces.
 
 ## Product Risks / Reality Check
 - homepage messaging currently promises video / image / music, but the clearest confirmed implemented core is image generation

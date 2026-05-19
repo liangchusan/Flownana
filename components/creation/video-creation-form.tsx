@@ -10,6 +10,7 @@ import {
   VIDEO_MODEL_OPTIONS,
   type VideoModelOption,
 } from "@/lib/generation-pricing";
+import { trackEvent } from "@/lib/analytics";
 
 const getModelName = (option: VideoModelOption): string => {
   if (option.family === "kling") return "Kling 3.0";
@@ -163,6 +164,13 @@ export function VideoCreationForm({
     if (!prompt.trim()) { alert("Please enter a prompt"); return; }
     if (!selectedOption) { alert("Invalid model settings, please adjust and try again."); return; }
     setIsGenerating(true);
+    trackEvent("generation_started", {
+      type: "video",
+      model_option_id: selectedOption.id,
+      model: selectedOption.providerModel,
+      credits_cost: selectedOption.credits,
+      aspect_ratio: aspectRatio,
+    });
     try {
       const response = await axios.post("/api/veo/generate", {
         prompt,
@@ -173,13 +181,36 @@ export function VideoCreationForm({
       if (response.data.success) {
         const taskId = response.data.taskId;
         const responsePrompt = response.data.prompt || prompt;
+        trackEvent("generation_success", {
+          type: "video",
+          model_option_id: response.data.modelOptionId || selectedOption.id,
+          credits_cost: response.data.creditsCost || selectedOption.credits,
+        });
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
         onGenerate(response.data.videoUrl, taskId, responsePrompt);
       } else {
+        trackEvent("generation_failed", {
+          type: "video",
+          model_option_id: selectedOption.id,
+          error: "unknown",
+        });
         alert("Generation failed, please try again");
       }
     } catch (error: any) {
-      alert(error.response?.data?.error || "Generation failed, please try again");
+      const message = error.response?.data?.error || "Generation failed, please try again";
+      if (error.response?.status === 402) {
+        trackEvent("insufficient_credits_shown", {
+          type: "video",
+          required: error.response?.data?.required,
+          available: error.response?.data?.available,
+        });
+      }
+      trackEvent("generation_failed", {
+        type: "video",
+        model_option_id: selectedOption.id,
+        error: message,
+      });
+      alert(message);
     } finally {
       setIsGenerating(false);
     }

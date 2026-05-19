@@ -5,6 +5,7 @@ import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { UserMenu } from "@/components/layout/user-menu";
+import { trackEvent } from "@/lib/analytics";
 
 interface HeaderProps {
   showBackground?: boolean;
@@ -37,6 +38,7 @@ export function Header({ showBackground = false }: HeaderProps) {
           </Link>
           <Link 
             href="/ai-image" 
+            onClick={() => trackEvent("ai_image_entry_click", { source: "header" })}
             className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
           >
             AI Image
@@ -67,7 +69,10 @@ export function Header({ showBackground = false }: HeaderProps) {
             />
           ) : (
             <Button
-              onClick={() => signIn("google")}
+              onClick={() => {
+                trackEvent("signup_started", { source: "header" });
+                signIn("google");
+              }}
               className="flex items-center space-x-2 border border-white/20 bg-white/10 text-white transition-all duration-300 hover:bg-white/20 hover:opacity-90 active:scale-[0.98]"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -96,4 +101,3 @@ export function Header({ showBackground = false }: HeaderProps) {
     </header>
   );
 }
-

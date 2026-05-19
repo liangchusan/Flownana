@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Pause
 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 const HOME_DEMO_VIDEO_URL = "/videos/flownana-home-demo.mp4";
 
@@ -221,7 +222,13 @@ export default function Home() {
                 <span className="text-white font-semibold"> No design skills required.</span>
               </p>
 
-              <Link href="/ai-image">
+              <Link
+                href="/ai-image"
+                onClick={() => {
+                  trackEvent("hero_cta_click", { source: "home_hero" });
+                  trackEvent("ai_image_entry_click", { source: "home_hero" });
+                }}
+              >
                 <Button size="lg" className="border-0 bg-white px-8 py-6 text-lg text-stone-900 shadow-2xl transition-all duration-300 hover:bg-stone-100 hover:opacity-90 active:scale-[0.98]">
                   Start Creating Free
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -309,7 +316,11 @@ export default function Home() {
             </Link>
 
             {/* AI Image */}
-            <Link href="/ai-image" className="group">
+            <Link
+              href="/ai-image"
+              className="group"
+              onClick={() => trackEvent("ai_image_entry_click", { source: "home_feature_card" })}
+            >
               <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-600 to-stone-700 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
@@ -387,7 +398,13 @@ export default function Home() {
             Join 50,000+ creators using Flownana to bring their ideas to life. Start free today.
           </p>
           <div className="flex justify-center">
-            <Link href="/ai-image">
+            <Link
+              href="/ai-image"
+              onClick={() => {
+                trackEvent("hero_cta_click", { source: "home_final_cta" });
+                trackEvent("ai_image_entry_click", { source: "home_final_cta" });
+              }}
+            >
               <Button size="lg" className="border-0 bg-white px-8 py-6 text-lg text-stone-700 shadow-2xl transition-all duration-300 hover:bg-stone-100 hover:opacity-90 active:scale-[0.98]">
                 Start Creating Free
                 <ArrowRight className="ml-2 h-5 w-5" />

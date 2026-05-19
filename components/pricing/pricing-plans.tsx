@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import type { PriceKey } from "@/lib/plans";
 import { UpgradeModal } from "@/components/billing/upgrade-modal";
+import { trackEvent } from "@/lib/analytics";
 
 const SHARED_FEATURES = [
   "Access to top-quality video models",
@@ -76,6 +77,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
 
   const subscribe = async (pk: PriceKey) => {
     if (!session) {
+      trackEvent("signup_started", { source: "pricing", price_key: pk });
       await signIn("google");
       return;
     }
@@ -84,6 +86,10 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       return;
     }
     setLoading(pk);
+    trackEvent("checkout_started", {
+      price_key: pk,
+      checkout_type: "new_subscription",
+    });
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -102,10 +108,15 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
 
   const upgradeNow = async (pk: PriceKey) => {
     if (!session) {
+      trackEvent("signup_started", { source: "pricing_upgrade", price_key: pk });
       await signIn("google");
       return;
     }
     setLoading(pk);
+    trackEvent("checkout_started", {
+      price_key: pk,
+      checkout_type: "upgrade",
+    });
     try {
       const res = await fetch("/api/stripe/change-plan", {
         method: "POST",

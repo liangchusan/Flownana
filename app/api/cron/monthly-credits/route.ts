@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { grantCredits } from "@/lib/credits";
 import type { PlanKey } from "@/lib/plans";
-import { addMonths } from "@/lib/subscription-sync";
+import {
+  getDueYearlyCreditGrantDates,
+  getNextYearlyCreditAt,
+} from "@/lib/yearly-credit-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -31,27 +34,30 @@ export async function GET(request: Request) {
   const failed: string[] = [];
 
   for (const sub of subs) {
-    let nextCreditAt = sub.nextCreditAt;
-    if (!nextCreditAt) continue;
+    const dueDates = getDueYearlyCreditGrantDates({
+      nextCreditAt: sub.nextCreditAt,
+      currentPeriodEnd: sub.currentPeriodEnd,
+      now,
+    });
+    if (dueDates.length === 0) continue;
 
     try {
-      while (nextCreditAt <= now && nextCreditAt < sub.currentPeriodEnd) {
+      for (const dueDate of dueDates) {
         await grantCredits({
           userId: sub.userId,
           planType: sub.planType as PlanKey,
           source: "yearly_monthly_cron",
         });
         granted += 1;
-        nextCreditAt = addMonths(nextCreditAt, 1);
       }
 
       await prisma.subscription.update({
         where: { id: sub.id },
         data: {
-          nextCreditAt:
-            nextCreditAt.getTime() >= sub.currentPeriodEnd.getTime()
-              ? null
-              : nextCreditAt,
+          nextCreditAt: getNextYearlyCreditAt({
+            lastDueCreditAt: dueDates[dueDates.length - 1],
+            currentPeriodEnd: sub.currentPeriodEnd,
+          }),
         },
       });
     } catch (err) {

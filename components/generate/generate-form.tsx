@@ -9,6 +9,7 @@ import {
   IMAGE_RESOLUTION_CREDITS,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
+import { trackEvent } from "@/lib/analytics";
 
 const MODEL_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
@@ -93,6 +94,14 @@ export function GenerateForm({
   const handleGenerate = async () => {
     if (!prompt.trim()) { alert("Please enter a prompt"); return; }
     setIsGenerating(true);
+    trackEvent("generation_started", {
+      type: "image",
+      model,
+      resolution,
+      aspect_ratio: aspectRatio,
+      credits_cost: IMAGE_RESOLUTION_CREDITS[resolution],
+      mode: uploadedImage ? "image-to-image" : "text-to-image",
+    });
     try {
       const mode = uploadedImage ? "image-to-image" : "text-to-image";
       const response = await axios.post("/api/generate", {
@@ -101,13 +110,38 @@ export function GenerateForm({
       if (response.data.success) {
         const taskId = response.data.taskId;
         const responsePrompt = response.data.prompt || prompt;
+        trackEvent("generation_success", {
+          type: "image",
+          model,
+          resolution,
+          aspect_ratio: aspectRatio,
+          credits_cost: response.data.creditsCost || IMAGE_RESOLUTION_CREDITS[resolution],
+        });
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
         onGenerate(response.data.imageUrl, taskId, responsePrompt);
       } else {
+        trackEvent("generation_failed", {
+          type: "image",
+          model,
+          error: "unknown",
+        });
         alert("Generation failed, please try again");
       }
     } catch (error: any) {
-      alert(error.response?.data?.error || error.message || "Generation failed, please try again");
+      const message = error.response?.data?.error || error.message || "Generation failed, please try again";
+      if (error.response?.status === 402) {
+        trackEvent("insufficient_credits_shown", {
+          type: "image",
+          required: error.response?.data?.required,
+          available: error.response?.data?.available,
+        });
+      }
+      trackEvent("generation_failed", {
+        type: "image",
+        model,
+        error: message,
+      });
+      alert(message);
     } finally {
       setIsGenerating(false);
     }

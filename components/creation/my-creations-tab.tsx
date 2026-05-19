@@ -7,19 +7,15 @@ import { Download, Trash2, RefreshCw, Loader2, Image as ImageIcon, Video, Music,
 import { Button } from "@/components/ui/button";
 import ImageModal from "./image-modal";
 import VideoModal from "./video-modal";
+import {
+  creationIdentity,
+  mergeCreations,
+  type CreationHistoryItem,
+  type CreationStatus,
+} from "@/lib/creation-history";
+import { trackEvent } from "@/lib/analytics";
 
-type CreationStatus = "pending" | "generating" | "processing" | "success" | "failed";
-
-interface Creation {
-  id: string;
-  type: "image" | "video" | "music";
-  status: CreationStatus;
-  urls: string[]; // 支持多图
-  prompt: string;
-  createdAt: string;
-  taskId?: string;
-  error?: string;
-}
+type Creation = CreationHistoryItem;
 
 const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
 const LEGACY_STATUS_MAP: Record<string, CreationStatus> = {
@@ -94,69 +90,6 @@ function normalizeCreation(raw: unknown): Creation | null {
           : "Media not available"
         : undefined,
   };
-}
-
-function creationIdentity(creation: Creation): string {
-  return creation.taskId || creation.id;
-}
-
-function statusRank(status: CreationStatus): number {
-  switch (status) {
-    case "success":
-      return 5;
-    case "failed":
-      return 4;
-    case "processing":
-      return 3;
-    case "generating":
-      return 2;
-    case "pending":
-      return 1;
-    default:
-      return 0;
-  }
-}
-
-function isPersistedCreation(creation: Creation): boolean {
-  return !creation.taskId || creation.id !== creation.taskId;
-}
-
-function pickPreferredCreation(candidate: Creation, current: Creation): Creation {
-  const candidateStatusRank = statusRank(candidate.status);
-  const currentStatusRank = statusRank(current.status);
-  if (candidateStatusRank !== currentStatusRank) {
-    return candidateStatusRank > currentStatusRank ? candidate : current;
-  }
-
-  if (candidate.urls.length !== current.urls.length) {
-    return candidate.urls.length > current.urls.length ? candidate : current;
-  }
-
-  const candidatePersisted = isPersistedCreation(candidate);
-  const currentPersisted = isPersistedCreation(current);
-  if (candidatePersisted !== currentPersisted) {
-    return candidatePersisted ? candidate : current;
-  }
-
-  return new Date(candidate.createdAt).getTime() >= new Date(current.createdAt).getTime()
-    ? candidate
-    : current;
-}
-
-function mergeCreations(primary: Creation[], secondary: Creation[]): Creation[] {
-  const map = new Map<string, Creation>();
-  for (const item of [...primary, ...secondary]) {
-    const key = creationIdentity(item);
-    const existed = map.get(key);
-    if (!existed) {
-      map.set(key, item);
-      continue;
-    }
-    map.set(key, pickPreferredCreation(item, existed));
-  }
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
 }
 
 interface MyCreationsTabProps {
@@ -329,6 +262,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   };
 
   const handleDownload = (url: string, type: string) => {
+    trackEvent("result_download_clicked", { type });
     const link = document.createElement("a");
     link.href = url;
     link.download = `flownana-${type}-${Date.now()}.${type === "image" ? "png" : type === "video" ? "mp4" : "mp3"}`;
