@@ -41,7 +41,6 @@ The broader brand message may include video / image / music, but current MVP pri
 - Video generation offers HappyHorse 1.0 text-to-video through KIE `happyhorse/text-to-video`. HappyHorse supports every whole second from 3s through 15s at 720P and 1080P. Platform credits are calculated from KIE API credits per second (720P: 28, 1080P: 48) multiplied by duration and then by 0.3, rounded to the nearest integer.
 - The `/ai-video` generate button checks NextAuth client session before calling `/api/veo/generate`; logged-out or expired-session users are sent through Google sign-in with `signup_started` source `ai_video_generate` instead of seeing a raw API 401.
 - `/ai-video` inserts a local optimistic My Creations card immediately after an authenticated user clicks Generate. The card uses a temporary local id, shows a generating animation while the API request is pending, is replaced with the real `taskId` and media URL on success, and becomes a failed card on generation error. Users can run up to 5 concurrent video generation requests; the Generate button stays available until that active-task limit is reached.
-- The authenticated avatar menu shows editable user name, connected email, current membership/free status, remaining credits, account/billing links, and sign out. User name edits use authenticated `PATCH /api/account/profile` and refresh the NextAuth session token through `useSession().update()`.
 
 ## Subscription Upgrade Rules (as of 2026-04-07)
 Allowed upgrade paths (old sub cancelled, new sub starts immediately with first credits):
