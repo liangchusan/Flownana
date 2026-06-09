@@ -97,7 +97,7 @@ Must track at minimum:
 - insufficient_credits_shown
 
 Auth CTA placement:
-- `/home`, `/ai-image`, `/ai-video`, and `/ai-music` use a compact left creation sidebar for navigation; logged-in users see membership status above credit balance and avatar in the sidebar footer. Free users see `Upgrade` linking to `/pricing`, paid users see their plan label linking to `/account/billing`, and logged-out users do not see a sidebar footer sign-in CTA.
+- `/home`, `/ai-image`, `/ai-video`, and `/ai-music` use a compact left creation sidebar for navigation; logged-in users see membership status above credit balance and avatar in the sidebar footer. Free users see `Upgrade` linking to `/pricing`, paid users see their plan label linking to `/account/billing`, and logged-out users see a muted user-avatar button in the sidebar footer that starts sign-in with `signup_started` source `sidebar_avatar`.
 
 ## Acceptance (Current Release)
 - unauthenticated users cannot generate

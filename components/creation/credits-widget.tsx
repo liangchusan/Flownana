@@ -64,6 +64,14 @@ const PLAN_COLOR: Record<string, string> = {
   max: "border-zinc-300 bg-zinc-100 text-zinc-700",
 };
 
+function formatCompactCredits(value: number) {
+  if (value >= 1000) {
+    const compact = value / 1000;
+    return `${compact >= 10 ? Math.round(compact) : compact.toFixed(1)}K`;
+  }
+  return value.toLocaleString();
+}
+
 export function CreditsWidget({ variant = "default" }: { variant?: "default" | "sidebar" }) {
   const { data: session, status } = useSession();
   const [summary, setSummary] = useState<Summary | null>(() => {
@@ -137,24 +145,26 @@ export function CreditsWidget({ variant = "default" }: { variant?: "default" | "
     : "border-stone-200/50 bg-white text-stone-700 hover:border-stone-300";
 
   if (variant === "sidebar") {
+    const compactCredits = isExhausted ? "0" : formatCompactCredits(credits);
     return (
       <Link
         href={href}
-        className={`flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-xl border px-0.5 py-1 text-[10px] shadow-sm transition-all duration-300 hover:shadow-md ${wrapperCls}`}
+        className={`flex min-h-[64px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border px-0.5 py-1.5 text-[10px] shadow-sm transition-all duration-300 hover:shadow-md ${wrapperCls}`}
         aria-label={`${sidebarPlanLabel} with ${credits} credits`}
+        title={`${sidebarPlanLabel} with ${credits.toLocaleString()} credits`}
       >
         <span
-          className={`max-w-full rounded-md border px-1 py-0.5 text-[9px] font-semibold leading-none ${planCls}`}
+          className={`max-w-full rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-none ${planCls}`}
         >
           {sidebarPlanLabel}
         </span>
-        <span className="flex max-w-full items-center gap-1 truncate font-semibold leading-none">
+        <span className="flex max-w-full flex-col items-center gap-0.5 font-semibold leading-none">
           {isExhausted ? (
             <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-700" />
           ) : (
             <Zap className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
           )}
-          {isExhausted ? "0" : credits.toLocaleString()}
+          <span className="max-w-full truncate text-[10px]">{compactCredits}</span>
         </span>
       </Link>
     );

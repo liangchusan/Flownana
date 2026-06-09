@@ -157,12 +157,14 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.picture = user.image;
       }
-      if (
-        trigger === "update" &&
-        typeof session?.user?.name === "string" &&
-        session.user.name.trim()
-      ) {
-        token.name = session.user.name.trim();
+      const updateName =
+        typeof session?.user?.name === "string"
+          ? session.user.name
+          : typeof (session as { name?: unknown } | undefined)?.name === "string"
+            ? ((session as { name: string }).name)
+            : "";
+      if (trigger === "update" && updateName.trim()) {
+        token.name = updateName.trim();
       }
       return token;
     },

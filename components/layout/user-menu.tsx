@@ -96,6 +96,7 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
         ? "Loading"
         : "0";
   const avatarLabel = displayName || user.email || "User";
+  const avatarInitial = avatarLabel.trim().charAt(0).toUpperCase();
 
   async function handleNameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,7 +120,7 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
       }
       setDisplayName(data.user.name);
       setNameDraft(data.user.name);
-      await update({ user: { name: data.user.name } });
+      await update({ name: data.user.name, user: { name: data.user.name } });
       setIsEditingName(false);
     } catch (error) {
       setNameError(error instanceof Error ? error.message : "Could not update name.");
@@ -137,7 +138,7 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
         }`}
         aria-label="Open account menu"
       >
-        {user.image ? (
+        {user.image && !compact ? (
           <img
             src={user.image}
             alt={avatarLabel}
@@ -145,7 +146,7 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
           />
         ) : (
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-800 text-xs font-semibold text-white">
-            {avatarLabel.charAt(0).toUpperCase()}
+            {avatarInitial}
           </span>
         )}
         {displayName && !compact && (

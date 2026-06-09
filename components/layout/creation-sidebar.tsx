@@ -3,11 +3,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Video, Image as ImageIcon, Music, Home } from "lucide-react";
+import { Video, Image as ImageIcon, Music, Home, UserCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Logo } from "@/components/ui/logo";
 import { CreditsWidget } from "@/components/creation/credits-widget";
 import { UserMenu } from "@/components/layout/user-menu";
+import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
+import { trackEvent } from "@/lib/analytics";
 
 function SidebarContent() {
   const pathname = usePathname();
@@ -103,7 +105,19 @@ function SidebarContent() {
               }}
             />
           </div>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              trackEvent("signup_started", { source: "sidebar_avatar" });
+              signInForCurrentEnvironment();
+            }}
+            className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-stone-200/70 bg-white/80 text-stone-500 shadow-sm transition-all duration-300 hover:bg-white hover:text-stone-900 active:scale-[0.98]"
+            aria-label="Sign in"
+          >
+            <UserCircle className="h-5 w-5" />
+          </button>
+        )}
       </div>
     </aside>
   );
