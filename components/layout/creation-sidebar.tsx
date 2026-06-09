@@ -29,7 +29,7 @@ function SidebarContent() {
   const isHome = pathname === "/home";
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[60px] flex-col overflow-x-hidden border-r border-stone-200/50 bg-[#F7F4ED]">
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[60px] flex-col overflow-visible border-r border-stone-200/50 bg-[#F7F4ED]">
       <div className="flex h-16 items-center justify-center">
         <Link
           href="/home"
@@ -112,7 +112,7 @@ function SidebarContent() {
 export function CreationSidebar() {
   return (
     <Suspense fallback={
-      <aside className="fixed left-0 top-0 z-40 flex h-screen w-[60px] flex-col overflow-x-hidden border-r border-stone-200/50 bg-[#F7F4ED]">
+      <aside className="fixed left-0 top-0 z-40 flex h-screen w-[60px] flex-col overflow-visible border-r border-stone-200/50 bg-[#F7F4ED]">
         <div className="flex h-16 items-center justify-center">
           <div className="h-10 w-10 rounded-xl bg-stone-100" />
         </div>
