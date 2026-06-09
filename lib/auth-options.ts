@@ -150,12 +150,19 @@ export const authOptions: NextAuthOptions = {
       }
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
         token.picture = user.image;
+      }
+      if (
+        trigger === "update" &&
+        typeof session?.user?.name === "string" &&
+        session.user.name.trim()
+      ) {
+        token.name = session.user.name.trim();
       }
       return token;
     },
