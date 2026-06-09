@@ -64,14 +64,6 @@ const PLAN_COLOR: Record<string, string> = {
   max: "border-zinc-300 bg-zinc-100 text-zinc-700",
 };
 
-function formatCompactCredits(value: number) {
-  if (value >= 1000) {
-    const compact = value / 1000;
-    return `${compact >= 10 ? Math.round(compact) : compact.toFixed(1)}K`;
-  }
-  return value.toLocaleString();
-}
-
 export function CreditsWidget({ variant = "default" }: { variant?: "default" | "sidebar" }) {
   const { data: session, status } = useSession();
   const [summary, setSummary] = useState<Summary | null>(() => {
@@ -145,11 +137,11 @@ export function CreditsWidget({ variant = "default" }: { variant?: "default" | "
     : "border-stone-200/50 bg-white text-stone-700 hover:border-stone-300";
 
   if (variant === "sidebar") {
-    const compactCredits = isExhausted ? "0" : formatCompactCredits(credits);
+    const displayCredits = isExhausted ? "0" : credits.toLocaleString();
     return (
       <Link
         href={href}
-        className={`flex min-h-[64px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border px-0.5 py-1.5 text-[10px] shadow-sm transition-all duration-300 hover:shadow-md ${wrapperCls}`}
+        className={`flex min-h-[68px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border px-0.5 py-1.5 text-[10px] shadow-sm transition-all duration-300 hover:shadow-md ${wrapperCls}`}
         aria-label={`${sidebarPlanLabel} with ${credits} credits`}
         title={`${sidebarPlanLabel} with ${credits.toLocaleString()} credits`}
       >
@@ -164,7 +156,9 @@ export function CreditsWidget({ variant = "default" }: { variant?: "default" | "
           ) : (
             <Zap className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
           )}
-          <span className="max-w-full truncate text-[10px]">{compactCredits}</span>
+          <span className="max-w-full truncate text-[9px] tabular-nums leading-none tracking-tight">
+            {displayCredits}
+          </span>
         </span>
       </Link>
     );
