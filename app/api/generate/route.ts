@@ -10,12 +10,23 @@ import {
   type CreditConsumptionSnapshot,
 } from "@/lib/credit-consumption";
 import {
-  IMAGE_RESOLUTION_CREDITS,
+  IMAGE_MODEL_OPTION_MAP,
+  getImageGenerationCredits,
+  type ImageModelOptionId,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
 import { persistGeneratedMedia } from "@/lib/media-storage";
 
-const NANO_BANANA_API_BASE = "https://api.kie.ai";
+const KIE_API_BASE = "https://api.kie.ai";
+const DEFAULT_IMAGE_MODEL_ID: ImageModelOptionId = "gpt-image-2";
+const IMAGE_ASPECT_RATIOS = new Set([
+  "auto",
+  "9:16",
+  "16:9",
+  "1:1",
+  "3:4",
+  "4:3",
+]);
 
 export const maxDuration = 300;
 
@@ -23,19 +34,40 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function createNanoBananaTask(params: {
+function isValidImageAspectRatio(params: {
+  modelId: ImageModelOptionId;
+  resolution: ImageResolutionKey;
+  aspectRatio: string;
+}) {
+  if (!IMAGE_ASPECT_RATIOS.has(params.aspectRatio)) {
+    return false;
+  }
+
+  if (params.modelId === "gpt-image-2") {
+    if (params.aspectRatio === "auto") {
+      return params.resolution === "1K";
+    }
+    if (params.resolution === "4K" && params.aspectRatio === "1:1") {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function createImageTask(params: {
+  modelId: ImageModelOptionId;
   prompt: string;
   aspectRatio?: string;
   resolution?: string;
   outputFormat?: "png" | "jpg" | "jpeg";
-  imageInput?: string[];
+  inputUrls?: string[];
 }) {
-  const apiKey =
-    process.env.NANO_BANANA_API_KEY || process.env.KIE_API_KEY;
+  const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "NANO_BANANA_API_KEY or KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
+      "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -51,16 +83,24 @@ async function createNanoBananaTask(params: {
     output_format: fmt,
   };
 
-  if (params.imageInput?.length) {
-    input.image_input = params.imageInput;
+  if (params.inputUrls?.length) {
+    if (params.modelId === "nano-banana-2") {
+      input.image_input = params.inputUrls;
+    } else {
+      input.input_urls = params.inputUrls;
+    }
   }
 
+  const modelOption = IMAGE_MODEL_OPTION_MAP[params.modelId];
+  const providerModel = params.inputUrls?.length
+    ? modelOption.imageToImageModel
+    : modelOption.textToImageModel;
   const body = {
-    model: "nano-banana-2",
+    model: providerModel,
     input,
   };
 
-  const res = await fetch(`${NANO_BANANA_API_BASE}/api/v1/jobs/createTask`, {
+  const res = await fetch(`${KIE_API_BASE}/api/v1/jobs/createTask`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -71,7 +111,7 @@ async function createNanoBananaTask(params: {
 
   if (!res.ok) {
     const text = await res.text();
-    console.error("Nano Banana createTask returned error:", text);
+    console.error(`${modelOption.label} createTask returned error:`, text);
     throw new Error("Failed to create generation task. Please try again later.");
   }
 
@@ -82,20 +122,21 @@ async function createNanoBananaTask(params: {
   };
 
   if (json.code !== 200 || !json.data?.taskId) {
-    console.error("Nano Banana createTask response异常:", json);
-    throw new Error(json.msg || "Failed to create generation task. Please try again later.");
+    console.error(`${modelOption.label} createTask response error:`, json);
+    throw new Error(
+      json.msg || "Failed to create generation task. Please try again later."
+    );
   }
 
   return json.data.taskId;
 }
 
-async function pollNanoBananaResult(taskId: string) {
-  const apiKey =
-    process.env.NANO_BANANA_API_KEY || process.env.KIE_API_KEY;
+async function pollImageResult(taskId: string, modelLabel: string) {
+  const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "NANO_BANANA_API_KEY or KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
+      "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
     );
   }
 
@@ -105,7 +146,7 @@ async function pollNanoBananaResult(taskId: string) {
 
   while (Date.now() - start < maxWaitMs) {
     const res = await fetch(
-      `${NANO_BANANA_API_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(
+      `${KIE_API_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(
         taskId
       )}`,
       {
@@ -118,8 +159,8 @@ async function pollNanoBananaResult(taskId: string) {
 
     if (!res.ok) {
       const text = await res.text();
-    console.error("Nano Banana recordInfo returned error:", text);
-    throw new Error("Failed to query task status. Please try again later.");
+      console.error(`${modelLabel} recordInfo returned error:`, text);
+      throw new Error("Failed to query task status. Please try again later.");
     }
 
     const json = (await res.json()) as {
@@ -133,8 +174,10 @@ async function pollNanoBananaResult(taskId: string) {
     };
 
     if (json.code !== 200 || !json.data) {
-    console.error("Nano Banana recordInfo response异常:", json);
-    throw new Error(json.msg || "Failed to query task status. Please try again later.");
+      console.error(`${modelLabel} recordInfo response error:`, json);
+      throw new Error(
+        json.msg || "Failed to query task status. Please try again later."
+      );
     }
 
     const state = json.data.state;
@@ -145,13 +188,17 @@ async function pollNanoBananaResult(taskId: string) {
     }
 
     if (state === "fail") {
-    console.error("Nano Banana task failed:", json.data.failMsg);
-    throw new Error(json.data.failMsg || "Generation failed. Please try again later.");
+      console.error(`${modelLabel} task failed:`, json.data.failMsg);
+      throw new Error(
+        json.data.failMsg || "Generation failed. Please try again later."
+      );
     }
 
     if (state === "success") {
       if (!json.data.resultJson) {
-        throw new Error("Task succeeded but did not return results. Please try again later.");
+        throw new Error(
+          "Task succeeded but did not return results. Please try again later."
+        );
       }
 
       // resultJson 是一个 JSON 字符串，例如：
@@ -161,14 +208,18 @@ async function pollNanoBananaResult(taskId: string) {
         parsed = JSON.parse(json.data.resultJson);
       } catch (e) {
         console.error("Error parsing resultJson:", e, json.data.resultJson);
-        throw new Error("Failed to parse generation results. Please try again later.");
+        throw new Error(
+          "Failed to parse generation results. Please try again later."
+        );
       }
 
       const result = parsed as { resultUrls?: string[] };
       const imageUrl = result.resultUrls?.[0];
 
       if (!imageUrl) {
-        throw new Error("Generated image URL not found. Please try again later.");
+        throw new Error(
+          "Generated image URL not found. Please try again later."
+        );
       }
 
       return imageUrl;
@@ -197,12 +248,14 @@ export async function POST(request: NextRequest) {
     const {
       prompt,
       imageUrl,
+      model,
       resolution,
       aspectRatio,
     } = body as {
       prompt?: string;
       imageUrl?: string | null;
       mode?: "text-to-image" | "image-to-image";
+      model?: string;
       resolution?: string;
       aspectRatio?: string;
     };
@@ -219,7 +272,11 @@ export async function POST(request: NextRequest) {
     const res = (
       resolution && resolution.trim() !== "" ? resolution : "1K"
     ).toUpperCase() as ImageResolutionKey;
-    const cost = IMAGE_RESOLUTION_CREDITS[res];
+    const modelId = IMAGE_MODEL_OPTION_MAP[model as ImageModelOptionId]
+      ? (model as ImageModelOptionId)
+      : DEFAULT_IMAGE_MODEL_ID;
+    const modelOption = IMAGE_MODEL_OPTION_MAP[modelId];
+    const cost = getImageGenerationCredits(modelId, res);
     if (!cost) {
       return NextResponse.json(
         { error: "Unsupported resolution." },
@@ -227,22 +284,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (
+      !isValidImageAspectRatio({ modelId, resolution: res, aspectRatio: ar })
+    ) {
+      return NextResponse.json(
+        { error: "Unsupported aspect ratio for this resolution." },
+        { status: 400 }
+      );
+    }
+
     consumedCredits = await consumeCreditsFIFO(session.user.id, cost);
 
-    const imageInput =
+    const inputUrls =
       imageUrl && String(imageUrl).trim() !== ""
         ? [String(imageUrl).trim()]
         : undefined;
 
-    taskId = await createNanoBananaTask({
+    taskId = await createImageTask({
+      modelId,
       prompt,
       aspectRatio: ar,
       resolution: res,
       outputFormat: "png",
-      imageInput,
+      inputUrls,
     });
 
-    const providerImageUrl = await pollNanoBananaResult(taskId);
+    const providerImageUrl = await pollImageResult(taskId, modelOption.label);
     const generatedImageUrl = await persistGeneratedMedia({
       sourceUrl: providerImageUrl,
       userId: session.user.id,
@@ -258,6 +325,10 @@ export async function POST(request: NextRequest) {
         urls: [generatedImageUrl],
         prompt,
         error: null,
+        modelOptionId: inputUrls?.length
+          ? modelOption.imageToImageModel
+          : modelOption.textToImageModel,
+        creditsCost: cost,
       },
       create: {
         userId,
@@ -266,6 +337,10 @@ export async function POST(request: NextRequest) {
         urls: [generatedImageUrl],
         prompt,
         taskId,
+        modelOptionId: inputUrls?.length
+          ? modelOption.imageToImageModel
+          : modelOption.textToImageModel,
+        creditsCost: cost,
       },
     });
 

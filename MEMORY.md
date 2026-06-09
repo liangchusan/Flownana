@@ -12,7 +12,7 @@ The broader brand message may include video / image / music, but current MVP pri
 - NextAuth
 - Prisma + PostgreSQL
 - Stripe
-- Nano Banana image generation API
+- KIE GPT Image 2 and Nano Banana 2 image generation APIs
 
 ## Current Core Routes
 - / : landing page
@@ -26,8 +26,20 @@ The broader brand message may include video / image / music, but current MVP pri
 - subscriptions and credit batches exist in the data model
 - Stripe event deduplication exists in the data model
 - new generated image/video/music media is downloaded server-side and uploaded to Vercel Blob before saving `Generation.urls`
+- Image generation offers both KIE GPT Image 2 and Nano Banana 2. GPT Image 2 uses `gpt-image-2-text-to-image` and `gpt-image-2-image-to-image` with platform credits 1K=2, 2K=3, 4K=5. Nano Banana 2 uses `nano-banana-2` with platform credits 1K=2, 2K=4, 4K=5. Platform image credits are calculated from KIE API credits multiplied by 0.3 and rounded. Both use KIE `/api/v1/jobs/createTask` and `/api/v1/jobs/recordInfo`. Image aspect ratio options are limited to `auto`, `9:16`, `16:9`, `1:1`, `3:4`, and `4:3`; GPT Image 2 still hides/rejects `auto` except at 1K and hides/rejects `1:1` at 4K.
 - older generation history may still contain external provider media URLs; UI attempts to refresh KIE media URLs via `/api/creations/media-url` when direct media loading fails
 - generation history display de-duplicates local optimistic items and persisted database rows by `taskId`
+- generation history deletion is available for successful, failed, and unavailable-media items; delete removes the persisted row by `taskId || id` and clears legacy localStorage history keys keyed by either user id or email
+- Google sign-in entry points pass the current path as `callbackUrl`; NextAuth redirects preserve same-origin callback URLs instead of forcing auth callbacks back to the homepage
+- Non-production environments support a `test-login` NextAuth credentials provider so QA can log in without Google OAuth. It is enabled in local development by default and can be enabled for Vercel preview/test with `ENABLE_TEST_AUTH=true` plus `NEXT_PUBLIC_ENABLE_TEST_AUTH=true`; it is disabled for Vercel production. Test login provisions `test@flownana.local` and a renewable `test-auth` credit batch.
+- creation pages treat NextAuth `loading` as a distinct state; refresh should not briefly show logged-out CTAs or switch logged-in users from My Creations to Explore while the session is resolving
+- My Creations downloads use authenticated same-origin `/api/creations/download`; the API verifies the media URL belongs to the current user's generation before streaming it as an attachment
+- Video generation platform credits are calculated from the model's KIE API credits multiplied by 0.3 and rounded to the nearest integer unless a model has an explicitly documented exception. Kling 3.0 uses KIE per-second prices for std/pro and audio/no-audio variants. VEO 3.1 uses KIE base 720P generation prices because the app does not request 1080P or 4K upgrade endpoints.
+- VEO 3.1 video status polling uses KIE `/api/v1/veo/record-info` and parses `successFlag` plus `response.resultUrls`; the synchronous poll window is kept below Vercel's 300s timeout so failures can be persisted and consumed credits refunded.
+- Video generation no longer offers Bytedance Seedance 1.5 Pro; Seedance options use KIE `bytedance/seedance-2` and `bytedance/seedance-2-fast`. Seedance 2 duration supports every whole second from 4s through 15s. Platform credits for Seedance 2 options are calculated from KIE no-video-input API credits per second multiplied by duration and then by 0.3, rounded to the nearest integer.
+- Video generation offers HappyHorse 1.0 text-to-video through KIE `happyhorse/text-to-video`. HappyHorse supports every whole second from 3s through 15s at 720P and 1080P. Platform credits are calculated from KIE API credits per second (720P: 28, 1080P: 48) multiplied by duration and then by 0.3, rounded to the nearest integer.
+- The `/ai-video` generate button checks NextAuth client session before calling `/api/veo/generate`; logged-out or expired-session users are sent through Google sign-in with `signup_started` source `ai_video_generate` instead of seeing a raw API 401.
+- `/ai-video` inserts a local optimistic My Creations card immediately after an authenticated user clicks Generate. The card uses a temporary local id, shows a generating animation while the API request is pending, is replaced with the real `taskId` and media URL on success, and becomes a failed card on generation error. Users can run up to 5 concurrent video generation requests; the Generate button stays available until that active-task limit is reached.
 
 ## Subscription Upgrade Rules (as of 2026-04-07)
 Allowed upgrade paths (old sub cancelled, new sub starts immediately with first credits):
@@ -82,6 +94,9 @@ Must track at minimum:
 - generation_failed
 - result_download_clicked
 - insufficient_credits_shown
+
+Auth CTA placement:
+- `/home`, `/ai-image`, `/ai-video`, and `/ai-music` use a compact left creation sidebar for navigation; logged-in users see membership status above credit balance and avatar in the sidebar footer. Free users see `Upgrade` linking to `/pricing`, paid users see their plan label linking to `/account/billing`, and logged-out users do not see a sidebar footer sign-in CTA.
 
 ## Acceptance (Current Release)
 - unauthenticated users cannot generate

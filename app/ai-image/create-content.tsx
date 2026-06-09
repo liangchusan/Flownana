@@ -5,16 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { ResultPanel } from "@/components/creation/result-panel";
-import { useSession, signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/layout/user-menu";
-import { CreditsWidget } from "@/components/creation/credits-widget";
-import { Logo } from "@/components/ui/logo";
-import Link from "next/link";
-import { trackEvent } from "@/lib/analytics";
 
 export function CreateContent({ mode }: { mode: "image" }) {
-  const { data: session } = useSession();
   const searchParams = useSearchParams();
 
   // Image state
@@ -39,41 +31,8 @@ export function CreateContent({ mode }: { mode: "image" }) {
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-[#FDFDF9]">
-        {/* Top Bar with Logo and User Info - Full width, above sidebar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-8 py-2">
-          <Link href="/" className="flex-shrink-0">
-            <Logo size="md" />
-          </Link>
-          <div>
-            {session ? (
-              <div className="flex items-center gap-2">
-                <CreditsWidget />
-                <UserMenu
-                  user={{
-                    name: session.user?.name,
-                    email: session.user?.email,
-                    image: session.user?.image,
-                  }}
-                />
-              </div>
-            ) : (
-              <Button
-                onClick={() => {
-                  trackEvent("signup_started", { source: "ai_image_topbar" });
-                  signIn("google");
-                }}
-                className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
-                size="sm"
-              >
-                Start Free Now
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Content area with left margin for sidebar */}
-        <div className="ml-16 flex h-[calc(100vh-73px)]">
+      <main className="ml-[60px] flex-1 overflow-y-auto bg-[#FDFDF9]">
+        <div className="flex h-screen">
           {/* Left: Creation Form */}
           <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-stone-200/50 bg-[#FDFDF9] p-8">
             <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">

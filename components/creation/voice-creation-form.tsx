@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import axios from "axios";
+import { useToast } from "@/components/blocks/app-toast-provider";
 
 interface VoiceCreationFormProps {
   onGenerate: (audioUrl: string, taskId?: string, prompt?: string) => void;
@@ -20,6 +21,7 @@ export function VoiceCreationForm({
   onTaskIdChange,
   initialPrompt,
 }: VoiceCreationFormProps) {
+  const { showToast } = useToast();
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
@@ -33,7 +35,11 @@ export function VoiceCreationForm({
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      alert("Please enter a prompt");
+      showToast({
+        title: "Prompt required",
+        message: "Please enter a prompt",
+        variant: "warning",
+      });
       return;
     }
 
@@ -54,11 +60,19 @@ export function VoiceCreationForm({
         }
         onGenerate(response.data.audioUrl, taskId, responsePrompt);
       } else {
-        alert("Generation failed, please try again");
+        showToast({
+          title: "Generation failed",
+          message: "Generation failed, please try again",
+          variant: "error",
+        });
       }
     } catch (error: any) {
       console.error("Generation error:", error);
-      alert(error.response?.data?.error || "Generation failed, please try again");
+      showToast({
+        title: "Generation failed",
+        message: error.response?.data?.error || "Generation failed, please try again",
+        variant: "error",
+      });
     } finally {
       setIsGenerating(false);
     }

@@ -1,5 +1,7 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { prisma } from "@/lib/prisma";
 
 if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
   process.env.GLOBAL_AGENT_HTTP_PROXY =
@@ -19,6 +21,60 @@ const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const nextAuthUrl = process.env.NEXTAUTH_URL;
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
+const isProductionDeployment =
+  process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production";
+const testAuthEnabled =
+  !isProductionDeployment &&
+  (process.env.NODE_ENV !== "production" || process.env.ENABLE_TEST_AUTH === "true");
+const testUserId = process.env.TEST_AUTH_USER_ID || "test-user-local";
+const testUserEmail = process.env.TEST_AUTH_EMAIL || "test@flownana.local";
+const testUserName = process.env.TEST_AUTH_NAME || "Test User";
+const testCreditAmount = Number(process.env.TEST_AUTH_CREDITS || 1000);
+
+async function ensureTestUser() {
+  await prisma.user.upsert({
+    where: { id: testUserId },
+    create: {
+      id: testUserId,
+      email: testUserEmail,
+      name: testUserName,
+    },
+    update: {
+      email: testUserEmail,
+      name: testUserName,
+    },
+  });
+
+  if (Number.isFinite(testCreditAmount) && testCreditAmount > 0) {
+    const now = new Date();
+    const activeBatch = await prisma.creditBatch.findFirst({
+      where: {
+        userId: testUserId,
+        remaining: { gt: 0 },
+        expiresAt: { gt: now },
+        source: "test-auth",
+      },
+    });
+
+    if (!activeBatch) {
+      await prisma.creditBatch.create({
+        data: {
+          userId: testUserId,
+          amount: testCreditAmount,
+          remaining: testCreditAmount,
+          expiresAt: new Date(Date.now() + 30 * 86_400_000),
+          source: "test-auth",
+        },
+      });
+    }
+  }
+
+  return {
+    id: testUserId,
+    email: testUserEmail,
+    name: testUserName,
+  };
+}
 
 if (googleClientSecret && !googleClientSecret.startsWith("GOCSPX-")) {
   console.warn(
@@ -42,6 +98,7 @@ if (process.env.NODE_ENV === "development") {
     "- 回调 URL:",
     `${nextAuthUrl || "http://localhost:3000"}/api/auth/callback/google`
   );
+  console.log("- TEST_AUTH:", testAuthEnabled ? "✅ 已启用" : "未启用");
 }
 
 if (!googleClientId || !googleClientSecret) {
@@ -54,6 +111,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  useSecureCookies: process.env.NODE_ENV === "development" ? false : undefined,
   providers: [
     GoogleProvider({
       clientId: googleClientId || "",
@@ -68,6 +126,18 @@ export const authOptions: NextAuthOptions = {
       },
       checks: ["pkce", "state"],
     }),
+    ...(testAuthEnabled
+      ? [
+          CredentialsProvider({
+            id: "test-login",
+            name: "Test Login",
+            credentials: {},
+            async authorize() {
+              return ensureTestUser();
+            },
+          }),
+        ]
+      : []),
   ],
   callbacks: {
     async signIn({ user, account }) {
@@ -115,11 +185,20 @@ export const authOptions: NextAuthOptions = {
       ) {
         return baseUrl;
       }
-      if (url.includes("/api/auth/callback")) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.origin === baseUrl) return url;
+        if (
+          testAuthEnabled &&
+          (parsedUrl.hostname === "localhost" ||
+            parsedUrl.hostname === "127.0.0.1")
+        ) {
+          return url;
+        }
+      } catch {
         return baseUrl;
       }
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
   },

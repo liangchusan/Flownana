@@ -13,7 +13,7 @@ export function ImagePreview({ imageUrl, isGenerating }: ImagePreviewProps) {
     if (imageUrl) {
       const link = document.createElement("a");
       link.href = imageUrl;
-      link.download = `nano-banana-${Date.now()}.png`;
+      link.download = `gpt-image-2-${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -61,4 +61,3 @@ export function ImagePreview({ imageUrl, isGenerating }: ImagePreviewProps) {
     </div>
   );
 }
-

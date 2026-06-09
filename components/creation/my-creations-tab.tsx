@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Download, Trash2, RefreshCw, Loader2, Image as ImageIcon, Video, Music, X } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   type CreationStatus,
 } from "@/lib/creation-history";
 import { trackEvent } from "@/lib/analytics";
+import type { PanelGeneration } from "./result-panel";
 
 type Creation = CreationHistoryItem;
 
@@ -94,34 +95,98 @@ function normalizeCreation(raw: unknown): Creation | null {
 
 interface MyCreationsTabProps {
   mode: "video" | "image" | "music";
-  currentGeneration?: {
-    url: string | null;
-    isGenerating: boolean;
-    taskId?: string;
-    prompt?: string;
-  };
+  currentGeneration?: PanelGeneration;
+  currentGenerations?: PanelGeneration[];
 }
 
-export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps) {
-  const { data: session } = useSession();
+function getCreationStorageKeys(session: {
+  user?: { id?: string | null; email?: string | null };
+} | null): string[] {
+  const keys = [
+    session?.user?.id ? `creations_${session.user.id}` : null,
+    session?.user?.email ? `creations_${session.user.email}` : null,
+  ].filter((item): item is string => !!item);
+
+  return Array.from(new Set(keys));
+}
+
+function removeStoredCreation(
+  storageKeys: string[],
+  id: string,
+  targetIdentity: string
+) {
+  for (const key of storageKeys) {
+    const stored = localStorage.getItem(key);
+    if (!stored) continue;
+
+    try {
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) continue;
+
+      const next = parsed.filter((item) => {
+        const creation = normalizeCreation(item);
+        if (!creation) return true;
+        return (
+          creation.id !== id &&
+          creation.taskId !== id &&
+          creationIdentity(creation) !== targetIdentity
+        );
+      });
+
+      if (next.length > 0) {
+        localStorage.setItem(key, JSON.stringify(next));
+      } else {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.error("Error removing stored creation:", error);
+    }
+  }
+}
+
+export function MyCreationsTab({
+  mode,
+  currentGeneration,
+  currentGenerations,
+}: MyCreationsTabProps) {
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [creations, setCreations] = useState<Creation[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [refreshingMedia, setRefreshingMedia] = useState<Set<string>>(new Set());
+  const generationItems = useMemo(
+    () => currentGenerations ?? (currentGeneration ? [currentGeneration] : []),
+    [currentGeneration, currentGenerations]
+  );
   const visibleCreations = mergeCreations(creations, []).filter((creation) => creation.type === mode);
+  const pollingTaskIds = useMemo(
+    () =>
+      mode === "video"
+        ? visibleCreations
+            .filter(
+              (creation) =>
+                (creation.status === "generating" || creation.status === "processing") &&
+                !!creation.taskId
+            )
+            .map((creation) => creation.taskId as string)
+        : [],
+    [mode, visibleCreations]
+  );
+  const pollingTaskKey = pollingTaskIds.join(",");
+  const pendingDeleteCreation = pendingDeleteId
+    ? creations.find((c) => c.id === pendingDeleteId || c.taskId === pendingDeleteId)
+    : null;
 
   // 优先从后端拉取历史，并兼容迁移老 localStorage 数据
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const storageKeys = [
-      `creations_${session.user.id}`,
-      session.user.email ? `creations_${session.user.email}` : null,
-    ].filter((item): item is string => !!item);
+    const storageKeys = getCreationStorageKeys(session);
 
     const readLocal = () => {
       const parsedAll: Creation[] = [];
@@ -166,38 +231,66 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
 
   // 处理新的生成任务
   useEffect(() => {
-    if (currentGeneration?.taskId && session?.user?.id) {
-      const taskId = currentGeneration.taskId;
+    if (!session?.user?.id) return;
+
+    for (const generation of generationItems) {
+      const identity = generation.taskId || generation.optimisticId;
+      if (!identity) continue;
+
+      const taskId = generation.taskId;
+      const optimisticId = generation.optimisticId;
+      const status = (
+        generation.error
+          ? "failed"
+          : generation.url
+            ? "success"
+            : generation.isGenerating
+              ? "generating"
+              : "pending"
+      ) as CreationStatus;
+
       setCreations((prev) => {
-        const exists = prev.find((c) => creationIdentity(c) === taskId);
+        const exists = prev.find((c) => {
+          const itemIdentity = creationIdentity(c);
+          return itemIdentity === identity || itemIdentity === taskId || itemIdentity === optimisticId;
+        });
         if (exists) {
           const updated = prev.map((c) =>
-            creationIdentity(c) === taskId
+            creationIdentity(c) === identity ||
+            creationIdentity(c) === taskId ||
+            creationIdentity(c) === optimisticId
               ? {
                   ...c,
-                  status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
-                  urls: currentGeneration.url ? [currentGeneration.url] : c.urls,
-                  prompt: currentGeneration.prompt || c.prompt,
-                  taskId: c.taskId || taskId,
+                  id: taskId || c.id,
+                  status,
+                  urls: generation.url ? [generation.url] : c.urls,
+                  prompt: generation.prompt || c.prompt,
+                  taskId: taskId || c.taskId || optimisticId,
+                  error: generation.error,
                 }
               : c
           );
           return mergeCreations(updated, []);
         } else {
           const newCreation: Creation = {
-            id: taskId,
+            id: identity,
             type: mode,
-            status: (currentGeneration.isGenerating ? "generating" : "success") as CreationStatus,
-            urls: currentGeneration.url ? [currentGeneration.url] : [],
-            prompt: currentGeneration.prompt || "",
+            status,
+            urls: generation.url ? [generation.url] : [],
+            prompt: generation.prompt || "",
             createdAt: new Date().toISOString(),
-            taskId: taskId,
+            taskId: taskId || optimisticId,
+            error: generation.error,
           };
           return mergeCreations([newCreation], prev);
         }
       });
     }
-  }, [currentGeneration, mode, session]);
+  }, [
+    generationItems,
+    mode,
+    session?.user?.id,
+  ]);
 
   // 保存到 localStorage
   useEffect(() => {
@@ -216,27 +309,113 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     localStorage.removeItem(storageKey);
   }, [creations, session]);
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this creation?")) {
-      const target = creations.find((c) => c.id === id || c.taskId === id);
-      const targetIdentity = target ? creationIdentity(target) : id;
-
-      setCreations((prev) =>
-        prev.filter((c) => c.id !== id && c.taskId !== id && creationIdentity(c) !== targetIdentity)
-      );
-      setFailedMedia((prev) => {
-        if (!prev.has(id) && !prev.has(targetIdentity)) return prev;
-        const next = new Set(prev);
-        next.delete(id);
-        next.delete(targetIdentity);
-        return next;
-      });
-      fetch(`/api/creations?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      }).catch((error) => {
-        console.error("Error deleting creation:", error);
-      });
+  useEffect(() => {
+    if (mode !== "video" || pollingTaskKey.length === 0) {
+      return;
     }
+
+    let cancelled = false;
+    const taskIds = pollingTaskKey.split(",").filter(Boolean);
+
+    const pollTasks = async () => {
+      for (const taskId of taskIds) {
+        try {
+          const res = await fetch(
+            `/api/veo/generate?taskId=${encodeURIComponent(taskId)}`
+          );
+          const data = await res.json().catch(() => null);
+          if (cancelled || data?.pending) {
+            continue;
+          }
+
+          if (res.ok && data?.success && data?.videoUrl) {
+            setCreations((prev) =>
+              mergeCreations(
+                prev.map((creation) =>
+                  creation.taskId === taskId
+                    ? {
+                        ...creation,
+                        status: "success",
+                        urls: [data.videoUrl],
+                        prompt: data.prompt || creation.prompt,
+                        error: undefined,
+                      }
+                    : creation
+                ),
+                []
+              )
+            );
+            continue;
+          }
+
+          if (!res.ok || data?.success === false) {
+            setCreations((prev) =>
+              mergeCreations(
+                prev.map((creation) =>
+                  creation.taskId === taskId
+                    ? {
+                        ...creation,
+                        status: "failed",
+                        error: data?.error || "Generation failed.",
+                      }
+                    : creation
+                ),
+                []
+              )
+            );
+          }
+        } catch (error) {
+          console.error("Error polling video generation:", error);
+        }
+      }
+    };
+
+    pollTasks();
+    const interval = window.setInterval(pollTasks, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [mode, pollingTaskKey]);
+
+  const deleteCreation = (id: string) => {
+    const target = creations.find((c) => c.id === id || c.taskId === id);
+    const targetIdentity = target ? creationIdentity(target) : id;
+    const deleteId = targetIdentity || id;
+
+    setCreations((prev) =>
+      prev.filter((c) => c.id !== id && c.taskId !== id && creationIdentity(c) !== targetIdentity)
+    );
+    removeStoredCreation(getCreationStorageKeys(session), id, targetIdentity);
+    setFailedMedia((prev) => {
+      if (!prev.has(id) && !prev.has(targetIdentity)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      next.delete(targetIdentity);
+      return next;
+    });
+    setResolvedMediaUrls((prev) => {
+      if (!prev[id] && !prev[targetIdentity]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      delete next[targetIdentity];
+      return next;
+    });
+    fetch(`/api/creations?id=${encodeURIComponent(deleteId)}`, {
+      method: "DELETE",
+    }).catch((error) => {
+      console.error("Error deleting creation:", error);
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDeleteId) return;
+    deleteCreation(pendingDeleteId);
+    setPendingDeleteId(null);
   };
 
   const handleRetry = (creation: Creation) => {
@@ -261,11 +440,15 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
     router.push(query ? `${basePath}?${query}` : basePath);
   };
 
-  const handleDownload = (url: string, type: string) => {
-    trackEvent("result_download_clicked", { type });
+  const handleDownload = (creation: Creation, url: string) => {
+    trackEvent("result_download_clicked", { type: creation.type });
+    const params = new URLSearchParams({
+      creationId: creation.id,
+      url,
+    });
     const link = document.createElement("a");
-    link.href = url;
-    link.download = `flownana-${type}-${Date.now()}.${type === "image" ? "png" : type === "video" ? "mp4" : "mp3"}`;
+    link.href = `/api/creations/download?${params.toString()}`;
+    link.download = "";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -316,6 +499,18 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
   };
 
   // 空状态
+  if (status === "loading") {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-4">
+          <div className="mx-auto h-12 w-12 animate-pulse rounded-xl bg-stone-200/80" />
+          <div className="mx-auto h-4 w-48 animate-pulse rounded bg-stone-200/80" />
+          <div className="mx-auto h-3 w-64 animate-pulse rounded bg-stone-100" />
+        </div>
+      </div>
+    );
+  }
+
   if (!session) {
     return (
       <div className="flex items-center justify-center h-full p-8">
@@ -384,9 +579,14 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               {/* 封面 */}
               <div className="relative aspect-video bg-stone-100">
                 {creation.status === "pending" || creation.status === "generating" ? (
-                  <div className="flex h-full w-full flex-col items-center justify-center bg-stone-50">
-                    <Loader2 className="mb-2 h-8 w-8 animate-spin text-stone-500" />
-                    <p className="text-xs text-stone-600">
+                  <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-stone-50">
+                    <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-stone-100 via-white to-stone-200" />
+                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white/80 to-transparent" />
+                    <div className="relative flex h-14 w-14 items-center justify-center rounded-full border border-stone-200/70 bg-white/90 shadow-sm">
+                      <div className="absolute h-14 w-14 animate-ping rounded-full bg-stone-300/30" />
+                      <Loader2 className="relative h-6 w-6 animate-spin text-stone-700" />
+                    </div>
+                    <p className="relative mt-3 text-xs font-medium text-stone-700">
                       {creation.status === "pending" ? "Queued" : "Generating..."}
                     </p>
                   </div>
@@ -494,9 +694,9 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                 )}
 
                 {/* Hover 操作按钮 */}
-                {creation.status === "success" && displayUrl && (
+                {(creation.status === "success" || creation.status === "failed" || !displayUrl) && (
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all duration-300 group-hover:bg-black/40 group-hover:opacity-100">
-                    {creation.type === "image" && (
+                    {creation.status === "success" && displayUrl && !mediaFailed && creation.type === "image" && (
                       <button
                         onClick={() => setSelectedImage(displayUrl)}
                         className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
@@ -505,7 +705,7 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                         <ImageIcon className="h-4 w-4 text-stone-900" />
                       </button>
                     )}
-                    {creation.type === "video" && (
+                    {creation.status === "success" && displayUrl && !mediaFailed && creation.type === "video" && (
                       <button
                         onClick={() => setSelectedVideo(displayUrl)}
                         className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
@@ -514,13 +714,15 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
                         <Video className="h-4 w-4 text-stone-900" />
                       </button>
                     )}
-                    <button
-                      onClick={() => handleDownload(displayUrl, creation.type)}
-                      className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
-                      title="Download"
-                    >
-                      <Download className="h-4 w-4 text-stone-900" />
-                    </button>
+                    {creation.status === "success" && displayUrl && !mediaFailed && (
+                      <button
+                        onClick={() => handleDownload(creation, displayUrl)}
+                        className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
+                        title="Download"
+                      >
+                        <Download className="h-4 w-4 text-stone-900" />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(creation.id)}
                       className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
@@ -548,15 +750,26 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
               {creation.status === "failed" && (
                 <div className="p-3 bg-red-50">
                   <p className="text-xs text-red-600 mb-2">{creation.error || "Generation failed"}</p>
-                  <Button
-                    onClick={() => handleRetry(creation)}
-                    size="sm"
-                    variant="outline"
-                    className="w-full text-xs"
-                  >
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Retry
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={() => handleRetry(creation)}
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Retry
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(creation.id)}
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -604,6 +817,38 @@ export function MyCreationsTab({ mode, currentGeneration }: MyCreationsTabProps)
           videoUrl={selectedVideo}
           onClose={() => setSelectedVideo(null)}
         />
+      )}
+      {pendingDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-stone-200/50 bg-white p-6 shadow-lg shadow-stone-200/20">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-stone-900">
+                  Delete creation?
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-stone-600">
+                  This will remove the {pendingDeleteCreation?.type || "creation"} from your history.
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setPendingDeleteId(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmDelete}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

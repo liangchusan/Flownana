@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import {
@@ -15,6 +16,7 @@ import {
   type VideoModelOption,
   type VideoModelOptionId,
 } from "@/lib/generation-pricing";
+import { parseKieVideoResult, type KieVideoResultData } from "@/lib/kie-video-result";
 import { persistGeneratedMedia } from "@/lib/media-storage";
 
 const KIE_API_BASE = "https://api.kie.ai";
@@ -25,7 +27,7 @@ const FAMILY_ENDPOINTS: Record<
 > = {
   veo: {
     create: "/api/v1/veo/generate",
-    detail: "/api/v1/veo/details",
+    detail: "/api/v1/veo/record-info",
     style: "veo",
   },
   kling: {
@@ -38,11 +40,12 @@ const FAMILY_ENDPOINTS: Record<
     detail: "/api/v1/jobs/recordInfo",
     style: "market",
   },
+  happyhorse: {
+    create: "/api/v1/jobs/createTask",
+    detail: "/api/v1/jobs/recordInfo",
+    style: "market",
+  },
 };
-
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function resolveVideoOption(params: {
   modelOptionId?: string;
@@ -108,17 +111,35 @@ async function createVideoTask(params: {
         sound: !!params.option.hasAudio,
       },
     };
-  } else {
+  } else if (params.option.family === "happyhorse") {
     body = {
       model: params.option.providerModel,
       input: {
         prompt: params.prompt,
-        input_urls: params.imageUrls || [],
+        resolution: params.option.resolution === "1080P" ? "1080p" : "720p",
+        aspect_ratio: params.aspectRatio || "16:9",
+        duration: params.option.duration,
+      },
+    };
+  } else {
+    const [firstFrameUrl, lastFrameUrl] = params.imageUrls || [];
+
+    body = {
+      model: params.option.providerModel,
+      input: {
+        prompt: params.prompt,
+        first_frame_url: firstFrameUrl,
+        last_frame_url: lastFrameUrl,
         aspect_ratio: params.aspectRatio || "16:9",
         resolution:
-          params.option.resolution === "1080P" ? "1080p" : "720p",
-        duration: String(params.option.duration),
+          params.option.resolution === "1080P"
+            ? "1080p"
+            : params.option.resolution === "480P"
+              ? "480p"
+              : "720p",
+        duration: params.option.duration,
         generate_audio: !!params.option.hasAudio,
+        web_search: false,
       },
     };
   }
@@ -152,7 +173,27 @@ async function createVideoTask(params: {
   return json.data.taskId;
 }
 
-async function pollVideoResult(taskId: string, option: VideoModelOption) {
+function normalizeCreditConsumptionSnapshot(
+  value: unknown
+): CreditConsumptionSnapshot {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const candidate = item as { batchId?: unknown; amount?: unknown };
+      if (typeof candidate.batchId !== "string") return null;
+      if (typeof candidate.amount !== "number" || candidate.amount <= 0) {
+        return null;
+      }
+      return {
+        batchId: candidate.batchId,
+        amount: candidate.amount,
+      };
+    })
+    .filter((item): item is CreditConsumptionSnapshot[number] => !!item);
+}
+
+async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
   const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -161,105 +202,193 @@ async function pollVideoResult(taskId: string, option: VideoModelOption) {
   }
 
   const endpoint = FAMILY_ENDPOINTS[option.family].detail;
-  const endpointStyle = FAMILY_ENDPOINTS[option.family].style;
-  const maxWaitMs = 300_000;
-  const intervalMs = 5_000;
-  const start = Date.now();
+  const detailUrl = `${KIE_API_BASE}${endpoint}?taskId=${encodeURIComponent(taskId)}`;
+  const res = await fetch(detailUrl, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
 
-  while (Date.now() - start < maxWaitMs) {
-    const detailUrl =
-      endpointStyle === "veo"
-        ? `${KIE_API_BASE}${endpoint}?taskId=${encodeURIComponent(taskId)}`
-        : `${KIE_API_BASE}${endpoint}?taskId=${encodeURIComponent(taskId)}`;
-    const res = await fetch(detailUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Video details returned error:", text);
+    return { state: "pending" as const };
+  }
+
+  const json = (await res.json()) as {
+    code: number;
+    msg: string;
+    data?: KieVideoResultData;
+  };
+
+  if (json.code !== 200 || !json.data) {
+    console.error("Video details response error:", json);
+    return { state: "pending" as const };
+  }
+
+  return parseKieVideoResult(json.data);
+}
+
+async function settleVideoTask(params: {
+  userId: string;
+  taskId: string;
+  option: VideoModelOption;
+}) {
+  const generation = await prisma.generation.findFirst({
+    where: {
+      taskId: params.taskId,
+      userId: params.userId,
+      type: "video",
+    },
+  });
+
+  if (!generation) {
+    return NextResponse.json({ error: "Generation not found." }, { status: 404 });
+  }
+
+  if (generation.status === "success") {
+    return NextResponse.json({
+      success: true,
+      pending: false,
+      status: generation.status,
+      videoUrl: generation.urls[0],
+      prompt: generation.prompt,
+      taskId: generation.taskId,
+      creditsCost: generation.creditsCost,
+      modelOptionId: generation.modelOptionId,
+    });
+  }
+
+  if (generation.status === "failed") {
+    return NextResponse.json(
+      {
+        success: false,
+        pending: false,
+        status: generation.status,
+        error: generation.error || "Generation failed.",
+        prompt: generation.prompt,
+        taskId: generation.taskId,
+      },
+      { status: 500 }
+    );
+  }
+
+  const result = await getVideoResultOnce(params.taskId, params.option);
+  if (result.state === "pending") {
+    return NextResponse.json({
+      success: true,
+      pending: true,
+      status: generation.status,
+      prompt: generation.prompt,
+      taskId: generation.taskId,
+      creditsCost: generation.creditsCost,
+      modelOptionId: generation.modelOptionId,
+    });
+  }
+
+  if (result.state === "failed") {
+    const consumedCredits = normalizeCreditConsumptionSnapshot(
+      generation.creditConsumption
+    );
+    if (consumedCredits.length > 0) {
+      try {
+        await refundConsumedCredits(consumedCredits);
+      } catch (refundError) {
+        console.error("Failed to refund async video credits:", refundError);
+      }
+    }
+
+    await prisma.generation.update({
+      where: { id: generation.id },
+      data: {
+        status: "failed",
+        error: result.error,
+        creditConsumption: Prisma.JsonNull,
       },
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("Video details returned error:", text);
-      await sleep(intervalMs);
-      continue;
-    }
+    return NextResponse.json(
+      {
+        success: false,
+        pending: false,
+        status: "failed",
+        error: result.error,
+        prompt: generation.prompt,
+        taskId: generation.taskId,
+      },
+      { status: 500 }
+    );
+  }
 
-    const json = (await res.json()) as {
-      code: number;
-      msg: string;
-      data?: {
-        status?: string;
-        state?: string;
-        videoUrl?: string;
-        resultUrl?: string;
-        outputUrl?: string;
-        resultJson?: string | null;
-        failMsg?: string | null;
-        error?: string;
-      };
-    };
+  const videoUrl = await persistGeneratedMedia({
+    sourceUrl: result.url,
+    userId: params.userId,
+    taskId: params.taskId,
+    kind: "video",
+  });
 
-    if (json.code !== 200 || !json.data) {
-      console.error("Video details response error:", json);
-      await sleep(intervalMs);
-      continue;
-    }
+  await prisma.generation.update({
+    where: { id: generation.id },
+    data: {
+      status: "success",
+      urls: [videoUrl],
+      error: null,
+      creditConsumption: Prisma.JsonNull,
+    },
+  });
 
-    const rawStatus = json.data.status || json.data.state || "";
-    const status = rawStatus.toLowerCase();
+  return NextResponse.json({
+    success: true,
+    pending: false,
+    status: "success",
+    videoUrl,
+    prompt: generation.prompt,
+    taskId: generation.taskId,
+    creditsCost: generation.creditsCost,
+    modelOptionId: generation.modelOptionId,
+  });
+}
 
-    if (status === "processing" || status === "waiting" || status === "pending") {
-      await sleep(intervalMs);
-      continue;
-    }
-
-    if (status === "failed" || status === "fail") {
-      throw new Error(
-        json.data.error ||
-          json.data.failMsg ||
-          "Video generation failed. Please try again later."
+export async function GET(request: NextRequest) {
+  const taskId = request.nextUrl.searchParams.get("taskId");
+  if (taskId) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Please sign in to view generation status." },
+        { status: 401 }
       );
     }
 
-    if (status === "completed" || status === "success") {
-      const directUrl =
-        json.data.videoUrl || json.data.resultUrl || json.data.outputUrl;
-      if (directUrl) {
-        return directUrl;
-      }
-
-      if (json.data.resultJson) {
-        try {
-          const parsed = JSON.parse(json.data.resultJson) as {
-            videoUrl?: string;
-            resultUrl?: string;
-            resultUrls?: string[];
-            videos?: Array<{ url?: string }>;
-          };
-          const parsedUrl =
-            parsed.videoUrl ||
-            parsed.resultUrl ||
-            parsed.resultUrls?.[0] ||
-            parsed.videos?.[0]?.url;
-          if (parsedUrl) {
-            return parsedUrl;
-          }
-        } catch (e) {
-          console.error("Error parsing video resultJson:", e);
-        }
-      }
-
-      throw new Error("Task succeeded but did not return video URL. Please try again later.");
+    const modelOptionId = request.nextUrl.searchParams.get("modelOptionId");
+    const generation = await prisma.generation.findFirst({
+      where: {
+        taskId,
+        userId: session.user.id,
+        type: "video",
+      },
+      select: {
+        modelOptionId: true,
+      },
+    });
+    const option = resolveVideoOption({
+      modelOptionId: modelOptionId || generation?.modelOptionId || undefined,
+    });
+    if (!option) {
+      return NextResponse.json(
+        { error: "Unsupported video model option." },
+        { status: 400 }
+      );
     }
 
-    await sleep(intervalMs);
+    return settleVideoTask({
+      userId: session.user.id,
+      taskId,
+      option,
+    });
   }
 
-  throw new Error("Video generation timeout. Please try again later.");
-}
-
-export async function GET() {
   return NextResponse.json({
     success: true,
     options: VIDEO_MODEL_OPTIONS,
@@ -274,7 +403,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Please sign in to generate videos." },
+        { status: 401 }
+      );
     }
     userId = session.user.id;
 
@@ -321,36 +453,35 @@ export async function POST(request: NextRequest) {
       option,
     });
 
-    const providerVideoUrl = await pollVideoResult(taskId, option);
-    const videoUrl = await persistGeneratedMedia({
-      sourceUrl: providerVideoUrl,
-      userId: session.user.id,
-      taskId,
-      kind: "video",
-    });
-
     await prisma.generation.upsert({
       where: { taskId },
       update: {
         type: "video",
-        status: "success",
-        urls: [videoUrl],
+        status: "generating",
+        urls: [],
         prompt,
         error: null,
+        modelOptionId: option.id,
+        creditsCost: option.credits,
+        creditConsumption: consumedCredits as Prisma.InputJsonValue,
       },
       create: {
         userId,
         type: "video",
-        status: "success",
-        urls: [videoUrl],
+        status: "generating",
+        urls: [],
         prompt,
         taskId,
+        modelOptionId: option.id,
+        creditsCost: option.credits,
+        creditConsumption: consumedCredits as Prisma.InputJsonValue,
       },
     });
 
     return NextResponse.json({
       success: true,
-      videoUrl,
+      pending: true,
+      status: "generating",
       prompt,
       taskId,
       creditsCost: option.credits,

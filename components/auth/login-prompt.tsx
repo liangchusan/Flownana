@@ -1,8 +1,8 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { LogIn, Sparkles } from "lucide-react";
+import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 export function LoginPrompt() {
   return (
@@ -23,12 +23,12 @@ export function LoginPrompt() {
       </p>
       
       <Button
-        onClick={() => signIn("google")}
+        onClick={() => signInForCurrentEnvironment()}
         size="lg"
         className="mx-auto flex items-center space-x-2 rounded-xl border-0 bg-stone-800 px-8 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
       >
         <LogIn className="h-5 w-5" />
-        <span>Sign in with Google</span>
+        <span>{getSignInLabel()}</span>
       </Button>
       
       <p className="mt-6 text-sm text-stone-500">

@@ -1,42 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { ExploreTab } from "./explore-tab";
 import { MyCreationsTab } from "./my-creations-tab";
 
 interface ResultPanelProps {
   mode: "video" | "image" | "music";
-  currentGeneration?: {
-    url: string | null;
-    isGenerating: boolean;
-    taskId?: string;
-    prompt?: string;
-  };
+  currentGeneration?: PanelGeneration;
+  currentGenerations?: PanelGeneration[];
   onGenerateSimilar?: (data: { prompt: string; imageUrl?: string }) => void;
 }
 
-export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: ResultPanelProps) {
-  const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<"explore" | "creations">(
-    session ? "creations" : "explore"
+export interface PanelGeneration {
+  url: string | null;
+  isGenerating: boolean;
+  taskId?: string;
+  optimisticId?: string;
+  prompt?: string;
+  error?: string;
+}
+
+export function ResultPanel({
+  mode,
+  currentGeneration,
+  currentGenerations,
+  onGenerateSimilar,
+}: ResultPanelProps) {
+  const { data: session, status } = useSession();
+  const [activeTab, setActiveTab] = useState<"explore" | "creations">("creations");
+  const generationItems = useMemo(
+    () => currentGenerations ?? (currentGeneration ? [currentGeneration] : []),
+    [currentGeneration, currentGenerations]
   );
 
   // 登录用户默认看历史，未登录默认 Explore
   useEffect(() => {
+    if (status === "loading") {
+      return;
+    }
     if (!session) {
       setActiveTab("explore");
       return;
     }
     setActiveTab("creations");
-  }, [session]);
+  }, [session, status]);
 
   // 如果有新的生成任务，切换到 My Creations
   useEffect(() => {
-    if (currentGeneration?.taskId && session) {
+    if (
+      generationItems.some((generation) => generation.taskId || generation.optimisticId) &&
+      session
+    ) {
       setActiveTab("creations");
     }
-  }, [currentGeneration?.taskId, session]);
+  }, [generationItems, session]);
 
   return (
     <div className="flex h-full flex-col bg-[#FDFDF9]">
@@ -72,7 +90,7 @@ export function ResultPanel({ mode, currentGeneration, onGenerateSimilar }: Resu
         ) : (
           <MyCreationsTab
             mode={mode}
-            currentGeneration={currentGeneration}
+            currentGenerations={generationItems}
           />
         )}
       </div>

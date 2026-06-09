@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { UserMenu } from "@/components/layout/user-menu";
 import { trackEvent } from "@/lib/analytics";
+import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 interface HeaderProps {
   showBackground?: boolean;
 }
 
 export function Header({ showBackground = false }: HeaderProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   return (
     <header
@@ -59,7 +60,9 @@ export function Header({ showBackground = false }: HeaderProps) {
 
         {/* User Menu / Login Button - Right */}
         <div className="flex items-center ml-auto">
-          {session ? (
+          {status === "loading" ? (
+            <div className="h-10 w-36 animate-pulse rounded-xl bg-white/15" />
+          ) : session ? (
             <UserMenu
               user={{
                 name: session.user?.name,
@@ -71,7 +74,7 @@ export function Header({ showBackground = false }: HeaderProps) {
             <Button
               onClick={() => {
                 trackEvent("signup_started", { source: "header" });
-                signIn("google");
+                signInForCurrentEnvironment();
               }}
               className="flex items-center space-x-2 border border-white/20 bg-white/10 text-white transition-all duration-300 hover:bg-white/20 hover:opacity-90 active:scale-[0.98]"
             >

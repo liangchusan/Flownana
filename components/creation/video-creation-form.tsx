@@ -5,16 +5,21 @@ import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronDown, Loader2, Upload, X } from "lucide-react";
 import axios from "axios";
+import { useSession } from "next-auth/react";
 import {
   VIDEO_MODEL_OPTION_MAP,
   VIDEO_MODEL_OPTIONS,
   type VideoModelOption,
 } from "@/lib/generation-pricing";
 import { trackEvent } from "@/lib/analytics";
+import { useToast } from "@/components/blocks/app-toast-provider";
+import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 const getModelName = (option: VideoModelOption): string => {
   if (option.family === "kling") return "Kling 3.0";
-  if (option.family === "seedance") return "Seedance 1.5 Pro";
+  if (option.family === "happyhorse") return "HappyHorse 1.0";
+  if (option.providerModel === "bytedance/seedance-2-fast") return "Seedance 2 Fast";
+  if (option.providerModel === "bytedance/seedance-2") return "Seedance 2";
   if (option.providerModel === "veo3_lite") return "VEO 3.1 Lite";
   if (option.providerModel === "veo3_fast") return "VEO 3.1 Fast";
   return "VEO 3.1 Quality";
@@ -29,9 +34,14 @@ const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 
 interface VideoCreationFormProps {
-  onGenerate: (videoUrl: string, taskId?: string, prompt?: string) => void;
-  isGenerating: boolean;
-  setIsGenerating: (value: boolean) => void;
+  onGenerate: (videoUrl: string, taskId?: string, prompt?: string, optimisticId?: string) => void;
+  onGenerationStart?: (data: { optimisticId: string; prompt: string }) => void;
+  onGenerationTaskCreated?: (data: { optimisticId: string; taskId: string; prompt: string }) => void;
+  onGenerationFailure?: (data: { optimisticId: string; prompt: string; error: string }) => void;
+  activeGenerationCount?: number;
+  maxConcurrentGenerations?: number;
+  isGenerating?: boolean;
+  setIsGenerating?: (value: boolean) => void;
   onTaskIdChange?: (taskId: string) => void;
   initialPrompt?: string;
   initialImage?: string;
@@ -39,12 +49,19 @@ interface VideoCreationFormProps {
 
 export function VideoCreationForm({
   onGenerate,
-  isGenerating,
+  onGenerationStart,
+  onGenerationTaskCreated,
+  onGenerationFailure,
+  activeGenerationCount,
+  maxConcurrentGenerations = 5,
+  isGenerating = false,
   setIsGenerating,
   onTaskIdChange,
   initialPrompt,
   initialImage,
 }: VideoCreationFormProps) {
+  const { showToast } = useToast();
+  const { data: session, status } = useSession();
   const defaultOption = VIDEO_MODEL_OPTION_MAP.veo31_fast_8;
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
@@ -55,6 +72,7 @@ export function VideoCreationForm({
   const [sound, setSound] = useState<"on" | "off">(defaultOption.hasAudio ? "on" : "off");
 
   const [modelOpen, setModelOpen] = useState(false);
+  const localActiveGenerationCountRef = useRef(activeGenerationCount ?? 0);
   const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
   const modelPopupRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,7 +95,7 @@ export function VideoCreationForm({
     [selectedModelName]
   );
 
-  const aspectRatioOptions = useMemo(() => ["16:9", "9:16", "1:1", "4:3"], []);
+  const aspectRatioOptions = useMemo(() => ["16:9", "9:16", "1:1", "4:3", "3:4"], []);
   const resolutionOptions = useMemo(
     () => [...new Set(optionsForModel.map((o) => formatResolution(o.resolution)))],
     [optionsForModel]
@@ -86,6 +104,11 @@ export function VideoCreationForm({
     () => [...new Set(optionsForModel.map((o) => o.duration))].sort((a, b) => a - b),
     [optionsForModel]
   );
+  const durationMin = durationOptions[0] ?? duration;
+  const durationMax = durationOptions[durationOptions.length - 1] ?? duration;
+  const useDurationSlider =
+    durationOptions.length > 2 &&
+    durationOptions.every((value, index) => index === 0 || value === durationOptions[index - 1] + 1);
   const soundOptions = useMemo(
     () => [...new Set(optionsForModel.map((o) => (o.hasAudio ? "on" : "off")))] as Array<"on" | "off">,
     [optionsForModel]
@@ -106,6 +129,10 @@ export function VideoCreationForm({
       optionsForModel[0]
     );
   }, [duration, optionsForModel, resolution, sound]);
+  const usesConcurrentGenerationLimit = activeGenerationCount !== undefined;
+  const generationLimitReached = usesConcurrentGenerationLimit
+    ? activeGenerationCount >= maxConcurrentGenerations
+    : isGenerating;
 
   useEffect(() => {
     if (modelNameOptions.length > 0 && !modelNameOptions.includes(selectedModelName))
@@ -123,6 +150,11 @@ export function VideoCreationForm({
     if (soundOptions.length > 0 && !soundOptions.includes(sound))
       setSound(soundOptions[0]);
   }, [soundOptions, sound]);
+  useEffect(() => {
+    if (activeGenerationCount !== undefined) {
+      localActiveGenerationCountRef.current = activeGenerationCount;
+    }
+  }, [activeGenerationCount]);
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
   useEffect(() => { if (initialImage !== undefined) setUploadedImage(initialImage); }, [initialImage]);
 
@@ -160,10 +192,97 @@ export function VideoCreationForm({
     },
   });
 
+  const pollGenerationStatus = async (params: {
+    taskId: string;
+    modelOptionId: string;
+    prompt: string;
+    optimisticId: string;
+    creditsCost: number;
+  }) => {
+    const maxAttempts = 360;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 8000));
+      const response = await axios.get("/api/veo/generate", {
+        params: {
+          taskId: params.taskId,
+          modelOptionId: params.modelOptionId,
+        },
+      });
+
+      if (response.data?.pending) {
+        continue;
+      }
+
+      if (response.data?.success && response.data?.videoUrl) {
+        trackEvent("generation_success", {
+          type: "video",
+          model_option_id: response.data.modelOptionId || params.modelOptionId,
+          credits_cost: response.data.creditsCost || params.creditsCost,
+        });
+        onGenerate(
+          response.data.videoUrl,
+          response.data.taskId || params.taskId,
+          response.data.prompt || params.prompt,
+          params.optimisticId
+        );
+        return;
+      }
+
+      throw new Error(response.data?.error || "Generation failed, please try again");
+    }
+
+    throw new Error("Generation is still processing. Please refresh My Creations later.");
+  };
+
   const handleGenerate = async () => {
-    if (!prompt.trim()) { alert("Please enter a prompt"); return; }
-    if (!selectedOption) { alert("Invalid model settings, please adjust and try again."); return; }
-    setIsGenerating(true);
+    if (status === "loading") {
+      return;
+    }
+    if (!session?.user) {
+      trackEvent("signup_started", {
+        source: "ai_video_generate",
+      });
+      await signInForCurrentEnvironment();
+      return;
+    }
+    if (!prompt.trim()) {
+      showToast({
+        title: "Prompt required",
+        message: "Please enter a prompt",
+        variant: "warning",
+      });
+      return;
+    }
+    if (!selectedOption) {
+      showToast({
+        title: "Invalid settings",
+        message: "Invalid model settings, please adjust and try again.",
+        variant: "warning",
+      });
+      return;
+    }
+    if (
+      generationLimitReached ||
+      (usesConcurrentGenerationLimit &&
+        localActiveGenerationCountRef.current >= maxConcurrentGenerations)
+    ) {
+      showToast({
+        title: "Generation limit reached",
+        message: `You can run up to ${maxConcurrentGenerations} video generations at once.`,
+        variant: "warning",
+      });
+      return;
+    }
+    if (usesConcurrentGenerationLimit) {
+      localActiveGenerationCountRef.current += 1;
+    }
+    const requestPrompt = prompt.trim();
+    const optimisticId = `local-video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    onGenerationStart?.({
+      optimisticId,
+      prompt: requestPrompt,
+    });
+    setIsGenerating?.(true);
     trackEvent("generation_started", {
       type: "video",
       model_option_id: selectedOption.id,
@@ -173,7 +292,7 @@ export function VideoCreationForm({
     });
     try {
       const response = await axios.post("/api/veo/generate", {
-        prompt,
+        prompt: requestPrompt,
         imageUrls: uploadedImage ? [uploadedImage] : undefined,
         modelOptionId: selectedOption.id,
         aspectRatio,
@@ -181,20 +300,50 @@ export function VideoCreationForm({
       if (response.data.success) {
         const taskId = response.data.taskId;
         const responsePrompt = response.data.prompt || prompt;
-        trackEvent("generation_success", {
-          type: "video",
-          model_option_id: response.data.modelOptionId || selectedOption.id,
-          credits_cost: response.data.creditsCost || selectedOption.credits,
-        });
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
-        onGenerate(response.data.videoUrl, taskId, responsePrompt);
+        if (response.data.pending && taskId) {
+          onGenerationTaskCreated?.({
+            optimisticId,
+            taskId,
+            prompt: responsePrompt,
+          });
+          await pollGenerationStatus({
+            taskId,
+            modelOptionId: response.data.modelOptionId || selectedOption.id,
+            prompt: responsePrompt,
+            optimisticId,
+            creditsCost: response.data.creditsCost || selectedOption.credits,
+          });
+          return;
+        }
+
+        if (response.data.videoUrl) {
+          trackEvent("generation_success", {
+            type: "video",
+            model_option_id: response.data.modelOptionId || selectedOption.id,
+            credits_cost: response.data.creditsCost || selectedOption.credits,
+          });
+          onGenerate(response.data.videoUrl, taskId, responsePrompt, optimisticId);
+          return;
+        }
+
+        throw new Error("Generation did not return a video URL.");
       } else {
         trackEvent("generation_failed", {
           type: "video",
           model_option_id: selectedOption.id,
           error: "unknown",
         });
-        alert("Generation failed, please try again");
+        onGenerationFailure?.({
+          optimisticId,
+          prompt: requestPrompt,
+          error: "Generation failed, please try again",
+        });
+        showToast({
+          title: "Generation failed",
+          message: "Generation failed, please try again",
+          variant: "error",
+        });
       }
     } catch (error: any) {
       const message = error.response?.data?.error || "Generation failed, please try again";
@@ -210,9 +359,24 @@ export function VideoCreationForm({
         model_option_id: selectedOption.id,
         error: message,
       });
-      alert(message);
+      onGenerationFailure?.({
+        optimisticId,
+        prompt: requestPrompt,
+        error: message,
+      });
+      showToast({
+        title: "Generation failed",
+        message,
+        variant: "error",
+      });
     } finally {
-      setIsGenerating(false);
+      if (usesConcurrentGenerationLimit) {
+        localActiveGenerationCountRef.current = Math.max(
+          0,
+          localActiveGenerationCountRef.current - 1
+        );
+      }
+      setIsGenerating?.(false);
     }
   };
 
@@ -281,14 +445,39 @@ export function VideoCreationForm({
         </div>
 
         <div className={showSound ? "py-3" : "pt-3"}>
-          <p className="mb-2 text-xs font-medium text-stone-400">Length</p>
-          <div className="flex flex-wrap gap-1.5">
-            {durationOptions.length > 0
-              ? durationOptions.map((d) => (
-                  <button key={d} type="button" onClick={() => setDuration(d)} className={chipCls(duration === d)}>{d}s</button>
-                ))
-              : <span className="text-sm text-stone-400">—</span>}
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium text-stone-400">Duration</p>
+            {useDurationSlider && (
+              <span className="text-sm font-semibold text-stone-900">{duration}s</span>
+            )}
           </div>
+          {useDurationSlider ? (
+            <div className="rounded-2xl bg-stone-50 px-4 py-4">
+              <input
+                type="range"
+                min={durationMin}
+                max={durationMax}
+                step={1}
+                value={duration}
+                onInput={(event) => setDuration(Number(event.currentTarget.value))}
+                onChange={(event) => setDuration(Number(event.target.value))}
+                className="h-2 w-full cursor-pointer accent-stone-900"
+                aria-label="Duration"
+              />
+              <div className="mt-2 flex justify-between text-[11px] font-medium text-stone-400">
+                <span>{durationMin}s</span>
+                <span>{durationMax}s</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {durationOptions.length > 0
+                ? durationOptions.map((d) => (
+                    <button key={d} type="button" onClick={() => setDuration(d)} className={chipCls(duration === d)}>{d}s</button>
+                  ))
+                : <span className="text-sm text-stone-400">-</span>}
+            </div>
+          )}
         </div>
 
         {showSound && (
@@ -372,11 +561,20 @@ export function VideoCreationForm({
 
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating || !prompt.trim() || !selectedOption}
+          disabled={
+            status === "loading" ||
+            (!!session && (generationLimitReached || !prompt.trim() || !selectedOption))
+          }
           className="w-full rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98] disabled:opacity-50"
           size="lg"
         >
-          {isGenerating ? (
+          {status === "loading" ? (
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Checking session...</>
+          ) : !session ? (
+            getSignInLabel()
+          ) : usesConcurrentGenerationLimit && generationLimitReached ? (
+            `Generating ${maxConcurrentGenerations}/${maxConcurrentGenerations}`
+          ) : isGenerating ? (
             <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Generating...</>
           ) : "Generate"}
         </Button>

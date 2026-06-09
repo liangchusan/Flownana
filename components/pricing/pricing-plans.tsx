@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 import type { PriceKey } from "@/lib/plans";
 import { UpgradeModal } from "@/components/billing/upgrade-modal";
+import { useToast } from "@/components/blocks/app-toast-provider";
 import { trackEvent } from "@/lib/analytics";
+import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 const SHARED_FEATURES = [
   "Access to top-quality video models",
@@ -51,6 +53,7 @@ function priceKeyFor(
 
 export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   const { data: session, status } = useSession();
+  const { showToast } = useToast();
   const [billing, setBilling] = useState<BillingMode>("monthly");
   const [summary, setSummary] = useState<{
     subscription: {
@@ -78,11 +81,15 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   const subscribe = async (pk: PriceKey) => {
     if (!session) {
       trackEvent("signup_started", { source: "pricing", price_key: pk });
-      await signIn("google");
+      await signInForCurrentEnvironment();
       return;
     }
     if (!stripeEnabled) {
-      alert("Stripe is not configured. Set STRIPE_PRICE_* in .env.");
+      showToast({
+        title: "Checkout unavailable",
+        message: "Stripe is not configured. Set STRIPE_PRICE_* in .env.",
+        variant: "warning",
+      });
       return;
     }
     setLoading(pk);
@@ -100,7 +107,11 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       if (!res.ok) throw new Error(data.error || "Checkout failed");
       if (data.url) window.location.href = data.url;
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Checkout failed");
+      showToast({
+        title: "Checkout failed",
+        message: e instanceof Error ? e.message : "Checkout failed",
+        variant: "error",
+      });
     } finally {
       setLoading(null);
     }
@@ -109,7 +120,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   const upgradeNow = async (pk: PriceKey) => {
     if (!session) {
       trackEvent("signup_started", { source: "pricing_upgrade", price_key: pk });
-      await signIn("google");
+      await signInForCurrentEnvironment();
       return;
     }
     setLoading(pk);
@@ -131,7 +142,11 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       }
       window.location.href = "/account/billing?upgrade=success";
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : "Upgrade failed");
+      showToast({
+        title: "Upgrade failed",
+        message: e instanceof Error ? e.message : "Upgrade failed",
+        variant: "error",
+      });
     } finally {
       setLoading(null);
     }

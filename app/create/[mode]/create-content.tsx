@@ -8,16 +8,17 @@ import { GenerateForm } from "@/components/generate/generate-form";
 import { ImagePreview } from "@/components/generate/image-preview";
 import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
 import { VoicePreview } from "@/components/creation/voice-preview";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/layout/user-menu";
 import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
+import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 type CreationMode = "video" | "image" | "voice";
 
 export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   
   const mode = modeParam as CreationMode | null;
   
@@ -63,7 +64,9 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
             <Logo size="md" />
           </Link>
           <div>
-            {session ? (
+            {status === "loading" ? (
+              <div className="h-9 w-32 animate-pulse rounded-xl bg-stone-200/80" />
+            ) : session ? (
               <UserMenu
                 user={{
                   name: session.user?.name,
@@ -73,7 +76,7 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
               />
             ) : (
               <Button
-                onClick={() => signIn("google")}
+                onClick={() => signInForCurrentEnvironment()}
                 className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
                 size="sm"
               >

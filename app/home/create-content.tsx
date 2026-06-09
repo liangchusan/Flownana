@@ -11,26 +11,19 @@ import {
   History,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Search,
+  Loader2,
 } from "lucide-react";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/layout/user-menu";
-import { CreditsWidget } from "@/components/creation/credits-widget";
-import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
+import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
+import { mergeCreations, type CreationHistoryItem, type CreationStatus } from "@/lib/creation-history";
 
 type CreationType = "image" | "video" | "music";
 
-interface Creation {
-  id: string;
-  type: CreationType;
-  status: string;
-  urls: string[];
-  prompt: string;
-  createdAt: string;
-  taskId?: string;
-}
+type Creation = CreationHistoryItem;
 
 // 模块1: 顶部大 Banner 卡片（支持图片或视频，横向滑动）
 type BannerType = "image" | "video";
@@ -59,13 +52,13 @@ const heroBanners: HeroBanner[] = [
     tag: "VEO 3.1",
   },
   {
-    id: "nano-banana",
+    id: "gpt-image-2",
     type: "image",
     mediaUrl:
       "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&auto=format&fit=crop&q=80",
-    title: "Photorealistic Images with Nano Banana",
+    title: "Photorealistic Images with GPT Image 2",
     description: "Generate product shots, key visuals and thumbnails in 4K quality.",
-    tag: "Nano Banana",
+    tag: "GPT Image 2",
   },
   {
     id: "suno",
@@ -102,22 +95,119 @@ const promptExamples = [
   "Futuristic sci‑fi city",
 ];
 
+const creationModeOptions = [
+  { id: "image" as const, label: "AI Image", icon: ImageIcon },
+  { id: "video" as const, label: "AI Video", icon: Video },
+  { id: "music" as const, label: "AI Music", icon: Music },
+];
+
+const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
+const LEGACY_STATUS_MAP: Record<string, CreationStatus> = {
+  completed: "success",
+  done: "success",
+  error: "failed",
+};
+
+function isCreationStatus(value: unknown): value is CreationStatus {
+  return typeof value === "string" && VALID_STATUS.includes(value as CreationStatus);
+}
+
+function isValidMediaUrl(url: unknown): url is string {
+  return typeof url === "string" && url.trim().length > 0;
+}
+
+function normalizeCreation(raw: unknown): Creation | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const candidate = raw as Partial<Creation> & {
+    url?: unknown;
+    imageUrl?: unknown;
+    videoUrl?: unknown;
+    audioUrl?: unknown;
+    outputUrl?: unknown;
+    resultUrl?: unknown;
+  };
+  const type = candidate.type;
+  if (type !== "image" && type !== "video" && type !== "music") return null;
+  if (typeof candidate.id !== "string" || candidate.id.trim().length === 0) return null;
+
+  const urlsFromArray = Array.isArray(candidate.urls)
+    ? candidate.urls.filter(isValidMediaUrl)
+    : [];
+  const urlsFromLegacy = [
+    candidate.url,
+    candidate.imageUrl,
+    candidate.videoUrl,
+    candidate.audioUrl,
+    candidate.outputUrl,
+    candidate.resultUrl,
+  ].filter(isValidMediaUrl);
+  const urls = [...urlsFromArray, ...urlsFromLegacy].filter(
+    (url, index, list) => list.indexOf(url) === index
+  );
+
+  const rawStatus = typeof candidate.status === "string" ? candidate.status.toLowerCase() : "";
+  const mappedStatus = LEGACY_STATUS_MAP[rawStatus];
+  const status = isCreationStatus(candidate.status) ? candidate.status : mappedStatus || "failed";
+
+  return {
+    id: candidate.id,
+    type,
+    status,
+    urls,
+    prompt: typeof candidate.prompt === "string" ? candidate.prompt : "",
+    createdAt:
+      typeof candidate.createdAt === "string" && candidate.createdAt.trim().length > 0
+        ? candidate.createdAt
+        : new Date().toISOString(),
+    taskId: typeof candidate.taskId === "string" ? candidate.taskId : undefined,
+    error: typeof candidate.error === "string" ? candidate.error : undefined,
+  };
+}
+
+function getCreationStorageKeys(session: {
+  user?: { id?: string | null; email?: string | null };
+} | null): string[] {
+  const keys = [
+    session?.user?.id ? `creations_${session.user.id}` : null,
+    session?.user?.email ? `creations_${session.user.email}` : null,
+  ].filter((item): item is string => !!item);
+
+  return Array.from(new Set(keys));
+}
+
+function formatCreationDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
 export function CreateContent() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [creationMode, setCreationMode] = useState<CreationType>("image");
+  const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [recentCreations, setRecentCreations] = useState<Creation[]>([]);
+  const [isLoadingCreations, setIsLoadingCreations] = useState(false);
   const bannerScrollRef = useRef<HTMLDivElement | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [videoFallbackMap, setVideoFallbackMap] = useState<Record<string, boolean>>({});
+  const selectedMode = creationModeOptions.find((option) => option.id === creationMode) ?? creationModeOptions[0];
+  const SelectedModeIcon = selectedMode.icon;
 
   // 模块1: Banner 精确滚动到指定卡片
   const scrollToBanner = (index: number) => {
     const container = bannerScrollRef.current;
     if (!container) return;
     const cards = container.querySelectorAll<HTMLDivElement>("[data-banner-card]");
-    const clampedIndex = ((index % cards.length) + cards.length) % cards.length;
+    if (cards.length === 0) return;
+
+    const clampedIndex = Math.min(Math.max(index, 0), cards.length - 1);
     const targetCard = cards[clampedIndex];
     if (!targetCard) return;
 
@@ -133,7 +223,7 @@ export function CreateContent() {
     const delta = direction === "left" ? -1 : 1;
     setActiveBannerIndex((prev) => {
       const next = prev + delta;
-      return ((next % heroBanners.length) + heroBanners.length) % heroBanners.length;
+      return Math.min(Math.max(next, 0), heroBanners.length - 1);
     });
   };
 
@@ -145,19 +235,63 @@ export function CreateContent() {
 
   // 模块3: 加载用户创作记录
   useEffect(() => {
-    if (!session?.user?.email) {
+    if (sessionStatus === "loading") return;
+
+    if (!session?.user?.id && !session?.user?.email) {
       setRecentCreations([]);
+      setIsLoadingCreations(false);
       return;
     }
-    try {
-      const raw = localStorage.getItem(`creations_${session.user.email}`);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Creation[];
-      setRecentCreations(parsed.slice(0, 8));
-    } catch {
-      setRecentCreations([]);
-    }
-  }, [session?.user?.email]);
+
+    const readLocalCreations = () => {
+      const parsedAll: Creation[] = [];
+      for (const key of getCreationStorageKeys(session)) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+
+        try {
+          const parsed = JSON.parse(raw);
+          const normalized = Array.isArray(parsed)
+            ? parsed
+                .map((item) => normalizeCreation(item))
+                .filter((item): item is Creation => !!item)
+            : [];
+          parsedAll.push(...normalized);
+        } catch (error) {
+          console.error("Error parsing stored creations:", error);
+        }
+      }
+
+      return mergeCreations(parsedAll, []);
+    };
+
+    let cancelled = false;
+    const localCreations = readLocalCreations();
+    setRecentCreations(localCreations.slice(0, 8));
+    setIsLoadingCreations(true);
+
+    fetch("/api/creations")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const fromApi = Array.isArray(data?.creations)
+          ? data.creations
+              .map((item: unknown) => normalizeCreation(item))
+              .filter((item: Creation | null): item is Creation => !!item)
+          : [];
+        setRecentCreations(mergeCreations(fromApi, localCreations).slice(0, 8));
+      })
+      .catch((error) => {
+        console.error("Error fetching recent creations:", error);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingCreations(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session, sessionStatus]);
 
   const handleStartCreating = () => {
     const trimmed = prompt.trim();
@@ -176,66 +310,37 @@ export function CreateContent() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="h-screen overflow-hidden">
       <CreationSidebar />
-      <main className="flex-1 overflow-y-auto bg-[#FDFDF9]">
-        {/* Top Bar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-8 py-2">
-          <Link href="/" className="flex-shrink-0">
-            <Logo size="md" />
-          </Link>
-          <div>
-            {session ? (
-              <div className="flex items-center gap-2">
-                <CreditsWidget />
-                <UserMenu
-                  user={{
-                    name: session.user?.name,
-                    email: session.user?.email,
-                    image: session.user?.image,
-                  }}
-                />
-              </div>
-            ) : (
-              <Button
-                onClick={() => signIn("google")}
-                className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
-                size="sm"
-              >
-                Start Free Now
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="ml-16 min-h-[calc(100vh-73px)]">
+      <main className="ml-[60px] h-screen overflow-y-auto bg-[#FDFDF9]">
+        <div className="min-h-screen bg-[linear-gradient(180deg,#FDFDF9_0%,#FAFAF6_48%,#FDFDF9_100%)]">
           {/* ---------- 模块1: 顶部大 Banner 卡片（图片/视频，横向滑动） ---------- */}
-          <section className="banner-gradient-flow border-b border-stone-100 bg-gradient-to-r from-stone-50 via-zinc-50/60 to-stone-100/70">
-            <div className="w-full px-6 py-8 md:py-10">
-              <div className="flex items-center justify-between mb-4 md:mb-6 gap-3">
+          <section className="border-b border-stone-100/70">
+            <div className="mx-auto w-full max-w-[1680px] px-4 py-5 md:px-8 md:py-6 xl:px-10">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm text-stone-600">
-                  <Sparkles className="h-5 w-5 text-stone-500" />
+                  <Sparkles className="h-4 w-4 text-stone-500" />
                   <span className="font-medium">Featured capabilities</span>
                 </div>
               </div>
 
-                <div className="relative group">
+              <div className="group relative">
                 <div
                   ref={bannerScrollRef}
-                  className="flex gap-4 md:gap-5 overflow-x-auto pb-2 scroll-smooth no-scrollbar"
+                  className="flex gap-4 overflow-x-auto pb-1 scroll-smooth no-scrollbar xl:grid xl:grid-cols-4 xl:overflow-visible"
                 >
                   {heroBanners.map((banner) => (
                     <div
                       key={banner.id}
                       data-banner-card
-                      className="flex w-[85vw] max-w-lg shrink-0 flex-col gap-2"
+                      className="group flex w-[76vw] max-w-sm shrink-0 flex-col overflow-hidden rounded-2xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md sm:w-[42vw] lg:w-[360px] xl:w-full xl:max-w-none"
                     >
                       {/* 媒体区域：图片 / 视频，16:9 比例 */}
-                      <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-black">
+                      <div className="relative aspect-video w-full overflow-hidden bg-black">
                         {banner.type === "video" && !videoFallbackMap[banner.id] ? (
                           <video
                             src={banner.mediaUrl}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105"
                             autoPlay
                             loop
                             muted
@@ -250,18 +355,21 @@ export function CreateContent() {
                           <img
                             src={banner.posterUrl ?? banner.mediaUrl}
                             alt={banner.title}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105"
                             loading="lazy"
                             decoding="async"
                           />
                         )}
+                        <div className="absolute left-2 top-2 rounded-lg bg-white/90 px-2 py-1 text-[11px] font-medium text-stone-700 shadow-sm">
+                          {banner.tag}
+                        </div>
                       </div>
                       {/* 文本区域：标题和描述放在图片下方（无白色背景，不与上半部分连在一起） */}
-                      <div className="px-1 sm:px-1.5">
-                        <h2 className="mb-1 text-sm font-semibold leading-snug text-stone-900 sm:text-base">
+                      <div className="px-3 pb-3 pt-2.5">
+                        <h2 className="mb-0.5 truncate text-sm font-semibold leading-snug text-stone-900">
                           {banner.title}
                         </h2>
-                        <p className="line-clamp-2 text-[11px] text-stone-500 sm:text-xs">
+                        <p className="truncate text-[11px] text-stone-500 sm:text-xs">
                           {banner.description}
                         </p>
                       </div>
@@ -269,12 +377,12 @@ export function CreateContent() {
                   ))}
                 </div>
 
-                {/* 左右滑动箭头：尽量对齐图片/视频区域中线，鼠标移入时显示 */}
-                <div className="pointer-events-none absolute bottom-16 left-0 right-0 top-1 hidden items-center justify-between px-1 opacity-0 transition-all duration-300 group-hover:opacity-100 md:flex">
+                <div className="pointer-events-none absolute inset-y-0 left-0 right-0 hidden items-center justify-between px-2 opacity-0 transition-all duration-300 group-hover:opacity-100 md:flex xl:hidden">
                   <button
                     type="button"
                     onClick={() => scrollBanners("left")}
-                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200/70 bg-white/80 text-stone-500 backdrop-blur-sm transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-700"
+                    disabled={activeBannerIndex === 0}
+                    className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-stone-200/70 bg-white/90 text-stone-500 shadow-md shadow-stone-200/30 backdrop-blur-sm transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-stone-200/70 disabled:hover:text-stone-500 disabled:active:scale-100"
                     aria-label="Previous"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -282,7 +390,8 @@ export function CreateContent() {
                   <button
                     type="button"
                     onClick={() => scrollBanners("right")}
-                    className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-stone-200/70 bg-white/80 text-stone-500 backdrop-blur-sm transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-700"
+                    disabled={activeBannerIndex === heroBanners.length - 1}
+                    className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-stone-200/70 bg-white/90 text-stone-500 shadow-md shadow-stone-200/30 backdrop-blur-sm transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-stone-200/70 disabled:hover:text-stone-500 disabled:active:scale-100"
                     aria-label="Next"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -293,87 +402,135 @@ export function CreateContent() {
           </section>
 
           {/* ---------- 模块2: 引导创作入口 ---------- */}
-          <section className="bg-gradient-to-b from-[#FDFDF9] via-stone-50/50 to-[#FDFDF9] px-6 py-10">
-            <div className="max-w-2xl mx-auto">
-              <h1 className="mb-6 bg-gradient-to-r from-stone-800 via-zinc-800 to-stone-900 bg-clip-text text-center text-3xl font-bold text-transparent md:text-4xl">
+          <section className="px-4 py-10 md:px-8 md:py-12">
+            <div className="mx-auto w-full max-w-[1280px]">
+              <h1 className="mx-auto mb-6 max-w-5xl text-center text-3xl font-bold leading-tight text-stone-900 md:text-5xl">
                 What will you create today?
               </h1>
 
-              {/* 创作类型 Pills */}
-              <div className="flex flex-wrap justify-center gap-2 mb-6">
-                {[
-                  { id: "image" as const, label: "AI Image", icon: ImageIcon },
-                  { id: "video" as const, label: "AI Video", icon: Video },
-                  { id: "music" as const, label: "AI Music", icon: Music },
-                ].map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setCreationMode(id)}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all duration-300 ${
-                      creationMode === id
-                        ? "border-stone-800 bg-stone-800 text-white shadow-sm"
-                        : "border-stone-200/50 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
               {/* 主输入框 */}
-              <div className="relative rounded-2xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 focus-within:border-stone-300 focus-within:shadow-md">
-                <div className="flex items-center px-4 py-3 gap-3">
-                  <Search className="h-5 w-5 flex-shrink-0 text-stone-400" />
-                  <input
-                    type="text"
+              <div className="overflow-hidden rounded-2xl border border-stone-200/70 bg-white shadow-lg shadow-stone-200/20 transition-all duration-300 focus-within:border-stone-300">
+                <div className="flex min-h-36 items-start gap-3 px-4 py-4 md:min-h-40 md:px-6 md:py-5">
+                  <Search className="mt-1.5 h-5 w-5 flex-shrink-0 text-stone-400" />
+                  <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleStartCreating()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleStartCreating();
+                      }
+                    }}
                     placeholder="Enter your prompt to get started..."
-                    className="min-w-0 flex-1 bg-transparent text-base text-stone-900 outline-none placeholder:text-stone-400"
+                    rows={4}
+                    className="min-h-28 min-w-0 flex-1 resize-none bg-transparent text-base leading-relaxed text-stone-900 outline-none placeholder:text-stone-400 md:min-h-32 md:text-lg"
                   />
                 </div>
-                <div className="px-4 pb-3 pt-0 flex justify-end">
-                  <Button
-                    onClick={handleStartCreating}
-                    className="rounded-xl bg-stone-800 px-5 py-2 text-sm font-medium text-white transition-all duration-300 hover:bg-stone-800/90"
-                  >
-                    Start creating
-                    <ChevronRight className="h-4 w-4 ml-1 inline" />
-                  </Button>
-                </div>
-              </div>
+                <div className="relative border-t border-stone-100 px-4 py-3 md:px-6">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsModeMenuOpen((open) => !open)}
+                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-stone-200/70 bg-stone-50 px-3 text-sm font-medium text-stone-700 transition-all duration-300 hover:border-stone-300 hover:bg-white active:scale-[0.98]"
+                        aria-expanded={isModeMenuOpen}
+                        aria-haspopup="listbox"
+                      >
+                        <SelectedModeIcon className="h-4 w-4 text-stone-500" />
+                        <span>{selectedMode.label}</span>
+                        <ChevronDown className={`h-4 w-4 text-stone-400 transition-all duration-300 ${isModeMenuOpen ? "rotate-180" : ""}`} />
+                      </button>
 
-              {/* 提示词案例 */}
-              <p className="mb-2 mt-3 text-left text-xs text-stone-500">Try a prompt example</p>
-              <div className="flex flex-wrap justify-start gap-2">
-                {promptExamples.slice(0, 6).map((example) => (
-                  <button
-                    key={example}
-                    type="button"
-                    onClick={() => setPrompt(example)}
-                    className="line-clamp-1 max-w-xs rounded-xl border border-stone-200/50 bg-white px-3 py-1.5 text-xs text-stone-600 transition-all duration-300 hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800"
-                  >
-                    {example}
-                  </button>
-                ))}
+                      {isModeMenuOpen && (
+                        <div
+                          role="listbox"
+                          className="absolute bottom-12 left-0 z-10 w-44 overflow-hidden rounded-xl border border-stone-200/70 bg-white p-1 shadow-lg shadow-stone-200/30"
+                        >
+                          {creationModeOptions.map(({ id, label, icon: Icon }) => (
+                            <button
+                              key={id}
+                              type="button"
+                              role="option"
+                              aria-selected={creationMode === id}
+                              onClick={() => {
+                                setCreationMode(id);
+                                setIsModeMenuOpen(false);
+                              }}
+                              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all duration-300 ${
+                                creationMode === id
+                                  ? "bg-stone-900 text-white"
+                                  : "text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+                              }`}
+                            >
+                              <Icon className="h-4 w-4" />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleStartCreating}
+                      className="ml-auto rounded-xl bg-stone-800 px-5 py-2 text-sm font-medium text-white transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
+                    >
+                      Start creating
+                      <ChevronRight className="h-4 w-4 ml-1 inline" />
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-stone-100 pt-3">
+                    {promptExamples.slice(0, 6).map((example) => (
+                      <button
+                        key={example}
+                        type="button"
+                        onClick={() => setPrompt(example)}
+                        className="line-clamp-1 max-w-xs rounded-xl border border-stone-200/50 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-600 transition-all duration-300 hover:border-stone-300 hover:bg-white hover:text-stone-900 active:scale-[0.98]"
+                      >
+                        {example}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
           {/* ---------- 模块3: 用户创作记录 ---------- */}
-          <section className="border-t border-stone-100 bg-stone-50/60 px-6 py-8">
-            <div className="w-full">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-stone-900">
-                <History className="h-5 w-5 text-stone-500" />
-                Recent creations
-              </h2>
+          <section className="px-4 pb-10 md:px-8">
+            <div className="mx-auto w-full max-w-[1680px] rounded-2xl border border-stone-200/60 bg-white/70 p-4 shadow-sm md:p-6 xl:p-7">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-stone-900">
+                  <History className="h-5 w-5 text-stone-500" />
+                  Recent creations
+                </h2>
+                {session && recentCreations.length > 0 && (
+                  <Link
+                    href="/ai-image"
+                    className="text-sm font-medium text-stone-500 transition-all duration-300 hover:text-stone-900"
+                  >
+                    Open studio
+                  </Link>
+                )}
+              </div>
 
               {session ? (
-                recentCreations.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                isLoadingCreations && recentCreations.length === 0 ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm"
+                      >
+                        <div className="aspect-[4/3] animate-pulse bg-stone-100" />
+                        <div className="space-y-2 p-3">
+                          <div className="h-3 w-3/4 animate-pulse rounded bg-stone-100" />
+                          <div className="h-3 w-1/2 animate-pulse rounded bg-stone-100" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : recentCreations.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                     {recentCreations.map((c) => (
                       <Link
                         key={c.id}
@@ -386,12 +543,19 @@ export function CreateContent() {
                         }
                         className="group overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md"
                       >
-                        <div className="flex aspect-square items-center justify-center overflow-hidden bg-stone-100">
-                          {c.urls?.[0] ? (
+                        <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-stone-100">
+                          {c.status === "pending" || c.status === "generating" || c.status === "processing" ? (
+                            <div className="flex h-full w-full flex-col items-center justify-center bg-stone-50">
+                              <Loader2 className="mb-2 h-6 w-6 animate-spin text-stone-500" />
+                              <span className="text-xs font-medium text-stone-500">
+                                {c.status === "pending" ? "Queued" : c.status === "processing" ? "Processing" : "Generating"}
+                              </span>
+                            </div>
+                          ) : c.urls?.[0] ? (
                             c.type === "video" ? (
                               <video
                                 src={c.urls[0]}
-                                className="w-full h-full object-cover"
+                                className="h-full w-full object-cover"
                                 muted
                                 playsInline
                                 preload="metadata"
@@ -400,25 +564,41 @@ export function CreateContent() {
                               <img
                                 src={c.urls[0]}
                                 alt=""
-                                className="w-full h-full object-cover"
+                                className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105"
+                                loading="lazy"
                               />
                             )
                           ) : (
-                            <span className="text-stone-300">
-                              {c.type === "image" && <ImageIcon className="h-10 w-10" />}
-                              {c.type === "video" && <Video className="h-10 w-10" />}
-                              {c.type === "music" && <Music className="h-10 w-10" />}
+                            <span className="flex flex-col items-center gap-2 text-stone-300">
+                              {c.type === "image" && <ImageIcon className="h-9 w-9" />}
+                              {c.type === "video" && <Video className="h-9 w-9" />}
+                              {c.type === "music" && <Music className="h-9 w-9" />}
+                              <span className="text-xs text-stone-400">
+                                {c.status === "failed" ? "Failed" : "No media"}
+                              </span>
                             </span>
                           )}
+                          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-[11px] font-medium capitalize text-stone-700 shadow-sm">
+                            {c.type === "image" && <ImageIcon className="h-3 w-3" />}
+                            {c.type === "video" && <Video className="h-3 w-3" />}
+                            {c.type === "music" && <Music className="h-3 w-3" />}
+                            {c.type}
+                          </span>
                         </div>
-                        <p className="truncate border-t border-stone-100 p-2 text-xs text-stone-500 group-hover:text-stone-700">
-                          {c.prompt || "Untitled"}
-                        </p>
+                        <div className="border-t border-stone-100 p-3">
+                          <p className="truncate text-xs font-medium text-stone-700 group-hover:text-stone-900">
+                            {c.prompt || "Untitled"}
+                          </p>
+                          <p className="mt-1 flex items-center justify-between gap-2 text-[11px] text-stone-400">
+                            <span className="capitalize">{c.status}</span>
+                            <span>{formatCreationDate(c.createdAt)}</span>
+                          </p>
+                        </div>
                       </Link>
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-stone-200/50 bg-white/50 py-10 text-center">
+                  <div className="rounded-xl border border-dashed border-stone-200/50 bg-white/60 py-10 text-center">
                     <p className="mb-2 text-sm text-stone-500">No creations yet</p>
                     <p className="mb-4 text-xs text-stone-400">Start with a prompt above or open a studio.</p>
                     <div className="flex flex-wrap justify-center gap-2">
@@ -447,10 +627,10 @@ export function CreateContent() {
                     Your images, videos, and music will be saved here.
                   </p>
                   <Button
-                    onClick={() => signIn("google")}
+                    onClick={() => signInForCurrentEnvironment()}
                     className="rounded-xl border-0 bg-stone-800 px-5 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
                   >
-                    Sign in with Google
+                    {getSignInLabel()}
                   </Button>
                 </div>
               )}

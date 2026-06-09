@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/blocks/app-toast-provider";
+import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 type Summary = {
   subscription: {
@@ -26,6 +28,7 @@ type Summary = {
 
 export default function BillingPage() {
   const { data: session, status } = useSession();
+  const { showToast } = useToast();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [upgradeInfo, setUpgradeInfo] = useState<{
@@ -87,7 +90,13 @@ export default function BillingPage() {
       .then((r) => r.json())
       .then((d) => {
         if (d.url) window.location.href = d.url;
-        else alert(d.error || "Billing portal unavailable");
+        else {
+          showToast({
+            title: "Billing portal unavailable",
+            message: d.error || "Billing portal unavailable",
+            variant: "error",
+          });
+        }
       });
   };
 
@@ -108,9 +117,7 @@ export default function BillingPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-8">
         <p className="mb-4 text-stone-700">Sign in to view billing.</p>
-        <Link href="/api/auth/signin">
-          <Button>Sign in</Button>
-        </Link>
+        <Button onClick={() => signInForCurrentEnvironment()}>Sign in</Button>
       </div>
     );
   }

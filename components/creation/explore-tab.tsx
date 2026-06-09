@@ -9,13 +9,13 @@ interface ExploreTabProps {
   onGenerateSimilar?: (data: { prompt: string; imageUrl?: string }) => void;
 }
 
-// 模拟的官方案例数据 - Nano Banana 生成的图片和 VEO3 生成的视频
+// 模拟的官方案例数据 - GPT Image 2 生成的图片和 VEO3 生成的视频
 const exploreExamples = [
   {
     id: "1",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "A beautiful sunset over mountains",
   },
   {
@@ -29,7 +29,7 @@ const exploreExamples = [
     id: "3",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Abstract geometric patterns",
   },
   {
@@ -43,7 +43,7 @@ const exploreExamples = [
     id: "5",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Serene lake reflection",
   },
   {
@@ -57,7 +57,7 @@ const exploreExamples = [
     id: "7",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Starry night sky",
   },
   {
@@ -71,7 +71,7 @@ const exploreExamples = [
     id: "9",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Desert landscape",
   },
   {
@@ -85,7 +85,7 @@ const exploreExamples = [
     id: "11",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Modern architecture",
   },
   {
@@ -99,7 +99,7 @@ const exploreExamples = [
     id: "13",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Misty mountain range at dawn",
   },
   {
@@ -113,7 +113,7 @@ const exploreExamples = [
     id: "15",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1511593358241-7eea1f3c84e5?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Vibrant city lights at night",
   },
   {
@@ -127,7 +127,7 @@ const exploreExamples = [
     id: "17",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Ancient forest with sunlight rays",
   },
   {
@@ -141,7 +141,7 @@ const exploreExamples = [
     id: "19",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Abstract watercolor painting",
   },
   {
@@ -155,7 +155,7 @@ const exploreExamples = [
     id: "21",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Peaceful countryside landscape",
   },
   {
@@ -169,7 +169,7 @@ const exploreExamples = [
     id: "23",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Tropical paradise beach",
   },
   {
@@ -183,7 +183,7 @@ const exploreExamples = [
     id: "25",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Minimalist modern design",
   },
   {
@@ -197,7 +197,7 @@ const exploreExamples = [
     id: "27",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&h=1200&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Cosmic nebula and stars",
   },
   {
@@ -211,7 +211,7 @@ const exploreExamples = [
     id: "29",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Zen garden meditation",
   },
   {
@@ -225,7 +225,7 @@ const exploreExamples = [
     id: "31",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&h=1000&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Cyberpunk neon cityscape",
   },
   {
@@ -239,7 +239,7 @@ const exploreExamples = [
     id: "33",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Vintage film photography style",
   },
   {
@@ -253,7 +253,7 @@ const exploreExamples = [
     id: "35",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Underwater coral reef",
   },
   {
@@ -267,7 +267,7 @@ const exploreExamples = [
     id: "37",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&h=1200&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Steampunk mechanical design",
   },
   {
@@ -281,7 +281,7 @@ const exploreExamples = [
     id: "39",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Nordic aurora borealis",
   },
   {
@@ -295,7 +295,7 @@ const exploreExamples = [
     id: "41",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1511593358241-7eea1f3c84e5?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Japanese cherry blossoms",
   },
   {
@@ -309,7 +309,7 @@ const exploreExamples = [
     id: "43",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=1000&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Minimalist Scandinavian interior",
   },
   {
@@ -323,7 +323,7 @@ const exploreExamples = [
     id: "45",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Retro 80s synthwave aesthetic",
   },
   {
@@ -337,7 +337,7 @@ const exploreExamples = [
     id: "47",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Medieval castle architecture",
   },
   {
@@ -351,7 +351,7 @@ const exploreExamples = [
     id: "49",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=1200&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Bioluminescent deep sea",
   },
   {
@@ -365,7 +365,7 @@ const exploreExamples = [
     id: "51",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Art deco geometric patterns",
   },
   {
@@ -379,7 +379,7 @@ const exploreExamples = [
     id: "53",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&h=1000&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Futuristic space station",
   },
   {
@@ -393,7 +393,7 @@ const exploreExamples = [
     id: "55",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=800&h=800&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Impressionist painting style",
   },
   {
@@ -407,7 +407,7 @@ const exploreExamples = [
     id: "57",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&h=600&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Neon-lit Tokyo streets",
   },
   {
@@ -421,7 +421,7 @@ const exploreExamples = [
     id: "59",
     type: "image" as const,
     url: "https://images.unsplash.com/photo-1511593358241-7eea1f3c84e5?w=800&h=1200&fit=crop",
-    model: "Nano Banana",
+    model: "GPT Image 2",
     prompt: "Victorian era architecture",
   },
   {

@@ -5,25 +5,18 @@ import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
 import { ResultPanel } from "@/components/creation/result-panel";
-import { useSession, signIn } from "next-auth/react";
-import { Button } from "@/components/ui/button";
-import { UserMenu } from "@/components/layout/user-menu";
-import { CreditsWidget } from "@/components/creation/credits-widget";
-import { Logo } from "@/components/ui/logo";
-import Link from "next/link";
-import { trackEvent } from "@/lib/analytics";
+import type { PanelGeneration } from "@/components/creation/result-panel";
 
 export function CreateContent({ mode }: { mode: "video" }) {
-  const { data: session } = useSession();
   const searchParams = useSearchParams();
 
   // Video state
-  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [currentTaskId, setCurrentTaskId] = useState<string | undefined>(undefined);
-  const [currentPrompt, setCurrentPrompt] = useState<string | undefined>(undefined);
+  const [videoGenerations, setVideoGenerations] = useState<PanelGeneration[]>([]);
   const [similarPrompt, setSimilarPrompt] = useState<string | undefined>(undefined);
   const [similarImage, setSimilarImage] = useState<string | undefined>(undefined);
+  const activeVideoGenerationCount = videoGenerations.filter(
+    (generation) => generation.isGenerating && !generation.url && !generation.error
+  ).length;
 
   // Sync initial prompt/image from URL (?prompt=... & ?image=...)
   useEffect(() => {
@@ -39,55 +32,70 @@ export function CreateContent({ mode }: { mode: "video" }) {
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-[#FDFDF9]">
-        {/* Top Bar with Logo and User Info - Full width, above sidebar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-8 py-2">
-          <Link href="/" className="flex-shrink-0">
-            <Logo size="md" />
-          </Link>
-          <div>
-            {session ? (
-              <div className="flex items-center gap-2">
-                <CreditsWidget />
-                <UserMenu
-                  user={{
-                    name: session.user?.name,
-                    email: session.user?.email,
-                    image: session.user?.image,
-                  }}
-                />
-              </div>
-            ) : (
-              <Button
-                onClick={() => {
-                  trackEvent("signup_started", { source: "ai_video_topbar" });
-                  signIn("google");
-                }}
-                className="rounded-xl border-0 bg-stone-800 px-4 py-1.5 text-sm text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]"
-                size="sm"
-              >
-                Start Free Now
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Content area with left margin for sidebar */}
-        <div className="ml-16 flex h-[calc(100vh-73px)]">
+      <main className="ml-[60px] flex-1 overflow-y-auto bg-[#FDFDF9]">
+        <div className="flex h-screen">
           {/* Left: Creation Form */}
           <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-stone-200/50 bg-[#FDFDF9] p-8">
             <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">
               AI Video
             </h1>
             <VideoCreationForm
-              onGenerate={(url, taskId, prompt) => {
-                setGeneratedVideo(url);
-                if (taskId) setCurrentTaskId(taskId);
-                if (prompt) setCurrentPrompt(prompt);
+              onGenerationStart={({ optimisticId, prompt }) => {
+                setVideoGenerations((prev) => [
+                  {
+                    url: null,
+                    isGenerating: true,
+                    optimisticId,
+                    prompt,
+                  },
+                  ...prev,
+                ]);
               }}
-              isGenerating={isGeneratingVideo}
-              setIsGenerating={setIsGeneratingVideo}
-              onTaskIdChange={setCurrentTaskId}
+              onGenerate={(url, taskId, prompt, optimisticId) => {
+                setVideoGenerations((prev) =>
+                  prev.map((generation) =>
+                    generation.optimisticId === optimisticId
+                      ? {
+                          ...generation,
+                          url,
+                          isGenerating: false,
+                          taskId,
+                          prompt: prompt || generation.prompt,
+                          error: undefined,
+                        }
+                      : generation
+                  )
+                );
+              }}
+              onGenerationTaskCreated={({ optimisticId, taskId, prompt }) => {
+                setVideoGenerations((prev) =>
+                  prev.map((generation) =>
+                    generation.optimisticId === optimisticId
+                      ? {
+                          ...generation,
+                          taskId,
+                          prompt: prompt || generation.prompt,
+                        }
+                      : generation
+                  )
+                );
+              }}
+              onGenerationFailure={({ optimisticId, prompt, error }) => {
+                setVideoGenerations((prev) =>
+                  prev.map((generation) =>
+                    generation.optimisticId === optimisticId
+                      ? {
+                          ...generation,
+                          url: null,
+                          isGenerating: false,
+                          prompt,
+                          error,
+                        }
+                      : generation
+                  )
+                );
+              }}
+              activeGenerationCount={activeVideoGenerationCount}
               initialPrompt={similarPrompt}
               initialImage={similarImage}
             />
@@ -97,12 +105,7 @@ export function CreateContent({ mode }: { mode: "video" }) {
           <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
             <ResultPanel
               mode="video"
-              currentGeneration={{
-                url: generatedVideo,
-                isGenerating: isGeneratingVideo,
-                taskId: currentTaskId,
-                prompt: currentPrompt,
-              }}
+              currentGenerations={videoGenerations}
               onGenerateSimilar={(data) => {
                 setSimilarPrompt(data.prompt);
                 setSimilarImage(data.imageUrl);

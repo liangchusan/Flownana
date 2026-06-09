@@ -62,17 +62,20 @@ model ProcessedStripeEvent {
 }
 
 model Generation {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String
-  status    String
-  urls      String[] @default([])
-  prompt    String
-  taskId    String?  @unique
-  error     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  status            String
+  urls              String[] @default([])
+  prompt            String
+  taskId            String?  @unique
+  error             String?
+  modelOptionId     String?
+  creditsCost       Int?
+  creditConsumption Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])

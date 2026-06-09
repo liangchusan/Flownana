@@ -12,9 +12,11 @@ interface UserMenuProps {
     email?: string | null;
     image?: string | null;
   };
+  align?: "left" | "right";
+  compact?: boolean;
 }
 
-export function UserMenu({ user }: UserMenuProps) {
+export function UserMenu({ user, align = "right", compact = false }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -38,25 +40,38 @@ export function UserMenu({ user }: UserMenuProps) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 transition-all duration-300 hover:opacity-80 active:scale-[0.98]"
+        className={`flex items-center transition-all duration-300 hover:opacity-80 active:scale-[0.98] ${
+          compact ? "justify-center" : "space-x-2"
+        }`}
+        aria-label="Open account menu"
       >
-        {user.image && (
+        {user.image ? (
           <img
             src={user.image}
             alt={user.name || "User"}
             className="h-8 w-8 rounded-full"
           />
+        ) : (
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-800 text-xs font-semibold text-white">
+            {(user.name || user.email || "U").charAt(0).toUpperCase()}
+          </span>
         )}
-        {user.name && (
+        {user.name && !compact && (
           <span className="hidden text-sm text-stone-700 sm:inline">
             {user.name}
           </span>
         )}
-        <ChevronDown className="hidden h-4 w-4 text-stone-500 sm:inline" />
+        {!compact && <ChevronDown className="hidden h-4 w-4 text-stone-500 sm:inline" />}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-stone-200/50 bg-white py-2 shadow-lg">
+        <div
+          className={`absolute z-50 w-64 rounded-xl border border-stone-200/50 bg-white py-2 shadow-lg shadow-stone-200/20 ${
+            align === "left"
+              ? "bottom-0 left-[calc(100%+0.75rem)]"
+              : "right-0 top-full mt-2"
+          }`}
+        >
           <div className="border-b border-stone-200/50 px-4 py-3">
             {user.name && (
               <p className="text-sm font-semibold text-stone-900">{user.name}</p>
@@ -91,4 +106,3 @@ export function UserMenu({ user }: UserMenuProps) {
     </div>
   );
 }
-

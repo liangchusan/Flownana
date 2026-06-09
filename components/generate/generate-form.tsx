@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronDown, Upload, X, Loader2 } from "lucide-react";
 import axios from "axios";
 import {
-  IMAGE_RESOLUTION_CREDITS,
+  IMAGE_MODEL_OPTIONS,
+  getImageGenerationCredits,
+  type ImageModelOptionId,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
 import { trackEvent } from "@/lib/analytics";
+import { useToast } from "@/components/blocks/app-toast-provider";
 
 const MODEL_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
@@ -33,9 +36,10 @@ export function GenerateForm({
   initialPrompt,
   initialImage,
 }: GenerateFormProps) {
+  const { showToast } = useToast();
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
-  const [model, setModel] = useState("nano-banana-2");
+  const [model, setModel] = useState<ImageModelOptionId>("gpt-image-2");
   const [resolution, setResolution] = useState<ImageResolutionKey>("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
 
@@ -47,15 +51,30 @@ export function GenerateForm({
   const optionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const optionsPopupRef = useRef<HTMLDivElement | null>(null);
 
-  const imageModels = useMemo(
-    () => [{ id: "nano-banana-2", label: "Nano Banana 2" }],
-    []
+  const imageModels = useMemo(() => IMAGE_MODEL_OPTIONS, []);
+  const ratioOptions = useMemo(
+    () =>
+      ["auto", "9:16", "16:9", "1:1", "3:4", "4:3"].filter((ratio) => {
+        if (model === "gpt-image-2" && ratio === "auto") {
+          return resolution === "1K";
+        }
+        if (model === "gpt-image-2" && resolution === "4K" && ratio === "1:1") {
+          return false;
+        }
+        return true;
+      }),
+    [model, resolution]
   );
-  const ratioOptions = useMemo(() => ["1:1", "16:9", "9:16", "4:3", "3:4"], []);
   const resolutionOptions = useMemo(() => ["1K", "2K", "4K"] as ImageResolutionKey[], []);
+  const creditsCost = getImageGenerationCredits(model, resolution);
 
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
   useEffect(() => { if (initialImage !== undefined) setUploadedImage(initialImage); }, [initialImage]);
+  useEffect(() => {
+    if (!ratioOptions.includes(aspectRatio)) {
+      setAspectRatio(ratioOptions[0] || "1:1");
+    }
+  }, [aspectRatio, ratioOptions]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -92,20 +111,32 @@ export function GenerateForm({
   });
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) { alert("Please enter a prompt"); return; }
+    if (!prompt.trim()) {
+      showToast({
+        title: "Prompt required",
+        message: "Please enter a prompt",
+        variant: "warning",
+      });
+      return;
+    }
     setIsGenerating(true);
     trackEvent("generation_started", {
       type: "image",
       model,
       resolution,
       aspect_ratio: aspectRatio,
-      credits_cost: IMAGE_RESOLUTION_CREDITS[resolution],
+      credits_cost: creditsCost,
       mode: uploadedImage ? "image-to-image" : "text-to-image",
     });
     try {
       const mode = uploadedImage ? "image-to-image" : "text-to-image";
       const response = await axios.post("/api/generate", {
-        prompt, imageUrl: uploadedImage, mode, model, resolution, aspectRatio,
+        prompt,
+        imageUrl: uploadedImage,
+        mode,
+        model,
+        resolution,
+        aspectRatio,
       });
       if (response.data.success) {
         const taskId = response.data.taskId;
@@ -115,7 +146,7 @@ export function GenerateForm({
           model,
           resolution,
           aspect_ratio: aspectRatio,
-          credits_cost: response.data.creditsCost || IMAGE_RESOLUTION_CREDITS[resolution],
+          credits_cost: response.data.creditsCost || creditsCost,
         });
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
         onGenerate(response.data.imageUrl, taskId, responsePrompt);
@@ -125,7 +156,11 @@ export function GenerateForm({
           model,
           error: "unknown",
         });
-        alert("Generation failed, please try again");
+        showToast({
+          title: "Generation failed",
+          message: "Generation failed, please try again",
+          variant: "error",
+        });
       }
     } catch (error: any) {
       const message = error.response?.data?.error || error.message || "Generation failed, please try again";
@@ -141,7 +176,11 @@ export function GenerateForm({
         model,
         error: message,
       });
-      alert(message);
+      showToast({
+        title: "Generation failed",
+        message,
+        variant: "error",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -285,7 +324,7 @@ export function GenerateForm({
         </Button>
 
         <p className="text-xs text-stone-600">
-          This generation will cost {IMAGE_RESOLUTION_CREDITS[resolution]} credits.
+          This generation will cost {creditsCost} credits.
         </p>
       </div>
     </div>

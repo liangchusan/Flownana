@@ -330,11 +330,11 @@ export default function Home() {
                     </div>
                     <h3 className="text-2xl md:text-3xl font-bold mb-2">AI Image</h3>
                     <p className="text-purple-100/90 text-base md:text-lg">
-                      Generate stunning visuals instantly. Powered by Nano Banana
+                      Generate stunning visuals instantly. Powered by GPT Image 2
                     </p>
                   </div>
                   <div className="flex items-center text-white/95 font-medium">
-                    Try Nano Banana
+                    Try GPT Image 2
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
                   </div>
                 </div>
