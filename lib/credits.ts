@@ -29,25 +29,25 @@ export async function getCreditSummary(userId: string): Promise<{
   expiringInDays: number | null;
 }> {
   const now = new Date();
-  const batches = await prisma.creditBatch.findMany({
-    where: {
-      userId,
-      remaining: { gt: 0 },
-      expiresAt: { gt: now },
-    },
-    orderBy: { expiresAt: "asc" },
-  });
+  const activeWhere = {
+    userId,
+    remaining: { gt: 0 },
+    expiresAt: { gt: now },
+  };
 
-  // Sum credits with a plain loop to avoid any TypeScript inference quirks
-  // across different build environments.
-  let total = 0;
-  for (const b of batches) {
-    total += b.remaining;
-  }
+  const [totalResult, soon] = await Promise.all([
+    prisma.creditBatch.aggregate({
+      where: activeWhere,
+      _sum: { remaining: true },
+    }),
+    prisma.creditBatch.findFirst({
+      where: activeWhere,
+      orderBy: { expiresAt: "asc" },
+    }),
+  ]);
 
-  const soon = batches[0];
   if (!soon) {
-    return { total: 0, expiringSoon: 0, expiringInDays: null };
+    return { total: totalResult._sum.remaining ?? 0, expiringSoon: 0, expiringInDays: null };
   }
 
   const days = Math.ceil(
@@ -55,7 +55,7 @@ export async function getCreditSummary(userId: string): Promise<{
   );
 
   return {
-    total,
+    total: totalResult._sum.remaining ?? 0,
     expiringSoon: soon.remaining,
     expiringInDays: days,
   };
