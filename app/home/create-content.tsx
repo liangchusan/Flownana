@@ -186,13 +186,17 @@ function formatCreationDate(value: string): string {
   }).format(date);
 }
 
-export function CreateContent() {
+export function CreateContent({
+  initialRecentCreations = [],
+}: {
+  initialRecentCreations?: Creation[];
+}) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [creationMode, setCreationMode] = useState<CreationType>("image");
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [recentCreations, setRecentCreations] = useState<Creation[]>([]);
+  const [recentCreations, setRecentCreations] = useState<Creation[]>(initialRecentCreations);
   const [isLoadingCreations, setIsLoadingCreations] = useState(false);
   const bannerScrollRef = useRef<HTMLDivElement | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -267,8 +271,9 @@ export function CreateContent() {
 
     let cancelled = false;
     const localCreations = readLocalCreations();
-    setRecentCreations(localCreations.slice(0, 8));
-    setIsLoadingCreations(true);
+    const seededCreations = mergeCreations(initialRecentCreations, localCreations).slice(0, 8);
+    setRecentCreations(seededCreations);
+    setIsLoadingCreations(seededCreations.length === 0);
 
     fetch("/api/creations")
       .then((res) => (res.ok ? res.json() : null))
@@ -279,7 +284,7 @@ export function CreateContent() {
               .map((item: unknown) => normalizeCreation(item))
               .filter((item: Creation | null): item is Creation => !!item)
           : [];
-        setRecentCreations(mergeCreations(fromApi, localCreations).slice(0, 8));
+        setRecentCreations(mergeCreations(fromApi, seededCreations).slice(0, 8));
       })
       .catch((error) => {
         console.error("Error fetching recent creations:", error);
@@ -291,7 +296,7 @@ export function CreateContent() {
     return () => {
       cancelled = true;
     };
-  }, [session, sessionStatus]);
+  }, [session, sessionStatus, initialRecentCreations]);
 
   const handleStartCreating = () => {
     const trimmed = prompt.trim();

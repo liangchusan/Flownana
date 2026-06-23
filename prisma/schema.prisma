@@ -78,5 +78,6 @@ model Generation {
   updatedAt         DateTime @updatedAt
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, type, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
 }

@@ -5,8 +5,15 @@ import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { ResultPanel } from "@/components/creation/result-panel";
+import type { CreationHistoryItem } from "@/lib/creation-history";
 
-export function CreateContent({ mode }: { mode: "image" }) {
+export function CreateContent({
+  mode,
+  initialCreations = [],
+}: {
+  mode: "image";
+  initialCreations?: CreationHistoryItem[];
+}) {
   const searchParams = useSearchParams();
 
   // Image state
@@ -56,6 +63,7 @@ export function CreateContent({ mode }: { mode: "image" }) {
           <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
             <ResultPanel
               mode="image"
+              initialCreations={initialCreations}
               currentGeneration={{
                 url: generatedImage,
                 isGenerating: isGeneratingImage,

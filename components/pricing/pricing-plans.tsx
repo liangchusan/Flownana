@@ -9,6 +9,7 @@ import { UpgradeModal } from "@/components/billing/upgrade-modal";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { trackEvent } from "@/lib/analytics";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
+import { fetchBillingSummary } from "@/lib/billing-summary-client";
 
 const SHARED_FEATURES = [
   "Access to top-quality video models",
@@ -72,8 +73,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       setSummary(null);
       return;
     }
-    fetch("/api/billing/summary")
-      .then((r) => r.json())
+    fetchBillingSummary()
       .then(setSummary)
       .catch(() => setSummary(null));
   }, [session]);

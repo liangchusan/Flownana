@@ -6,8 +6,15 @@ import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
 import { ResultPanel } from "@/components/creation/result-panel";
 import type { PanelGeneration } from "@/components/creation/result-panel";
+import type { CreationHistoryItem } from "@/lib/creation-history";
 
-export function CreateContent({ mode }: { mode: "video" }) {
+export function CreateContent({
+  mode,
+  initialCreations = [],
+}: {
+  mode: "video";
+  initialCreations?: CreationHistoryItem[];
+}) {
   const searchParams = useSearchParams();
 
   // Video state
@@ -105,6 +112,7 @@ export function CreateContent({ mode }: { mode: "video" }) {
           <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
             <ResultPanel
               mode="video"
+              initialCreations={initialCreations}
               currentGenerations={videoGenerations}
               onGenerateSimilar={(data) => {
                 setSimilarPrompt(data.prompt);

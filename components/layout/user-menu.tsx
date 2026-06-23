@@ -16,8 +16,12 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  fetchBillingSummary,
+  type ClientBillingSummary,
+} from "@/lib/billing-summary-client";
 
-type BillingSummary = {
+type BillingSummary = ClientBillingSummary & {
   subscription: {
     planType: string;
     billingCycle: string;
@@ -77,8 +81,7 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
     if (!isOpen || summary || summaryLoading) return;
 
     setSummaryLoading(true);
-    fetch("/api/billing/summary")
-      .then((r) => (r.ok ? r.json() : null))
+    fetchBillingSummary()
       .then((data) => setSummary(data))
       .catch(() => setSummary(null))
       .finally(() => setSummaryLoading(false));

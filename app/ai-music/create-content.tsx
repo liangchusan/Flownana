@@ -5,8 +5,15 @@ import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
 import { ResultPanel } from "@/components/creation/result-panel";
+import type { CreationHistoryItem } from "@/lib/creation-history";
 
-export function CreateContent({ mode }: { mode: "voice" }) {
+export function CreateContent({
+  mode,
+  initialCreations = [],
+}: {
+  mode: "voice";
+  initialCreations?: CreationHistoryItem[];
+}) {
   const searchParams = useSearchParams();
   
   // Voice state
@@ -53,6 +60,7 @@ export function CreateContent({ mode }: { mode: "voice" }) {
           <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
             <ResultPanel
               mode="music"
+              initialCreations={initialCreations}
               currentGeneration={{
                 url: generatedAudio,
                 isGenerating: isGeneratingVoice,

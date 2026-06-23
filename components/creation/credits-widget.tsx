@@ -4,8 +4,14 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { AlertCircle, Zap } from "lucide-react";
+import {
+  clearCachedBillingSummary,
+  fetchBillingSummary,
+  getCachedBillingSummary,
+  type ClientBillingSummary,
+} from "@/lib/billing-summary-client";
 
-type Summary = {
+type Summary = ClientBillingSummary & {
   subscription: {
     planType: string;
     billingCycle: string;
@@ -17,40 +23,6 @@ type Summary = {
     expiringInDays: number | null;
   };
 };
-
-const SUMMARY_CACHE_TTL_MS = 60_000;
-const SUMMARY_STORAGE_KEY = "flownana_billing_summary_cache_v1";
-let summaryCache: Summary | null = null;
-let summaryCacheAt = 0;
-
-function readPersistedSummary(): { summary: Summary | null; cachedAt: number } {
-  if (typeof window === "undefined") {
-    return { summary: null, cachedAt: 0 };
-  }
-  try {
-    const raw = window.localStorage.getItem(SUMMARY_STORAGE_KEY);
-    if (!raw) return { summary: null, cachedAt: 0 };
-    const parsed = JSON.parse(raw) as { summary?: Summary; cachedAt?: number };
-    return {
-      summary: parsed.summary ?? null,
-      cachedAt: parsed.cachedAt ?? 0,
-    };
-  } catch {
-    return { summary: null, cachedAt: 0 };
-  }
-}
-
-function persistSummary(summary: Summary | null, cachedAt: number) {
-  if (typeof window === "undefined") return;
-  if (!summary) {
-    window.localStorage.removeItem(SUMMARY_STORAGE_KEY);
-    return;
-  }
-  window.localStorage.setItem(
-    SUMMARY_STORAGE_KEY,
-    JSON.stringify({ summary, cachedAt })
-  );
-}
 
 const PLAN_LABEL: Record<string, string> = {
   free: "Free",
@@ -67,48 +39,39 @@ const PLAN_COLOR: Record<string, string> = {
 export function CreditsWidget({ variant = "default" }: { variant?: "default" | "sidebar" }) {
   const { data: session, status } = useSession();
   const [summary, setSummary] = useState<Summary | null>(() => {
-    if (summaryCache) return summaryCache;
-    const persisted = readPersistedSummary();
-    if (!persisted.summary) return null;
-    summaryCache = persisted.summary;
-    summaryCacheAt = persisted.cachedAt;
-    return persisted.summary;
+    return getCachedBillingSummary() as Summary | null;
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       setSummary(null);
-      summaryCache = null;
-      summaryCacheAt = 0;
-      persistSummary(null, 0);
+      clearCachedBillingSummary();
       return;
     }
     if (status !== "authenticated") return;
 
-    const hasFreshCache =
-      summaryCache && Date.now() - summaryCacheAt < SUMMARY_CACHE_TTL_MS;
-    if (hasFreshCache) {
-      setSummary(summaryCache);
-    } else if (!summaryCache) {
+    const cached = getCachedBillingSummary() as Summary | null;
+    if (cached) {
+      setSummary(cached);
+      return;
+    }
+
+    if (!summary) {
       setLoading(true);
     }
 
-    fetch("/api/billing/summary")
-      .then((r) => (r.ok ? r.json() : null))
+    fetchBillingSummary()
       .then((d) => {
-        setSummary(d);
-        summaryCache = d;
-        summaryCacheAt = Date.now();
-        persistSummary(d, summaryCacheAt);
+        setSummary(d as Summary | null);
       })
       .catch(() => {
-        if (!summaryCache) {
+        if (!getCachedBillingSummary()) {
           setSummary(null);
         }
       })
       .finally(() => setLoading(false));
-  }, [status]);
+  }, [status, summary]);
 
   if ((status === "loading" || loading) && !summary) {
     if (variant === "sidebar") {

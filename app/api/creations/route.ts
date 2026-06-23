@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
+import { getCreationHistory, type CreationType } from "@/lib/creations";
 
 export async function GET(request: Request) {
   try {
@@ -12,25 +13,13 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
-    const where =
+    const creationType =
       type === "image" || type === "video" || type === "music"
-        ? { userId: session.user.id, type }
-        : { userId: session.user.id };
-
-    const creations = await prisma.generation.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        type: true,
-        status: true,
-        urls: true,
-        prompt: true,
-        createdAt: true,
-        taskId: true,
-        error: true,
-      },
+        ? (type as CreationType)
+        : undefined;
+    const creations = await getCreationHistory({
+      userId: session.user.id,
+      type: creationType,
     });
 
     return NextResponse.json({ success: true, creations });

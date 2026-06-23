@@ -95,6 +95,7 @@ function normalizeCreation(raw: unknown): Creation | null {
 
 interface MyCreationsTabProps {
   mode: "video" | "image" | "music";
+  initialCreations?: Creation[];
   currentGeneration?: PanelGeneration;
   currentGenerations?: PanelGeneration[];
 }
@@ -146,12 +147,13 @@ function removeStoredCreation(
 
 export function MyCreationsTab({
   mode,
+  initialCreations = [],
   currentGeneration,
   currentGenerations,
 }: MyCreationsTabProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [creations, setCreations] = useState<Creation[]>([]);
+  const [creations, setCreations] = useState<Creation[]>(initialCreations);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
@@ -209,8 +211,9 @@ export function MyCreationsTab({
     };
 
     const localCreations = readLocal();
-    if (localCreations.length > 0) {
-      setCreations(localCreations);
+    const seededCreations = mergeCreations(initialCreations, localCreations);
+    if (seededCreations.length > 0) {
+      setCreations(seededCreations);
     }
 
     fetch(`/api/creations?type=${mode}`)
@@ -221,13 +224,13 @@ export function MyCreationsTab({
               .map((item: unknown) => normalizeCreation(item))
               .filter((item: Creation | null): item is Creation => !!item)
           : [];
-        const merged = mergeCreations(fromApi, localCreations);
+        const merged = mergeCreations(fromApi, seededCreations);
         setCreations(merged);
       })
       .catch((error) => {
         console.error("Error fetching creations:", error);
       });
-  }, [mode, session]);
+  }, [mode, session, initialCreations]);
 
   // 处理新的生成任务
   useEffect(() => {

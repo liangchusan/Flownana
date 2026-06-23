@@ -33,8 +33,9 @@ The broader brand message may include video / image / music, but current MVP pri
 - Google sign-in entry points pass the current path as `callbackUrl`; NextAuth redirects preserve same-origin callback URLs instead of forcing auth callbacks back to the homepage
 - Non-production environments support a `test-login` NextAuth credentials provider so QA can log in without Google OAuth. It is enabled in local development by default and can be enabled for Vercel preview/test with `ENABLE_TEST_AUTH=true` plus `NEXT_PUBLIC_ENABLE_TEST_AUTH=true`; it is disabled for Vercel production. Test login provisions `test@flownana.local` and a renewable `test-auth` credit batch.
 - creation pages treat NextAuth `loading` as a distinct state; refresh should not briefly show logged-out CTAs or switch logged-in users from My Creations to Explore while the session is resolving
+- `/home`, `/ai-image`, `/ai-video`, and `/ai-music` wrap their creation UI in a page-level `SessionBoundary` with the server session and server-preload the first creation history batch so My Creations does not wait for client session resolution before showing existing history
 - My Creations downloads use authenticated same-origin `/api/creations/download`; the API verifies the media URL belongs to the current user's generation before streaming it as an attachment
-- The user menu fetches `/api/billing/summary` when opened, displays email, plan, and remaining credits, and supports editing the user's display name through authenticated `PATCH /api/account/profile`; NextAuth `update()` refreshes the session name after a successful save.
+- Billing summary clients share a 60-second in-memory/localStorage cache and in-flight request dedupe for sidebar credits, pricing, and user menu. The user menu displays email, plan, and remaining credits, and supports editing the user's display name through authenticated `PATCH /api/account/profile`; NextAuth `update()` refreshes the session name after a successful save.
 - Video generation platform credits are calculated from the model's KIE API credits multiplied by 0.3 and rounded to the nearest integer unless a model has an explicitly documented exception. Kling 3.0 uses KIE per-second prices for std/pro and audio/no-audio variants. VEO 3.1 uses KIE base 720P generation prices because the app does not request 1080P or 4K upgrade endpoints.
 - VEO 3.1 video status polling uses KIE `/api/v1/veo/record-info` and parses `successFlag` plus `response.resultUrls`; the synchronous poll window is kept below Vercel's 300s timeout so failures can be persisted and consumed credits refunded.
 - Video generation no longer offers Bytedance Seedance 1.5 Pro; Seedance options use KIE `bytedance/seedance-2` and `bytedance/seedance-2-fast`. Seedance 2 duration supports every whole second from 4s through 15s. Platform credits for Seedance 2 options are calculated from KIE no-video-input API credits per second multiplied by duration and then by 0.3, rounded to the nearest integer.
@@ -62,6 +63,7 @@ Downgrades are disabled in code. UI shows a disabled button with note to use bil
 ## Schema
 - `Subscription.nextPlan` field removed (was unused); migration: 20260407000000_remove_next_plan
 - Production Supabase Prisma migration history was baselined on 2026-05-19 via Supabase migration `baseline_prisma_migration_history`; `_prisma_migrations` now records the four local Prisma migrations as applied.
+- Generation history has a composite index on `[userId, type, createdAt desc]` for typed My Creations queries; migration: 20260623000000_add_generation_user_type_created_at_index.
 
 ## MVP Scope (Current)
 Must support:

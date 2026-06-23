@@ -4,9 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { ExploreTab } from "./explore-tab";
 import { MyCreationsTab } from "./my-creations-tab";
+import type { CreationHistoryItem } from "@/lib/creation-history";
 
 interface ResultPanelProps {
   mode: "video" | "image" | "music";
+  initialCreations?: CreationHistoryItem[];
   currentGeneration?: PanelGeneration;
   currentGenerations?: PanelGeneration[];
   onGenerateSimilar?: (data: { prompt: string; imageUrl?: string }) => void;
@@ -23,6 +25,7 @@ export interface PanelGeneration {
 
 export function ResultPanel({
   mode,
+  initialCreations = [],
   currentGeneration,
   currentGenerations,
   onGenerateSimilar,
@@ -90,6 +93,7 @@ export function ResultPanel({
         ) : (
           <MyCreationsTab
             mode={mode}
+            initialCreations={initialCreations}
             currentGenerations={generationItems}
           />
         )}
