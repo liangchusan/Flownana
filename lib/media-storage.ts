@@ -45,6 +45,15 @@ function extensionFor(params: {
   );
 }
 
+function isExpectedContentType(kind: MediaKind, contentType: string | null) {
+  const normalizedContentType = contentType?.split(";")[0]?.toLowerCase();
+  if (!normalizedContentType) return true;
+
+  if (kind === "image") return normalizedContentType.startsWith("image/");
+  if (kind === "video") return normalizedContentType.startsWith("video/");
+  return normalizedContentType.startsWith("audio/");
+}
+
 function safePathSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 96) || "unknown";
 }
@@ -67,6 +76,12 @@ export async function persistGeneratedMedia(params: {
     }
 
     const contentType = response.headers.get("content-type");
+    if (!isExpectedContentType(params.kind, contentType)) {
+      throw new Error(
+        `Unexpected ${params.kind} content type while downloading generated media: ${contentType}`
+      );
+    }
+
     const extension = extensionFor({
       contentType,
       sourceUrl: params.sourceUrl,

@@ -40,3 +40,10 @@ export function getNextYearlyCreditAt(params: {
     ? null
     : nextCreditAt;
 }
+
+export function getYearlyCreditGrantKey(
+  subscriptionId: string,
+  dueDate: Date
+): string {
+  return `grant_yearly_${subscriptionId}_${dueDate.getTime()}`;
+}

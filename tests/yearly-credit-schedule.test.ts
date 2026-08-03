@@ -4,6 +4,7 @@ import {
   addMonthsClamped,
   getDueYearlyCreditGrantDates,
   getNextYearlyCreditAt,
+  getYearlyCreditGrantKey,
 } from "../lib/yearly-credit-schedule.ts";
 
 test("addMonthsClamped handles short months", () => {
@@ -37,5 +38,18 @@ test("getNextYearlyCreditAt returns null once period is exhausted", () => {
       currentPeriodEnd: new Date("2027-04-08T07:35:41.000Z"),
     }),
     null
+  );
+});
+
+test("getYearlyCreditGrantKey is stable per subscription and due date", () => {
+  const dueDate = new Date("2026-07-08T07:36:12.000Z");
+
+  assert.equal(
+    getYearlyCreditGrantKey("sub_123", dueDate),
+    `grant_yearly_sub_123_${dueDate.getTime()}`
+  );
+  assert.notEqual(
+    getYearlyCreditGrantKey("sub_456", dueDate),
+    getYearlyCreditGrantKey("sub_123", dueDate)
   );
 });

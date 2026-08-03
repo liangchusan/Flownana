@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { grantCredits } from "@/lib/credits";
-import type { PlanKey } from "@/lib/plans";
+import { PLAN_CREDITS, type PlanKey } from "@/lib/plans";
 import {
   getDueYearlyCreditGrantDates,
   getNextYearlyCreditAt,
+  getYearlyCreditGrantKey,
 } from "@/lib/yearly-credit-schedule";
 
 export const dynamic = "force-dynamic";
+const MS_PER_DAY = 86_400_000;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 /**
  * Yearly plans: grant months 2–12 (month 1 is handled by invoice.paid).
@@ -31,6 +40,7 @@ export async function GET(request: Request) {
   });
 
   let granted = 0;
+  let duplicates = 0;
   const failed: string[] = [];
 
   for (const sub of subs) {
@@ -41,31 +51,51 @@ export async function GET(request: Request) {
     });
     if (dueDates.length === 0) continue;
 
-    try {
-      for (const dueDate of dueDates) {
-        await grantCredits({
-          userId: sub.userId,
-          planType: sub.planType as PlanKey,
-          source: "yearly_monthly_cron",
+    for (const dueDate of dueDates) {
+      const grantKey = getYearlyCreditGrantKey(sub.id, dueDate);
+      const nextCreditAt = getNextYearlyCreditAt({
+        lastDueCreditAt: dueDate,
+        currentPeriodEnd: sub.currentPeriodEnd,
+      });
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.processedStripeEvent.create({
+            data: { id: grantKey, type: "yearly_monthly_credit_grant" },
+          });
+
+          const amount = PLAN_CREDITS[sub.planType as PlanKey];
+          await tx.creditBatch.create({
+            data: {
+              userId: sub.userId,
+              amount,
+              remaining: amount,
+              expiresAt: new Date(Date.now() + 30 * MS_PER_DAY),
+              source: "yearly_monthly_cron",
+            },
+          });
+
+          await tx.subscription.update({
+            where: { id: sub.id },
+            data: { nextCreditAt },
+          });
         });
         granted += 1;
-      }
+      } catch (err) {
+        if (isUniqueConstraintError(err)) {
+          duplicates += 1;
+          continue;
+        }
 
-      await prisma.subscription.update({
-        where: { id: sub.id },
-        data: {
-          nextCreditAt: getNextYearlyCreditAt({
-            lastDueCreditAt: dueDates[dueDates.length - 1],
-            currentPeriodEnd: sub.currentPeriodEnd,
-          }),
-        },
-      });
-    } catch (err) {
-      // Grant failed: leave nextCreditAt unchanged so the next cron run retries.
-      console.error(`[cron/monthly-credits] Failed to grant for sub ${sub.id}:`, err);
-      failed.push(sub.id);
+        console.error(
+          `[cron/monthly-credits] Failed to grant ${grantKey}:`,
+          err
+        );
+        failed.push(sub.id);
+        break;
+      }
     }
   }
 
-  return NextResponse.json({ ok: true, granted, failed });
+  return NextResponse.json({ ok: true, granted, duplicates, failed });
 }

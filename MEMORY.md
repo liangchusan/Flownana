@@ -26,6 +26,7 @@ The broader brand message may include video / image / music, but current MVP pri
 - subscriptions and credit batches exist in the data model
 - Stripe event deduplication exists in the data model
 - new generated image/video/music media is downloaded server-side and uploaded to Vercel Blob before saving `Generation.urls`
+- generated media persistence validates provider download content type before Blob upload; My Creations ignores malformed media URLs and image cards refresh or mark expired instead of staying blank when media fails to load
 - Image generation offers both KIE GPT Image 2 and Nano Banana 2. GPT Image 2 uses `gpt-image-2-text-to-image` and `gpt-image-2-image-to-image` with platform credits 1K=2, 2K=3, 4K=5. Nano Banana 2 uses `nano-banana-2` with platform credits 1K=2, 2K=4, 4K=5. Platform image credits are calculated from KIE API credits multiplied by 0.3 and rounded. Both use KIE `/api/v1/jobs/createTask` and `/api/v1/jobs/recordInfo`. Image aspect ratio options are limited to `auto`, `9:16`, `16:9`, `1:1`, `3:4`, and `4:3`; GPT Image 2 still hides/rejects `auto` except at 1K and hides/rejects `1:1` at 4K.
 - older generation history may still contain external provider media URLs; UI attempts to refresh KIE media URLs via `/api/creations/media-url` when direct media loading fails
 - generation history display de-duplicates local optimistic items and persisted database rows by `taskId`
@@ -57,8 +58,14 @@ Downgrades are disabled in code. UI shows a disabled button with note to use bil
 ## Credit Issuance Rules
 - First month: granted via webhook `checkout.session.completed` or `invoice.paid`
 - Monthly plans: each month's invoice triggers `invoice.paid` → grant credits
-- Yearly plans month 2–12: Vercel Cron calls `/api/cron/monthly-credits` daily at 08:00 UTC with `CRON_SECRET`; catch-up loop grants all overdue months in one run if cron was delayed
+- Yearly plans month 2–12: Vercel Cron calls `/api/cron/monthly-credits` daily at 08:00 UTC with `CRON_SECRET`; catch-up loop grants all overdue months in one run if cron was delayed. Each due month uses a unique subscription-and-date grant key, and its dedupe record, credit batch, and `nextCreditAt` update commit in one transaction so retries cannot duplicate credits.
 - Each credit batch expires 30 days after grant; consumed FIFO by expiry
+
+## Stripe Subscription Sync Rules
+- `customer.subscription.created`, `updated`, `deleted`, `paused`, and `resumed` synchronize the local subscription record, including terminal cancellation state.
+- `invoice.payment_failed`, `invoice.payment_action_required`, and `invoice.finalization_failed` retrieve and synchronize the current Stripe subscription state without issuing credits.
+- During an upgrade, failure to cancel and synchronize the previous subscription fails the webhook so Stripe can retry; the failure is not silently accepted.
+- Payment-success query-string verification and GA4 `purchase_success` hardening are intentionally deferred until GA integration work.
 
 ## Schema
 - `Subscription.nextPlan` field removed (was unused); migration: 20260407000000_remove_next_plan

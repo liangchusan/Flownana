@@ -12,6 +12,7 @@ import {
   addMonths,
   upsertSubscriptionFromStripe,
 } from "@/lib/subscription-sync";
+import { getStripeStateSyncKind } from "@/lib/stripe-event-policy";
 
 export const dynamic = "force-dynamic";
 const MS_PER_DAY = 86_400_000;
@@ -74,6 +75,28 @@ async function resolveUserIdFromInvoice(
   }
 
   return null;
+}
+
+async function getSubscriptionContextFromInvoice(
+  stripe: ReturnType<typeof getStripe>,
+  invoice: Stripe.Invoice
+): Promise<{
+  sub: Stripe.Subscription;
+  userId: string;
+  priceId: string;
+} | null> {
+  const subscriptionId =
+    typeof invoice.subscription === "string"
+      ? invoice.subscription
+      : invoice.subscription?.id;
+  if (!subscriptionId) return null;
+
+  const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  const userId = await resolveUserIdFromInvoice(stripe, invoice, sub);
+  const priceId = sub.items.data[0]?.price?.id;
+  if (!userId || !priceId) return null;
+
+  return { sub, userId, priceId };
 }
 
 async function grantCreditsForCurrentPeriodIfNeeded(params: {
@@ -140,7 +163,34 @@ export async function POST(request: Request) {
   const stripe = getStripe();
 
   try {
-    switch (event.type) {
+    const stateSyncKind = getStripeStateSyncKind(event.type);
+
+    if (stateSyncKind === "subscription") {
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = await resolveUserId(stripe, sub);
+      if (!userId) {
+        console.warn("subscription event: could not resolve userId", sub.id);
+      } else {
+        const priceId = sub.items.data[0]?.price?.id;
+        if (priceId) {
+          await upsertSubscriptionFromStripe({
+            userId,
+            stripeSubscription: sub,
+            stripePriceId: priceId,
+          });
+        }
+      }
+    } else if (stateSyncKind === "invoice") {
+      const invoice = event.data.object as Stripe.Invoice;
+      const context = await getSubscriptionContextFromInvoice(stripe, invoice);
+      if (context) {
+        await upsertSubscriptionFromStripe({
+          userId: context.userId,
+          stripeSubscription: context.sub,
+          stripePriceId: context.priceId,
+        });
+      }
+    } else switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode !== "subscription") break;
@@ -184,21 +234,26 @@ export async function POST(request: Request) {
           upgradeFromSubId &&
           upgradeFromSubId !== sub.id
         ) {
-          try {
-            const canceled = await stripe.subscriptions.cancel(upgradeFromSubId, {
-              prorate: false,
-            });
-            const oldPriceId = canceled.items.data[0]?.price?.id;
-            if (oldPriceId) {
-              await upsertSubscriptionFromStripe({
-                userId,
-                stripeSubscription: canceled,
-                stripePriceId: oldPriceId,
-              });
-            }
-          } catch (cancelError) {
-            console.error("Failed to cancel previous subscription:", cancelError);
+          const previousSub = await stripe.subscriptions.retrieve(
+            upgradeFromSubId
+          );
+          const canceled =
+            previousSub.status === "canceled"
+              ? previousSub
+              : await stripe.subscriptions.cancel(upgradeFromSubId, {
+                  prorate: false,
+                });
+          const oldPriceId = canceled.items.data[0]?.price?.id;
+          if (!oldPriceId) {
+            throw new Error(
+              `Canceled subscription ${upgradeFromSubId} has no price`
+            );
           }
+          await upsertSubscriptionFromStripe({
+            userId,
+            stripeSubscription: canceled,
+            stripePriceId: oldPriceId,
+          });
         }
 
         if (
@@ -215,40 +270,13 @@ export async function POST(request: Request) {
         break;
       }
 
-      case "customer.subscription.updated":
-      case "customer.subscription.created": {
-        const sub = event.data.object as Stripe.Subscription;
-        const userId = await resolveUserId(stripe, sub);
-        if (!userId) {
-          console.warn("subscription event: could not resolve userId", sub.id);
-          break;
-        }
-        const priceId = sub.items.data[0]?.price?.id;
-        if (!priceId) break;
-        await upsertSubscriptionFromStripe({
-          userId,
-          stripeSubscription: sub,
-          stripePriceId: priceId,
-        });
-        break;
-      }
-
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId =
-          typeof invoice.subscription === "string"
-            ? invoice.subscription
-            : invoice.subscription?.id;
-        if (!subscriptionId) break;
+        const context = await getSubscriptionContextFromInvoice(stripe, invoice);
+        if (!context) break;
 
-        const sub = await stripe.subscriptions.retrieve(subscriptionId);
+        const { sub, userId, priceId } = context;
         if (sub.status !== "active" && sub.status !== "trialing") break;
-
-        const userId = await resolveUserIdFromInvoice(stripe, invoice, sub);
-        if (!userId) break;
-
-        const priceId = sub.items.data[0]?.price?.id;
-        if (!priceId) break;
 
         const parsed = getPriceKeyFromStripePriceId(priceId);
         if (!parsed) break;

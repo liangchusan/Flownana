@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Download, Trash2, RefreshCw, Loader2, Image as ImageIcon, Video, Music, X } from "lucide-react";
@@ -30,7 +30,18 @@ function isCreationStatus(value: unknown): value is CreationStatus {
 }
 
 function isValidMediaUrl(url: unknown): url is string {
-  return typeof url === "string" && url.trim().length > 0;
+  if (typeof url !== "string") return false;
+
+  const trimmed = url.trim();
+  if (trimmed.length === 0) return false;
+  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) return true;
+
+  try {
+    const protocol = new URL(trimmed).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function normalizeCreation(raw: unknown): Creation | null {
@@ -49,7 +60,9 @@ function normalizeCreation(raw: unknown): Creation | null {
   if (typeof candidate.id !== "string" || candidate.id.trim().length === 0) return null;
 
   const urlsFromArray = Array.isArray(candidate.urls)
-    ? candidate.urls.filter(isValidMediaUrl)
+    ? candidate.urls
+        .filter(isValidMediaUrl)
+        .map((url) => url.trim())
     : [];
   const urlsFromLegacy = [
     candidate.url,
@@ -58,7 +71,9 @@ function normalizeCreation(raw: unknown): Creation | null {
     candidate.audioUrl,
     candidate.outputUrl,
     candidate.resultUrl,
-  ].filter(isValidMediaUrl);
+  ]
+    .filter(isValidMediaUrl)
+    .map((url) => url.trim());
   const urls = [...urlsFromArray, ...urlsFromLegacy].filter(
     (url, index, list) => list.indexOf(url) === index
   );
@@ -143,6 +158,106 @@ function removeStoredCreation(
       console.error("Error removing stored creation:", error);
     }
   }
+}
+
+function CreationImagePreview({
+  creation,
+  displayUrl,
+  originalUrl,
+  hasMultiple,
+  mediaFailed,
+  isRefreshingMedia,
+  onToggleExpand,
+  onPreview,
+  onMediaError,
+}: {
+  creation: Creation;
+  displayUrl: string;
+  originalUrl: string;
+  hasMultiple: boolean;
+  mediaFailed: boolean;
+  isRefreshingMedia: boolean;
+  onToggleExpand: () => void;
+  onPreview: (url: string) => void;
+  onMediaError: (creation: Creation, originalUrl: string) => void;
+}) {
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    setIsLoaded(!!image && image.complete && image.naturalWidth > 0);
+  }, [displayUrl]);
+
+  useEffect(() => {
+    if (mediaFailed || isRefreshingMedia || isLoaded) return;
+
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth > 0) {
+      setIsLoaded(true);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      const currentImage = imageRef.current;
+      if (!currentImage || !currentImage.complete || currentImage.naturalWidth === 0) {
+        onMediaError(creation, originalUrl);
+      }
+    }, 12_000);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    creation,
+    displayUrl,
+    isLoaded,
+    isRefreshingMedia,
+    mediaFailed,
+    onMediaError,
+    originalUrl,
+  ]);
+
+  if (mediaFailed) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center bg-stone-100 px-3 text-center">
+        <ImageIcon className="h-8 w-8 text-stone-400" />
+        <p className="mt-2 text-[11px] text-stone-500">
+          Media expired
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <img
+        ref={imageRef}
+        src={displayUrl}
+        alt={creation.prompt}
+        className="w-full h-full object-cover cursor-pointer"
+        onClick={() => {
+          if (hasMultiple) {
+            onToggleExpand();
+          } else {
+            onPreview(displayUrl);
+          }
+        }}
+        onError={() => onMediaError(creation, originalUrl)}
+        onLoad={(event) => {
+          if (event.currentTarget.naturalWidth === 0) {
+            onMediaError(creation, originalUrl);
+            return;
+          }
+          setIsLoaded(true);
+        }}
+        loading="lazy"
+      />
+      {isRefreshingMedia && (
+        <div className="absolute inset-0 flex items-center justify-center bg-stone-100/80">
+          <Loader2 className="h-6 w-6 animate-spin text-stone-500" />
+        </div>
+      )}
+    </>
+  );
 }
 
 export function MyCreationsTab({
@@ -606,36 +721,17 @@ export function MyCreationsTab({
                 ) : displayUrl ? (
                   <>
                     {creation.type === "image" ? (
-                      mediaFailed ? (
-                        <div className="flex h-full w-full flex-col items-center justify-center bg-stone-100 px-3 text-center">
-                          <ImageIcon className="h-8 w-8 text-stone-400" />
-                          <p className="mt-2 text-[11px] text-stone-500">
-                            Media expired
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          <img
-                            src={displayUrl}
-                            alt={creation.prompt}
-                            className="w-full h-full object-cover cursor-pointer"
-                            onClick={() => {
-                              if (hasMultiple) {
-                                setExpandedTask(isExpanded ? null : key);
-                              } else {
-                                setSelectedImage(displayUrl);
-                              }
-                            }}
-                            onError={() => handleMediaError(creation, originalDisplayUrl)}
-                            loading="lazy"
-                          />
-                          {isRefreshingMedia && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-stone-100/80">
-                              <Loader2 className="h-6 w-6 animate-spin text-stone-500" />
-                            </div>
-                          )}
-                        </>
-                      )
+                      <CreationImagePreview
+                        creation={creation}
+                        displayUrl={displayUrl}
+                        originalUrl={originalDisplayUrl}
+                        hasMultiple={hasMultiple}
+                        mediaFailed={mediaFailed}
+                        isRefreshingMedia={isRefreshingMedia}
+                        onToggleExpand={() => setExpandedTask(isExpanded ? null : key)}
+                        onPreview={setSelectedImage}
+                        onMediaError={handleMediaError}
+                      />
                     ) : creation.type === "video" ? (
                       mediaFailed ? (
                         <div className="flex h-full w-full flex-col items-center justify-center bg-stone-100 px-3 text-center">
