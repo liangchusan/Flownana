@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
 
 type MediaKind = "image" | "video" | "music";
+const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   "image/png": "png",
@@ -58,6 +59,23 @@ function safePathSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 96) || "unknown";
 }
 
+function parseDataUrl(value: string): {
+  bytes: Buffer;
+  contentType: string;
+} | null {
+  const match = value.match(/^data:([^;,]+)(;base64)?,(.*)$/s);
+  if (!match) return null;
+
+  const contentType = match[1].toLowerCase();
+  const isBase64 = !!match[2];
+  const payload = match[3];
+  const bytes = isBase64
+    ? Buffer.from(payload, "base64")
+    : Buffer.from(decodeURIComponent(payload), "utf8");
+
+  return { bytes, contentType };
+}
+
 export async function persistGeneratedMedia(params: {
   sourceUrl: string;
   userId: string;
@@ -65,8 +83,7 @@ export async function persistGeneratedMedia(params: {
   kind: MediaKind;
 }): Promise<string> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error("BLOB_READ_WRITE_TOKEN is not configured; using provider URL.");
-    return params.sourceUrl;
+    throw new Error("Generated media storage is not configured.");
   }
 
   try {
@@ -105,6 +122,92 @@ export async function persistGeneratedMedia(params: {
     return blob.url;
   } catch (error) {
     console.error("Failed to persist generated media to Vercel Blob:", error);
-    return params.sourceUrl;
+    throw new Error("Failed to persist generated media.");
   }
+}
+
+export async function persistImageInputMedia(params: {
+  source: string;
+  userId: string;
+  requestId: string;
+}): Promise<string> {
+  const source = params.source.trim();
+  if (!source) {
+    throw new Error("Input image is empty.");
+  }
+
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (source.startsWith("http://") || source.startsWith("https://")) {
+      return source;
+    }
+    throw new Error("Image upload storage is not configured.");
+  }
+
+  let body: Blob | ReadableStream<Uint8Array>;
+  let contentType: string | null = null;
+  let sourceForExtension = source;
+
+  const dataUrl = parseDataUrl(source);
+  if (dataUrl) {
+    if (dataUrl.bytes.byteLength > MAX_INPUT_IMAGE_BYTES) {
+      throw new Error("Input image exceeds the maximum file size of 20 MB.");
+    }
+    body = new Blob([new Uint8Array(dataUrl.bytes)], {
+      type: dataUrl.contentType,
+    });
+    contentType = dataUrl.contentType;
+    sourceForExtension = `input.${extensionFor({
+      contentType,
+      sourceUrl: "input.png",
+      kind: "image",
+    })}`;
+  } else {
+    let url: URL;
+    try {
+      url = new URL(source);
+    } catch {
+      throw new Error("Input image URL is invalid.");
+    }
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("Input image URL must be a public image URL.");
+    }
+
+    const response = await fetch(source);
+    if (!response.ok || !response.body) {
+      throw new Error(`Failed to download input image: ${response.status}`);
+    }
+
+    contentType = response.headers.get("content-type");
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > MAX_INPUT_IMAGE_BYTES) {
+      throw new Error("Input image exceeds the maximum file size of 20 MB.");
+    }
+    body = response.body;
+  }
+
+  if (!isExpectedContentType("image", contentType)) {
+    throw new Error(`Input image file type is not supported: ${contentType || "unknown"}`);
+  }
+
+  const extension = extensionFor({
+    contentType,
+    sourceUrl: sourceForExtension,
+    kind: "image",
+  });
+  const pathname = [
+    "generation-inputs",
+    safePathSegment(params.userId),
+    `${safePathSegment(params.requestId)}.${extension}`,
+  ].join("/");
+
+  const blob = await put(pathname, body, {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: contentType || undefined,
+    multipart: true,
+  });
+
+  return blob.url;
 }

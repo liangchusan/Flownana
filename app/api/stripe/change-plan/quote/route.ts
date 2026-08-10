@@ -5,19 +5,12 @@ import { getStripe } from "@/lib/stripe";
 import {
   getPriceKeyFromStripePriceId,
   getStripePriceId,
-  type PriceKey,
+  isPriceKey,
 } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { buildUpgradeQuote, isUpgradeAllowed } from "@/lib/upgrade-logic";
 
 export const dynamic = "force-dynamic";
-
-const VALID_KEYS: PriceKey[] = [
-  "pro_monthly",
-  "pro_yearly",
-  "max_monthly",
-  "max_yearly",
-];
 
 export async function GET(request: Request) {
   try {
@@ -27,8 +20,8 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const targetKey = url.searchParams.get("priceKey") as PriceKey | null;
-    if (!targetKey || !VALID_KEYS.includes(targetKey)) {
+    const targetKey = url.searchParams.get("priceKey");
+    if (!targetKey || !isPriceKey(targetKey)) {
       return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });
     }
 

@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 const faqs = [
   {
     question: "What is Flownana AI?",
-    answer: "Flownana is a comprehensive AI platform that provides advanced video, image, and voice generation capabilities. Powered by cutting-edge models like VEO 3.1, GPT Image 2, and Suno, it enables creators to generate professional content with simple text prompts.",
+    answer: "Flownana is a comprehensive AI platform that provides advanced video, image, and voice generation capabilities. Powered by cutting-edge models like Seedance 2 Fast, GPT Image 2, and Suno, it enables creators to generate professional content with simple text prompts.",
   },
   {
     question: "What image formats and resolutions are supported?",

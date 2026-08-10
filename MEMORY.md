@@ -12,7 +12,7 @@ The broader brand message may include video / image / music, but current MVP pri
 - NextAuth
 - Prisma + PostgreSQL
 - Stripe
-- KIE GPT Image 2 and Nano Banana 2 image generation APIs
+- KIE GPT Image 2, Nano Banana 2, and Qwen Image 3.0 Pro image generation APIs
 
 ## Current Core Routes
 - / : landing page
@@ -25,35 +25,56 @@ The broader brand message may include video / image / music, but current MVP pri
 - failed generation should refund consumed credits
 - subscriptions and credit batches exist in the data model
 - Stripe event deduplication exists in the data model
-- new generated image/video/music media is downloaded server-side and uploaded to Vercel Blob before saving `Generation.urls`
-- generated media persistence validates provider download content type before Blob upload; My Creations ignores malformed media URLs and image cards refresh or mark expired instead of staying blank when media fails to load
-- Image generation offers both KIE GPT Image 2 and Nano Banana 2. GPT Image 2 uses `gpt-image-2-text-to-image` and `gpt-image-2-image-to-image` with platform credits 1K=2, 2K=3, 4K=5. Nano Banana 2 uses `nano-banana-2` with platform credits 1K=2, 2K=4, 4K=5. Platform image credits are calculated from KIE API credits multiplied by 0.3 and rounded. Both use KIE `/api/v1/jobs/createTask` and `/api/v1/jobs/recordInfo`. Image aspect ratio options are limited to `auto`, `9:16`, `16:9`, `1:1`, `3:4`, and `4:3`; GPT Image 2 still hides/rejects `auto` except at 1K and hides/rejects `1:1` at 4K.
+- new generated image/video/music media is downloaded server-side and uploaded to Vercel Blob before saving `Generation.urls`; image-to-image and video image-to-video input media are also normalized server-side into a public Vercel Blob image URL before sending the task to KIE
+- generated media persistence validates provider download content type before Blob upload; My Creations ignores malformed media URLs, retries fresh Vercel Blob image URLs briefly before marking expired, and refreshes provider-hosted media URLs when direct media loading fails
+- Image and video generation failures use the shared catalog in `lib/generation-errors.ts`. Authentication, prompt/input validation, file format/size, invalid images, unsupported parameters, content policy, user-credit shortage, credit conflicts, provider balance/auth outages, rate limits, timeouts, network failures, media persistence, missing tasks, and unknown failures return stable error codes with a user-facing title, explanation, next action, retryability, and credit-refund status. Provider raw messages stay in server logs; Toasts and My Creations cards never expose provider balances, API credentials, or internal field names. The operational reference is `docs/generation-failure-handling.md`.
+- Image generation offers KIE GPT Image 2, Nano Banana 2, and Qwen Image 3.0 Pro. GPT Image 2 uses `gpt-image-2-text-to-image` and `gpt-image-2-image-to-image` with platform credits 1K=2, 2K=3, 4K=5. Nano Banana 2 uses `nano-banana-2` with platform credits 1K=2, 2K=4, 4K=5. Qwen Image 3.0 Pro uses `qwen3/pro-text-to-image` and `qwen3/pro-image-to-image` with platform credits 1K=2 and 2K=4; KIE also bills input images at 0.5 API credits per image, which does not change the rounded one-image platform credit total for the current single-image UI. Platform image credits are calculated from KIE API credits multiplied by 0.3 and rounded. All three use KIE `/api/v1/jobs/createTask` and `/api/v1/jobs/recordInfo`. Image aspect ratio options are limited to `auto`, `9:16`, `16:9`, `1:1`, `3:4`, and `4:3`; GPT Image 2 still hides/rejects `auto` except at 1K and hides/rejects `1:1` at 4K, while Qwen Image 3.0 Pro hides/rejects `auto` and only offers 1K/2K.
 - older generation history may still contain external provider media URLs; UI attempts to refresh KIE media URLs via `/api/creations/media-url` when direct media loading fails
-- generation history display de-duplicates local optimistic items and persisted database rows by `taskId`
+- generation history display de-duplicates local optimistic items and persisted database rows by `taskId`; image/video result cards use square covers with contained media so non-square generations are shown fully with empty space instead of being cropped
 - generation history deletion is available for successful, failed, and unavailable-media items; delete removes the persisted row by `taskId || id` and clears legacy localStorage history keys keyed by either user id or email
 - Google sign-in entry points pass the current path as `callbackUrl`; NextAuth redirects preserve same-origin callback URLs instead of forcing auth callbacks back to the homepage
-- Non-production environments support a `test-login` NextAuth credentials provider so QA can log in without Google OAuth. It is enabled in local development by default and can be enabled for Vercel preview/test with `ENABLE_TEST_AUTH=true` plus `NEXT_PUBLIC_ENABLE_TEST_AUTH=true`; it is disabled for Vercel production. Test login provisions `test@flownana.local` and a renewable `test-auth` credit batch.
+- Non-production environments support a `test-login` NextAuth credentials provider so QA can log in without Google OAuth. It is enabled in local development by default and can be enabled for Vercel preview/test with `ENABLE_TEST_AUTH=true` plus `NEXT_PUBLIC_ENABLE_TEST_AUTH=true`; it is disabled for Vercel production. Local development defaults to a renewable 1,000-credit `test-auth` batch, while Preview sets `TEST_AUTH_CREDITS=0` so subscription QA reflects only paid-plan credits.
 - creation pages treat NextAuth `loading` as a distinct state; refresh should not briefly show logged-out CTAs or switch logged-in users from My Creations to Explore while the session is resolving
 - `/home`, `/ai-image`, `/ai-video`, and `/ai-music` wrap their creation UI in a page-level `SessionBoundary` with the server session and server-preload the first creation history batch so My Creations does not wait for client session resolution before showing existing history
 - My Creations downloads use authenticated same-origin `/api/creations/download`; the API verifies the media URL belongs to the current user's generation before streaming it as an attachment
+- Successful image and video generations persist display-safe generation parameters in `Generation.parameters`. My Creations opens a responsive, full-screen media detail view that shows the saved prompt, model, mode, aspect ratio, resolution, duration, and audio when available, with only Regenerate, Download, and Delete actions. Older rows fall back to details derivable from `modelOptionId` and explicitly identify settings that were never saved.
 - Billing summary clients share a 60-second in-memory/localStorage cache and in-flight request dedupe for sidebar credits, pricing, and user menu. The user menu displays email, plan, and remaining credits, and supports editing the user's display name through authenticated `PATCH /api/account/profile`; NextAuth `update()` refreshes the session name after a successful save.
-- Video generation platform credits are calculated from the model's KIE API credits multiplied by 0.3 and rounded to the nearest integer unless a model has an explicitly documented exception. Kling 3.0 uses KIE per-second prices for std/pro and audio/no-audio variants. VEO 3.1 uses KIE base 720P generation prices because the app does not request 1080P or 4K upgrade endpoints.
+- Video generation platform credits are calculated from the model's KIE API credits multiplied by 0.3 and rounded to the nearest integer unless a model has an explicitly documented exception.
+- Video generation UI applies canonical parameter display rules across models: aspect ratio options are capped to `Auto`, `16:9`, `9:16`, `1:1`, `4:3`, and `3:4`; resolution options are capped to `Auto`, `480P`, `720P`, `1080P`, `2K`, and `4K`; unsupported or non-canonical provider values such as `5:4` are not shown. Fixed-duration models show fixed duration buttons, continuous whole-second ranges use the duration slider, and audio-capable models show `Auto`, `On`, and `Off` with `On` selected when switching into that model. Text-to-video `Auto` aspect ratio resolves to a provider-safe `16:9`. Image-to-video requests omit aspect ratio regardless of the UI selection so uploaded image framing drives the output and does not conflict with provider contracts.
 - VEO 3.1 video status polling uses KIE `/api/v1/veo/record-info` and parses `successFlag` plus `response.resultUrls`; the synchronous poll window is kept below Vercel's 300s timeout so failures can be persisted and consumed credits refunded.
-- Video generation no longer offers Bytedance Seedance 1.5 Pro; Seedance options use KIE `bytedance/seedance-2` and `bytedance/seedance-2-fast`. Seedance 2 duration supports every whole second from 4s through 15s. Platform credits for Seedance 2 options are calculated from KIE no-video-input API credits per second multiplied by duration and then by 0.3, rounded to the nearest integer.
-- Video generation offers HappyHorse 1.0 text-to-video through KIE `happyhorse/text-to-video`. HappyHorse supports every whole second from 3s through 15s at 720P and 1080P. Platform credits are calculated from KIE API credits per second (720P: 28, 1080P: 48) multiplied by duration and then by 0.3, rounded to the nearest integer.
+- Video generation no longer offers VEO 3.1 Lite, VEO 3.1 Fast, VEO 3.1 Quality, Kling 3.0, Kling 3.0 Turbo, Seedance 2, Seedance 2 Mini, HappyHorse 1.0, or Bytedance Seedance 1.5 Pro as selectable models.
+- Video generation offers Seedance 2 Fast through KIE `bytedance/seedance-2-fast` at 480P and 720P for 4s through 15s. Platform credits are calculated from KIE API credits per second (480P: 15.5, 720P: 33) multiplied by duration and then by 0.3, rounded to the nearest integer.
+- Video generation offers MiniMax H3 through KIE `minimax-h3/text-to-video` and `minimax-h3/image-to-video` at 720P and 2K for 4s through 15s. The app's 720P option maps to KIE's `768P` request value/tier, and MiniMax image-to-video sends the uploaded image as `first_frame_url`. Platform credits are calculated from KIE API credits per second (720P/768P: 18, 2K: 29) multiplied by duration and then by 0.3, rounded to the nearest integer.
+- Video generation offers Grok Imagine Video 1.5 through KIE `grok-imagine-video-1-5-preview` at 480P and 720P for 1s through 15s. Grok requires an input image, so it is only exposed when the user has uploaded an image and server-side generation rejects missing image input before consuming credits. Platform credits are calculated from KIE API credits per second (480P: 14.5, 720P: 25) multiplied by duration and then by 0.3, rounded to the nearest integer.
+- Video generation offers HappyHorse 1.1 through KIE `happyhorse-1-1/text-to-video` and `happyhorse-1-1/image-to-video`. HappyHorse 1.1 supports every whole second from 3s through 15s at 720P and 1080P. Platform credits are calculated from KIE API credits per second (720P: 22, 1080P: 34) multiplied by duration and then by 0.3, rounded to the nearest integer.
+- Active KIE video request bodies are centralized in `lib/kie-video-request.ts` and contract-tested for Seedance 2 Fast, MiniMax H3, Grok Imagine Video 1.5, and HappyHorse 1.1. MiniMax maps UI 720P to KIE `768P` and uses `first_frame_url`; HappyHorse uses `image_urls`; Grok omits the obsolete `mode` field; single-image video requests omit `aspect_ratio`.
 - The `/ai-video` generate button checks NextAuth client session before calling `/api/veo/generate`; logged-out or expired-session users are sent through Google sign-in with `signup_started` source `ai_video_generate` instead of seeing a raw API 401.
 - `/ai-video` inserts a local optimistic My Creations card immediately after an authenticated user clicks Generate. The card uses a temporary local id, shows a generating animation while the API request is pending, is replaced with the real `taskId` and media URL on success, and becomes a failed card on generation error. Users can run up to 5 concurrent video generation requests; the Generate button stays available until that active-task limit is reached.
+- `/ai-image` inserts a local optimistic My Creations card immediately after an authenticated user clicks Generate. The card shows a generating animation while the API request is pending, is replaced with the real `taskId` and image URL on success, and becomes a failed card on generation error. Users can run up to 5 concurrent image generation requests; the Generate button stays available until that active-task limit is reached. Image pending/generating/processing optimistic cards are not persisted to localStorage because the synchronous image endpoint cannot recover those local-only placeholders after refresh.
+- Image and video uploads reject unsupported formats and files over 20 MB before generation. New generated media must be persisted to Vercel Blob; storage/download/content-type failures no longer silently save short-lived provider URLs and instead fail clearly with automatic credit refund. Video tasks that remain pending for 45 minutes are marked timed out and refunded on status polling.
 
-## Subscription Upgrade Rules (as of 2026-04-07)
+## Subscription Plans (as of 2026-08-07)
+- Starter: $16 monthly or $96 yearly ($8/month effective), 200 credits/month, 720P output.
+- Pro: $48 monthly or $288 yearly ($24/month effective), 800 credits/month, 1080P output.
+- Max: $96 monthly or $576 yearly ($48/month effective), 2,400 credits/month, 1080P output.
+- Yearly billing is 50% off the monthly rate; yearly credits are still issued monthly and expire 30 days after each grant.
+- Checkout retrieves the configured Stripe Price before creating a session and rejects inactive prices or any USD amount/recurring-interval mismatch, preventing displayed pricing from diverging from the actual charge.
+- Billing summaries and yearly cron grants resolve entitlements from `stripePriceId` instead of trusting the denormalized stored `planType`, so an unrecognized or misconfigured price cannot display or receive a different tier's credits.
+- The configured Stripe account is currently test mode. On 2026-08-07, the six exact current catalog Prices were verified in Stripe and synchronized to Vercel Production/Preview/Development. Legacy two-plan compatibility was intentionally removed before launch; its orphaned database subscription, associated subscription credit batches, linked grant dedupe records, and obsolete $50/$300 Stripe Prices were cleared before the first Preview deployment.
+
+## Subscription Upgrade Rules (as of 2026-08-07)
 Allowed upgrade paths (old sub cancelled, new sub starts immediately with first credits):
+- starter_monthly → starter_yearly ✅
+- starter_monthly → pro_monthly / pro_yearly / max_monthly / max_yearly ✅
+- starter_yearly → pro_yearly / max_yearly ✅ (with remaining-month credit coupon)
 - pro_monthly → pro_yearly ✅
-- pro_monthly → max_monthly ✅ (newly added)
+- pro_monthly → max_monthly ✅
 - pro_monthly → max_yearly ✅
 - pro_yearly → max_yearly ✅ (with proration credit coupon)
 - max_monthly → max_yearly ✅
 - max_yearly → (no further upgrade)
 
-Downgrades are disabled in code. UI shows a disabled button with note to use billing portal.
+Monthly subscribers may move to the same tier yearly or any higher tier monthly/yearly. Yearly subscribers may move only to a higher yearly tier. All yearly-to-higher-yearly upgrades credit the value of unissued remaining months based on the actual current Stripe yearly price. Downgrades are disabled in code; UI directs users to the billing portal.
 
 ## Credit Issuance Rules
 - First month: granted via webhook `checkout.session.completed` or `invoice.paid`
@@ -65,7 +86,9 @@ Downgrades are disabled in code. UI shows a disabled button with note to use bil
 - `customer.subscription.created`, `updated`, `deleted`, `paused`, and `resumed` synchronize the local subscription record, including terminal cancellation state.
 - `invoice.payment_failed`, `invoice.payment_action_required`, and `invoice.finalization_failed` retrieve and synchronize the current Stripe subscription state without issuing credits.
 - During an upgrade, failure to cancel and synchronize the previous subscription fails the webhook so Stripe can retry; the failure is not silently accepted.
-- Payment-success query-string verification and GA4 `purchase_success` hardening are intentionally deferred until GA integration work.
+- Checkout return URLs include Stripe's `{CHECKOUT_SESSION_ID}`. The authenticated billing page verifies that the Session is complete, paid, and owned by the signed-in user before showing success; it then idempotently synchronizes the new subscription, cancels the previous subscription for upgrades, and grants the first credit batch. Query-string labels or amounts are never trusted as proof of payment.
+- Webhook and return-page credit grants share the same subscription-period dedupe key, so concurrent or repeated completion handling cannot grant credits twice.
+- GA4 `purchase_success` hardening remains deferred until GA integration work.
 
 ## Schema
 - `Subscription.nextPlan` field removed (was unused); migration: 20260407000000_remove_next_plan
@@ -123,6 +146,18 @@ Auth CTA placement:
 - Production deploy still requires explicit approval.
 - Business logic changes should include focused tests for pure credit, subscription, generation pricing, or history-display rules where practical.
 - GA4 is loaded only when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is configured; core funnel events are emitted from landing, pricing, checkout, auth, generation, failure, insufficient-credit, purchase-success, and download surfaces.
+
+## Current Preview QA (2026-08-07)
+- Stable test URL: `https://flownana-test.vercel.app`, pointing to Preview deployment `dpl_3B5MAJjGCiYAy3BpbND4juSgNbUX` (`READY`). No production deployment was performed.
+- Preview-only auth is configured with `ENABLE_TEST_AUTH=true`, `NEXT_PUBLIC_ENABLE_TEST_AUTH=true`, `TEST_AUTH_CREDITS=0`, and `NEXTAUTH_URL=https://flownana-test.vercel.app`; production test auth remains disabled.
+- Preview has the six verified Stripe test-mode Starter/Pro/Max Price IDs. Deployment Protection may require the project owner's Vercel sign-in before the URL opens.
+- The 2026-08-07 Starter-to-Pro monthly QA transaction exposed that Stripe test-mode webhooks currently target the production domain rather than Preview. The paid Pro subscription was repaired (old Starter canceled, Pro synchronized, 800 Pro credits granted), and Preview return-page verification now completes this initial purchase/upgrade synchronization even when the webhook is routed elsewhere. Recurring invoice events still require the production webhook endpoint after production deployment.
+
+## Current Production (2026-08-07)
+- `https://www.flownana.com` points to Vercel production deployment `dpl_BhidWMWj1T8WnWJxri74ws7R5Uax` (`READY`).
+- Production Supabase has applied migrations `20260623000000_add_generation_user_type_created_at_index` and `20260807090000_add_generation_parameters`; the composite history index and nullable `Generation.parameters` JSONB column were read-back verified before the application deployment.
+- Post-deploy `npm run smoke:prod` passed homepage, AI image/video pages, demo media, authenticated API protection, cron protection, and video-options checks; `/pricing` separately returned HTTP 200.
+- Production now runs the checkout-return verification and shared idempotent Stripe completion logic. The configured Stripe account remains in test mode until live-mode keys, Prices, and webhook secret are intentionally provisioned for launch.
 
 ## Product Risks / Reality Check
 - homepage messaging currently promises video / image / music, but the clearest confirmed implemented core is image generation

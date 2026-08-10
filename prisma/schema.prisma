@@ -72,6 +72,7 @@ model Generation {
   taskId            String?  @unique
   error             String?
   modelOptionId     String?
+  parameters        Json?
   creditsCost       Int?
   creditConsumption Json?
   createdAt         DateTime @default(now())

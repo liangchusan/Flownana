@@ -3,16 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { getStripePriceId, type PriceKey } from "@/lib/plans";
+import {
+  assertStripePriceMatchesPlan,
+  getStripePriceId,
+  isPriceKey,
+} from "@/lib/plans";
 import { upsertAppUser } from "@/lib/user-sync";
 import { prisma } from "@/lib/prisma";
-
-const VALID_KEYS: PriceKey[] = [
-  "pro_monthly",
-  "pro_yearly",
-  "max_monthly",
-  "max_yearly",
-];
 
 export async function POST(request: Request) {
   try {
@@ -22,8 +19,8 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as { priceKey?: string };
-    const priceKey = body.priceKey as PriceKey | undefined;
-    if (!priceKey || !VALID_KEYS.includes(priceKey)) {
+    const priceKey = body.priceKey;
+    if (!priceKey || !isPriceKey(priceKey)) {
       return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });
     }
 
@@ -39,6 +36,8 @@ export async function POST(request: Request) {
     const priceId = getStripePriceId(priceKey);
 
     const stripe = getStripe();
+    const stripePrice = await stripe.prices.retrieve(priceId);
+    assertStripePriceMatchesPlan(priceKey, stripePrice);
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -65,7 +64,7 @@ export async function POST(request: Request) {
       mode: "subscription",
       client_reference_id: session.user.id,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${baseUrl}/account/billing?checkout=success`,
+      success_url: `${baseUrl}/account/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/pricing`,
       metadata: {
         userId: session.user.id,

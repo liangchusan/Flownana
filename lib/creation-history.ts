@@ -5,6 +5,44 @@ export type CreationStatus =
   | "success"
   | "failed";
 
+export interface GenerationParameters {
+  model?: string;
+  resolution?: string;
+  aspectRatio?: string;
+  duration?: number;
+  audio?: string;
+  mode?: string;
+}
+
+function readParameterString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+export function normalizeGenerationParameters(
+  value: unknown
+): GenerationParameters | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const candidate = value as Record<string, unknown>;
+  const durationValue = candidate.duration;
+  const duration =
+    typeof durationValue === "number" && Number.isFinite(durationValue)
+      ? durationValue
+      : undefined;
+  const parameters: GenerationParameters = {
+    model: readParameterString(candidate.model),
+    resolution: readParameterString(candidate.resolution),
+    aspectRatio: readParameterString(candidate.aspectRatio),
+    duration,
+    audio: readParameterString(candidate.audio),
+    mode: readParameterString(candidate.mode),
+  };
+
+  return Object.values(parameters).some((item) => item !== undefined)
+    ? parameters
+    : undefined;
+}
+
 export interface CreationHistoryItem {
   id: string;
   type: "image" | "video" | "music";
@@ -14,6 +52,10 @@ export interface CreationHistoryItem {
   createdAt: string;
   taskId?: string;
   error?: string;
+  errorCode?: string;
+  modelOptionId?: string;
+  creditsCost?: number;
+  parameters?: GenerationParameters;
 }
 
 export function creationIdentity(creation: CreationHistoryItem): string {

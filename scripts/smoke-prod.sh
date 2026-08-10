@@ -63,6 +63,6 @@ expect_status GET /videos/flownana-home-demo.mp4 200
 expect_status GET /api/billing/summary 401
 expect_status GET '/api/creations?type=image' 401
 expect_status POST /api/generate 401 '{"prompt":"smoke","resolution":"1K","aspectRatio":"1:1"}'
-expect_status POST /api/veo/generate 401 '{"prompt":"smoke","modelOptionId":"veo31_lite_8","aspectRatio":"16:9"}'
+expect_status POST /api/veo/generate 401 '{"prompt":"smoke","modelOptionId":"seedance20fast_480_4","aspectRatio":"16:9"}'
 expect_status GET /api/cron/monthly-credits 401
 expect_body_contains GET /api/veo/generate '"options"'

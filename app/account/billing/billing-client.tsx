@@ -25,12 +25,10 @@ export type BillingSummary = {
 
 export type UpgradeInfo = {
   success: boolean;
-  from: string | null;
-  to: string | null;
+  toLabel: string | null;
   creditCents: number;
   payableCents: number;
   currency: string;
-  months: number;
 };
 
 type BillingClientProps = {
@@ -39,6 +37,7 @@ type BillingClientProps = {
   error?: string | null;
   isNewCheckout: boolean;
   upgradeInfo: UpgradeInfo;
+  isPaymentSyncPending: boolean;
 };
 
 export function BillingClient({
@@ -47,6 +46,7 @@ export function BillingClient({
   error,
   isNewCheckout,
   upgradeInfo,
+  isPaymentSyncPending,
 }: BillingClientProps) {
   const { showToast } = useToast();
 
@@ -133,13 +133,13 @@ export function BillingClient({
                 </p>
                 <p className="text-sm text-stone-700">
                   Upgraded to{" "}
-                  <span className="font-semibold capitalize">{upgradeInfo.to || "new plan"}</span>.
+                  <span className="font-semibold">{upgradeInfo.toLabel || "your new plan"}</span>.
                   {upgradeInfo.payableCents > 0 && (
                     <> Paid {formatMoney(upgradeInfo.payableCents)}
                     {upgradeInfo.creditCents > 0 ? ` (${formatMoney(upgradeInfo.creditCents)} credit applied)` : ""}.
                     </>
                   )}{" "}
-                  New credits have been added to your account.
+                  Your subscription and credit balance are up to date.
                 </p>
               </div>
             </div>
@@ -148,6 +148,19 @@ export function BillingClient({
                 Start Creating →
               </Button>
             </Link>
+          </div>
+        )}
+
+        {isPaymentSyncPending && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <p className="mb-1 text-lg font-bold text-stone-900">
+              Payment received — finishing setup
+            </p>
+            <p className="text-sm text-stone-700">
+              We could not verify the completed payment yet, so no plan or
+              credit change is being claimed on this page. Refresh shortly; if
+              it persists, contact support with your payment receipt.
+            </p>
           </div>
         )}
 
@@ -166,13 +179,18 @@ export function BillingClient({
               {summary.credits.expiringInDays !== null &&
                 summary.credits.expiringSoon > 0 && (
                   <p className="text-sm text-amber-800 mt-2">
-                    Expiring soon: {summary.credits.expiringSoon} (in{" "}
+                    Next expiration: {summary.credits.expiringSoon} credits (in{" "}
                     {summary.credits.expiringInDays} days)
                   </p>
                 )}
+              {summary.subscription?.planType === "starter" && (
+                <p className="mt-4 text-sm text-stone-700">
+                  Upgrade to Pro to get 800 credits instantly
+                </p>
+              )}
               {summary.subscription?.planType === "pro" && (
                 <p className="mt-4 text-sm text-stone-700">
-                  Upgrade to Max to get 800 credits instantly
+                  Upgrade to Max to get 2,400 credits instantly
                 </p>
               )}
             </section>

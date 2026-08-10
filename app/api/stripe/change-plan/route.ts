@@ -6,7 +6,8 @@ import { getStripe } from "@/lib/stripe";
 import {
   getPriceKeyFromStripePriceId,
   getStripePriceId,
-  type PriceKey,
+  isPriceKey,
+  PLAN_DISPLAY,
 } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { upsertAppUser } from "@/lib/user-sync";
@@ -14,13 +15,6 @@ import {
   buildUpgradeQuote,
   isUpgradeAllowed,
 } from "@/lib/upgrade-logic";
-
-const VALID_KEYS: PriceKey[] = [
-  "pro_monthly",
-  "pro_yearly",
-  "max_monthly",
-  "max_yearly",
-];
 
 type ChangePlanBody = {
   priceKey?: string;
@@ -34,8 +28,8 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as ChangePlanBody;
-    const targetKey = body.priceKey as PriceKey | undefined;
-    if (!targetKey || !VALID_KEYS.includes(targetKey)) {
+    const targetKey = body.priceKey;
+    if (!targetKey || !isPriceKey(targetKey)) {
       return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });
     }
 
@@ -105,21 +99,11 @@ export async function POST(request: Request) {
       currentPeriodEnd: current.currentPeriodEnd,
     });
 
-    const successQs = new URLSearchParams({
-      upgrade: "success",
-      from: currentParsed.key,
-      to: targetKey,
-      credit: String(quote.creditAmountCents),
-      payable: String(quote.payableAmountCents),
-      currency: quote.currency,
-      months: String(quote.remainingMonths),
-    });
-
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
       client_reference_id: session.user.id,
       line_items: [{ price: targetPriceId, quantity: 1 }],
-      success_url: `${baseUrl}/account/billing?${successQs.toString()}`,
+      success_url: `${baseUrl}/account/billing?upgrade=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/pricing`,
       metadata: {
         userId: session.user.id,
@@ -153,7 +137,7 @@ export async function POST(request: Request) {
         currency: quote.currency,
         max_redemptions: 1,
         redeem_by: redeemBy,
-        name: `Pro yearly remaining credit (${quote.remainingMonths}m)`,
+        name: `${PLAN_DISPLAY[currentParsed.key].label} remaining credit (${quote.remainingMonths}m)`,
       });
       sessionParams.discounts = [{ coupon: coupon.id }];
       sessionParams.metadata = {

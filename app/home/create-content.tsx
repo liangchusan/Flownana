@@ -42,14 +42,14 @@ const HOME_DEMO_VIDEO_URL = "/videos/flownana-home-demo.mp4";
 
 const heroBanners: HeroBanner[] = [
   {
-    id: "veo",
+    id: "seedance-2-fast",
     type: "video",
     mediaUrl: HOME_DEMO_VIDEO_URL,
     posterUrl:
       "https://images.unsplash.com/photo-1517821099601-8ccf4a767a87?w=1200&auto=format&fit=crop&q=80",
-    title: "Cinematic AI Video with VEO 3.1",
+    title: "Cinematic AI Video with Seedance 2 Fast",
     description: "Turn storyboards and prompts into film‑style motion in seconds.",
-    tag: "VEO 3.1",
+    tag: "Seedance 2 Fast",
   },
   {
     id: "gpt-image-2",

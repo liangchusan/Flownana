@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { getBillingSummary } from "@/lib/billing-summary";
+import { PLAN_DISPLAY } from "@/lib/plans";
+import { finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
 import { BillingClient, type UpgradeInfo } from "./billing-client";
 
 export const dynamic = "force-dynamic";
@@ -12,17 +14,13 @@ function getParam(searchParams: SearchParams, key: string) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function parseUpgradeInfo(searchParams: SearchParams): UpgradeInfo {
-  return {
-    success: getParam(searchParams, "upgrade") === "success",
-    from: getParam(searchParams, "from") ?? null,
-    to: getParam(searchParams, "to") ?? null,
-    creditCents: Number(getParam(searchParams, "credit") || "0"),
-    payableCents: Number(getParam(searchParams, "payable") || "0"),
-    currency: (getParam(searchParams, "currency") || "usd").toUpperCase(),
-    months: Number(getParam(searchParams, "months") || "0"),
-  };
-}
+const EMPTY_UPGRADE_INFO: UpgradeInfo = {
+  success: false,
+  toLabel: null,
+  creditCents: 0,
+  payableCents: 0,
+  currency: "USD",
+};
 
 export default async function BillingPage({
   searchParams = {},
@@ -30,8 +28,13 @@ export default async function BillingPage({
   searchParams?: SearchParams;
 }) {
   const session = await getServerSession(authOptions);
-  const isNewCheckout = getParam(searchParams, "checkout") === "success";
-  const upgradeInfo = parseUpgradeInfo(searchParams);
+  const requestedCompletion =
+    getParam(searchParams, "checkout") === "success" ||
+    getParam(searchParams, "upgrade") === "success";
+  const sessionId = getParam(searchParams, "session_id");
+  let isNewCheckout = false;
+  let upgradeInfo = EMPTY_UPGRADE_INFO;
+  let isPaymentSyncPending = false;
 
   if (!session?.user?.id) {
     return (
@@ -40,8 +43,36 @@ export default async function BillingPage({
         summary={null}
         isNewCheckout={isNewCheckout}
         upgradeInfo={upgradeInfo}
+        isPaymentSyncPending={false}
       />
     );
+  }
+
+  if (requestedCompletion) {
+    if (!sessionId) {
+      isPaymentSyncPending = true;
+    } else {
+      try {
+        const completion = await finalizeCheckoutSession({
+          sessionId,
+          expectedUserId: session.user.id,
+          source: "checkout_return_verified",
+        });
+        isNewCheckout = !completion.isUpgrade;
+        if (completion.isUpgrade) {
+          upgradeInfo = {
+            success: true,
+            toLabel: PLAN_DISPLAY[completion.priceKey].label,
+            creditCents: completion.creditAmountCents,
+            payableCents: completion.payableAmountCents,
+            currency: completion.currency,
+          };
+        }
+      } catch (error) {
+        isPaymentSyncPending = true;
+        console.error("Checkout return verification failed:", error);
+      }
+    }
   }
 
   try {
@@ -52,6 +83,7 @@ export default async function BillingPage({
         summary={summary}
         isNewCheckout={isNewCheckout}
         upgradeInfo={upgradeInfo}
+        isPaymentSyncPending={isPaymentSyncPending}
       />
     );
   } catch {
@@ -62,6 +94,7 @@ export default async function BillingPage({
         error="Could not load billing data"
         isNewCheckout={isNewCheckout}
         upgradeInfo={upgradeInfo}
+        isPaymentSyncPending={isPaymentSyncPending}
       />
     );
   }

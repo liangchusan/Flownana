@@ -7,37 +7,49 @@ import { Check, ChevronDown, Loader2, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import {
-  VIDEO_MODEL_OPTION_MAP,
   VIDEO_MODEL_OPTIONS,
+  formatVideoResolution,
+  getDisplayAspectRatios,
+  getDisplayResolutions,
+  getDisplaySoundOptions,
+  getVideoModelName,
+  type VideoAspectRatio,
   type VideoModelOption,
+  type VideoResolutionOption,
+  type VideoSoundOption,
 } from "@/lib/generation-pricing";
 import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
-
-const getModelName = (option: VideoModelOption): string => {
-  if (option.family === "kling") return "Kling 3.0";
-  if (option.family === "happyhorse") return "HappyHorse 1.0";
-  if (option.providerModel === "bytedance/seedance-2-fast") return "Seedance 2 Fast";
-  if (option.providerModel === "bytedance/seedance-2") return "Seedance 2";
-  if (option.providerModel === "veo3_lite") return "VEO 3.1 Lite";
-  if (option.providerModel === "veo3_fast") return "VEO 3.1 Fast";
-  return "VEO 3.1 Quality";
-};
-
-const formatResolution = (resolution: VideoModelOption["resolution"]): string =>
-  resolution === "/" ? "Auto" : resolution;
+import { getGenerationErrorDisplay } from "@/lib/generation-errors";
+import type { GenerationParameters } from "@/lib/creation-history";
 
 const MODEL_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
+const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 interface VideoCreationFormProps {
-  onGenerate: (videoUrl: string, taskId?: string, prompt?: string, optimisticId?: string) => void;
-  onGenerationStart?: (data: { optimisticId: string; prompt: string }) => void;
+  onGenerate: (
+    videoUrl: string,
+    taskId?: string,
+    prompt?: string,
+    optimisticId?: string,
+    parameters?: GenerationParameters
+  ) => void;
+  onGenerationStart?: (data: {
+    optimisticId: string;
+    prompt: string;
+    parameters: GenerationParameters;
+  }) => void;
   onGenerationTaskCreated?: (data: { optimisticId: string; taskId: string; prompt: string }) => void;
-  onGenerationFailure?: (data: { optimisticId: string; prompt: string; error: string }) => void;
+  onGenerationFailure?: (data: {
+    optimisticId: string;
+    prompt: string;
+    error: string;
+    errorCode?: string;
+  }) => void;
   activeGenerationCount?: number;
   maxConcurrentGenerations?: number;
   isGenerating?: boolean;
@@ -62,14 +74,16 @@ export function VideoCreationForm({
 }: VideoCreationFormProps) {
   const { showToast } = useToast();
   const { data: session, status } = useSession();
-  const defaultOption = VIDEO_MODEL_OPTION_MAP.veo31_fast_8;
+  const defaultOption = VIDEO_MODEL_OPTIONS[0];
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
-  const [selectedModelName, setSelectedModelName] = useState<string>(getModelName(defaultOption));
-  const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [resolution, setResolution] = useState<string>(formatResolution(defaultOption.resolution));
+  const [selectedModelName, setSelectedModelName] = useState<string>(getVideoModelName(defaultOption));
+  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("Auto");
+  const [resolution, setResolution] = useState<VideoResolutionOption>(
+    formatVideoResolution(defaultOption.resolution)
+  );
   const [duration, setDuration] = useState<VideoModelOption["duration"]>(defaultOption.duration);
-  const [sound, setSound] = useState<"on" | "off">(defaultOption.hasAudio ? "on" : "off");
+  const [sound, setSound] = useState<VideoSoundOption>("Auto");
 
   const [modelOpen, setModelOpen] = useState(false);
   const localActiveGenerationCountRef = useRef(activeGenerationCount ?? 0);
@@ -84,20 +98,28 @@ export function VideoCreationForm({
     const seen = new Set<string>();
     const names: string[] = [];
     for (const option of VIDEO_MODEL_OPTIONS) {
-      const name = getModelName(option);
+      if (option.requiresImageInput && !uploadedImage) continue;
+      const name = getVideoModelName(option);
       if (!seen.has(name)) { seen.add(name); names.push(name); }
     }
     return names;
-  }, []);
+  }, [uploadedImage]);
 
   const optionsForModel = useMemo(
-    () => VIDEO_MODEL_OPTIONS.filter((o) => getModelName(o) === selectedModelName),
-    [selectedModelName]
+    () =>
+      VIDEO_MODEL_OPTIONS.filter(
+        (o) =>
+          getVideoModelName(o) === selectedModelName &&
+          (!o.requiresImageInput || !!uploadedImage)
+      ),
+    [selectedModelName, uploadedImage]
   );
 
-  const aspectRatioOptions = useMemo(() => ["16:9", "9:16", "1:1", "4:3", "3:4"], []);
+  const aspectRatioOptions = useMemo(() => {
+    return getDisplayAspectRatios(optionsForModel);
+  }, [optionsForModel]);
   const resolutionOptions = useMemo(
-    () => [...new Set(optionsForModel.map((o) => formatResolution(o.resolution)))],
+    () => getDisplayResolutions(optionsForModel),
     [optionsForModel]
   );
   const durationOptions = useMemo(
@@ -109,22 +131,37 @@ export function VideoCreationForm({
   const useDurationSlider =
     durationOptions.length > 2 &&
     durationOptions.every((value, index) => index === 0 || value === durationOptions[index - 1] + 1);
-  const soundOptions = useMemo(
-    () => [...new Set(optionsForModel.map((o) => (o.hasAudio ? "on" : "off")))] as Array<"on" | "off">,
-    [optionsForModel]
-  );
-  const showSound = soundOptions.length > 1 || soundOptions[0] === "on";
+  const soundOptions = useMemo(() => getDisplaySoundOptions(optionsForModel), [optionsForModel]);
+  const showSound = soundOptions.length > 0;
 
   const selectedOption = useMemo(() => {
+    const matchingSettingOptions = optionsForModel.filter(
+      (o) =>
+        formatVideoResolution(o.resolution) === resolution &&
+        o.duration === duration
+    );
+    if (matchingSettingOptions.length > 0) {
+      if (sound === "On") {
+        return (
+          matchingSettingOptions.find((o) => o.hasAudio) ??
+          matchingSettingOptions[0]
+        );
+      }
+      if (sound === "Off") {
+        return (
+          matchingSettingOptions.find((o) => !o.hasAudio) ??
+          matchingSettingOptions[0]
+        );
+      }
+      return (
+        matchingSettingOptions.find((o) => o.hasAudio) ??
+        matchingSettingOptions[0]
+      );
+    }
+
     return (
       optionsForModel.find(
-        (o) =>
-          formatResolution(o.resolution) === resolution &&
-          o.duration === duration &&
-          (o.hasAudio ? "on" : "off") === sound
-      ) ??
-      optionsForModel.find(
-        (o) => formatResolution(o.resolution) === resolution && o.duration === duration
+        (o) => formatVideoResolution(o.resolution) === resolution && o.duration === duration
       ) ??
       optionsForModel[0]
     );
@@ -147,9 +184,16 @@ export function VideoCreationForm({
       setDuration(durationOptions[0]);
   }, [durationOptions, duration]);
   useEffect(() => {
+    if (aspectRatioOptions.length > 0 && !aspectRatioOptions.includes(aspectRatio))
+      setAspectRatio(aspectRatioOptions[0]);
+  }, [aspectRatioOptions, aspectRatio]);
+  useEffect(() => {
     if (soundOptions.length > 0 && !soundOptions.includes(sound))
       setSound(soundOptions[0]);
   }, [soundOptions, sound]);
+  useEffect(() => {
+    setSound(soundOptions.includes("On") ? "On" : soundOptions[0] ?? "Auto");
+  }, [selectedModelName, soundOptions]);
   useEffect(() => {
     if (activeGenerationCount !== undefined) {
       localActiveGenerationCountRef.current = activeGenerationCount;
@@ -183,12 +227,29 @@ export function VideoCreationForm({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
     maxFiles: 1,
+    maxSize: MAX_INPUT_IMAGE_BYTES,
     onDrop: (files) => {
       if (files.length > 0) {
         const reader = new FileReader();
         reader.onload = () => setUploadedImage(reader.result as string);
         reader.readAsDataURL(files[0]);
       }
+    },
+    onDropRejected: (rejections) => {
+      const code = rejections.some((rejection) =>
+        rejection.errors.some((error) => error.code === "file-too-large")
+      )
+        ? "file_too_large"
+        : "unsupported_file_type";
+      const display = getGenerationErrorDisplay(
+        { errorCode: code },
+        { mediaType: "video" }
+      );
+      showToast({
+        title: display.title,
+        message: `${display.message} ${display.action}`,
+        variant: "warning",
+      });
     },
   });
 
@@ -198,6 +259,7 @@ export function VideoCreationForm({
     prompt: string;
     optimisticId: string;
     creditsCost: number;
+    parameters: GenerationParameters;
   }) => {
     const maxAttempts = 360;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -223,7 +285,8 @@ export function VideoCreationForm({
           response.data.videoUrl,
           response.data.taskId || params.taskId,
           response.data.prompt || params.prompt,
-          params.optimisticId
+          params.optimisticId,
+          response.data.parameters || params.parameters
         );
         return;
       }
@@ -246,9 +309,13 @@ export function VideoCreationForm({
       return;
     }
     if (!prompt.trim()) {
+      const display = getGenerationErrorDisplay(
+        { errorCode: "prompt_required" },
+        { mediaType: "video" }
+      );
       showToast({
-        title: "Prompt required",
-        message: "Please enter a prompt",
+        title: display.title,
+        message: `${display.message} ${display.action}`,
         variant: "warning",
       });
       return;
@@ -278,11 +345,21 @@ export function VideoCreationForm({
     }
     const requestPrompt = prompt.trim();
     const optimisticId = `local-video-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const generationParameters: GenerationParameters = {
+      model: getVideoModelName(selectedOption),
+      resolution,
+      aspectRatio,
+      duration,
+      audio: showSound ? (selectedOption.hasAudio ? "On" : "Off") : undefined,
+      mode: uploadedImage ? "Image to video" : "Text to video",
+    };
     onGenerationStart?.({
       optimisticId,
       prompt: requestPrompt,
+      parameters: generationParameters,
     });
     setIsGenerating?.(true);
+    const requestAspectRatio = aspectRatio === "Auto" ? undefined : aspectRatio;
     trackEvent("generation_started", {
       type: "video",
       model_option_id: selectedOption.id,
@@ -295,7 +372,7 @@ export function VideoCreationForm({
         prompt: requestPrompt,
         imageUrls: uploadedImage ? [uploadedImage] : undefined,
         modelOptionId: selectedOption.id,
-        aspectRatio,
+        aspectRatio: requestAspectRatio,
       });
       if (response.data.success) {
         const taskId = response.data.taskId;
@@ -313,6 +390,7 @@ export function VideoCreationForm({
             prompt: responsePrompt,
             optimisticId,
             creditsCost: response.data.creditsCost || selectedOption.credits,
+            parameters: response.data.parameters || generationParameters,
           });
           return;
         }
@@ -323,7 +401,13 @@ export function VideoCreationForm({
             model_option_id: response.data.modelOptionId || selectedOption.id,
             credits_cost: response.data.creditsCost || selectedOption.credits,
           });
-          onGenerate(response.data.videoUrl, taskId, responsePrompt, optimisticId);
+          onGenerate(
+            response.data.videoUrl,
+            taskId,
+            responsePrompt,
+            optimisticId,
+            response.data.parameters || generationParameters
+          );
           return;
         }
 
@@ -346,7 +430,11 @@ export function VideoCreationForm({
         });
       }
     } catch (error: any) {
-      const message = error.response?.data?.error || "Generation failed, please try again";
+      const errorDisplay = getGenerationErrorDisplay(
+        error.response?.data || error,
+        { mediaType: "video", status: error.response?.status }
+      );
+      const message = errorDisplay.message;
       if (error.response?.status === 402) {
         trackEvent("insufficient_credits_shown", {
           type: "video",
@@ -357,17 +445,18 @@ export function VideoCreationForm({
       trackEvent("generation_failed", {
         type: "video",
         model_option_id: selectedOption.id,
-        error: message,
+        error: errorDisplay.code,
       });
       onGenerationFailure?.({
         optimisticId,
         prompt: requestPrompt,
         error: message,
+        errorCode: errorDisplay.code,
       });
       showToast({
-        title: "Generation failed",
-        message,
-        variant: "error",
+        title: errorDisplay.title,
+        message: `${message} ${errorDisplay.action}`,
+        variant: errorDisplay.retryable ? "error" : "warning",
       });
     } finally {
       if (usesConcurrentGenerationLimit) {
@@ -486,7 +575,7 @@ export function VideoCreationForm({
             <div className="flex flex-wrap gap-1.5">
               {soundOptions.map((s) => (
                 <button key={s} type="button" onClick={() => setSound(s)} className={chipCls(sound === s)}>
-                  {s === "on" ? "On" : "Off"}
+                  {s}
                 </button>
               ))}
             </div>
@@ -551,7 +640,7 @@ export function VideoCreationForm({
           <div className="relative min-w-44 flex-[1.75]">
             <button ref={optionsTriggerRef} type="button" onClick={openOptions} className={triggerCls}>
               <span className="truncate">
-                {aspectRatio} | {resolution} | {duration}s{showSound && sound === "on" ? " | Audio" : ""}
+                {aspectRatio} | {resolution} | {duration}s{showSound ? ` | ${sound}` : ""}
               </span>
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
             </button>

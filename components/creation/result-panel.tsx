@@ -4,7 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { ExploreTab } from "./explore-tab";
 import { MyCreationsTab } from "./my-creations-tab";
-import type { CreationHistoryItem } from "@/lib/creation-history";
+import type {
+  CreationHistoryItem,
+  GenerationParameters,
+} from "@/lib/creation-history";
 
 interface ResultPanelProps {
   mode: "video" | "image" | "music";
@@ -21,6 +24,8 @@ export interface PanelGeneration {
   optimisticId?: string;
   prompt?: string;
   error?: string;
+  errorCode?: string;
+  parameters?: GenerationParameters;
 }
 
 export function ResultPanel({

@@ -25,6 +25,22 @@ test("image generation credits are priced by model", () => {
     "2K": 4,
     "4K": 5,
   });
+  assert.deepEqual(IMAGE_MODEL_OPTION_MAP["qwen-image-3-pro"].credits, {
+    "1K": 2,
+    "2K": 4,
+  });
+  assert.deepEqual(IMAGE_MODEL_OPTION_MAP["qwen-image-3-pro"].resolutions, [
+    "1K",
+    "2K",
+  ]);
+  assert.equal(
+    IMAGE_MODEL_OPTION_MAP["qwen-image-3-pro"].textToImageModel,
+    "qwen3/pro-text-to-image"
+  );
+  assert.equal(
+    IMAGE_MODEL_OPTION_MAP["qwen-image-3-pro"].imageToImageModel,
+    "qwen3/pro-image-to-image"
+  );
 });
 
 test("unknown image model falls back to GPT Image 2 pricing", () => {

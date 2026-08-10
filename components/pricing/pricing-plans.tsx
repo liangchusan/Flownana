@@ -4,7 +4,16 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
-import type { PriceKey } from "@/lib/plans";
+import {
+  getPriceKey,
+  isLowerTier,
+  isPriceKey,
+  isUpgradeAllowed,
+  PLAN_CATALOG,
+  PLAN_KEYS,
+  type PlanKey,
+  type PriceKey,
+} from "@/lib/plans";
 import { UpgradeModal } from "@/components/billing/upgrade-modal";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { trackEvent } from "@/lib/analytics";
@@ -22,35 +31,11 @@ const SHARED_FEATURES = [
 
 type BillingMode = "monthly" | "yearly";
 
-const PLANS = [
-  {
-    name: "Pro",
-    planKey: "pro" as const,
-    monthly: 16,
-    yearly: 96,
-    credits: 200,
-    resolution: "720P",
-  },
-  {
-    name: "Max",
-    planKey: "max" as const,
-    monthly: 50,
-    yearly: 300,
-    credits: 800,
-    resolution: "1080P",
-    popular: true,
-  },
-];
-
-function priceKeyFor(
-  plan: "pro" | "max",
-  billing: BillingMode
-): PriceKey {
-  if (plan === "pro") {
-    return billing === "monthly" ? "pro_monthly" : "pro_yearly";
-  }
-  return billing === "monthly" ? "max_monthly" : "max_yearly";
-}
+const PLANS = PLAN_KEYS.map((planKey) => ({
+  planKey,
+  ...PLAN_CATALOG[planKey],
+  popular: planKey === "pro",
+}));
 
 export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   const { data: session, status } = useSession();
@@ -65,6 +50,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeKey, setUpgradeKey] = useState<PriceKey | null>(null);
   const [upgradeChargeLine, setUpgradeChargeLine] = useState<string | null>(null);
+  const [upgradeQuoteError, setUpgradeQuoteError] = useState<string | null>(null);
   const [loadingUpgradeQuote, setLoadingUpgradeQuote] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -164,6 +150,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
     setUpgradeKey(pk);
     setUpgradeOpen(true);
     setUpgradeChargeLine(null);
+    setUpgradeQuoteError(null);
     setLoadingUpgradeQuote(true);
     try {
       const res = await fetch(
@@ -189,7 +176,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         );
       }
     } catch (e: unknown) {
-      setUpgradeChargeLine(
+      setUpgradeQuoteError(
         e instanceof Error ? e.message : "Failed to get upgrade quote."
       );
     } finally {
@@ -197,27 +184,13 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
     }
   };
 
-  const allowedUpgrades: Record<PriceKey, PriceKey[]> = {
-    pro_monthly: ["pro_yearly", "max_monthly", "max_yearly"],
-    pro_yearly: ["max_yearly"],
-    max_monthly: ["max_yearly"],
-    max_yearly: [],
-  };
-
-  const PLAN_RANK: Record<PriceKey, number> = {
-    pro_monthly: 1,
-    pro_yearly: 2,
-    max_monthly: 3,
-    max_yearly: 4,
-  };
-
-  const ctaForPlan = (plan: "pro" | "max"): {
+  const ctaForPlan = (plan: PlanKey): {
     label: string;
     disabled: boolean;
     note?: string;
     onClick: () => void;
   } => {
-    const pk = priceKeyFor(plan, billing);
+    const pk = getPriceKey(plan, billing);
     const sub = summary?.subscription;
     if (!sub) {
       return {
@@ -227,12 +200,23 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       };
     }
 
-    const currentKey = `${sub.planType}_${sub.billingCycle}` as PriceKey;
+    const currentKeyValue = `${sub.planType}_${sub.billingCycle}`;
+    if (!isPriceKey(currentKeyValue)) {
+      return {
+        label: "Manage plan",
+        disabled: false,
+        note: "Open billing to manage this subscription.",
+        onClick: () => {
+          window.location.href = "/account/billing";
+        },
+      };
+    }
+    const currentKey = currentKeyValue;
     if (currentKey === pk) {
       return { label: "Current plan", disabled: true, onClick: () => {} };
     }
 
-    if (allowedUpgrades[currentKey]?.includes(pk)) {
+    if (isUpgradeAllowed(currentKey, pk)) {
       return {
         label: "Upgrade",
         disabled: false,
@@ -240,20 +224,24 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       };
     }
 
-    // Downgrade or lateral — not supported via UI
-    if (PLAN_RANK[pk] <= PLAN_RANK[currentKey]) {
+    if (isLowerTier(pk, currentKey)) {
       return {
         label: "Not available",
         disabled: true,
-        note:
-          PLAN_RANK[pk] < PLAN_RANK[currentKey]
-            ? "To downgrade, manage your subscription in the billing portal."
-            : undefined,
+        note: "To downgrade, manage your subscription in the billing portal.",
         onClick: () => {},
       };
     }
 
-    return { label: "Not available", disabled: true, onClick: () => {} };
+    return {
+      label: "Not available",
+      disabled: true,
+      note:
+        sub.billingCycle === "yearly" && billing === "monthly"
+          ? "Yearly plans can only upgrade to a higher yearly plan."
+          : undefined,
+      onClick: () => {},
+    };
   };
 
   return (
@@ -286,18 +274,20 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
         {PLANS.map((plan) => {
-          const price = billing === "monthly" ? plan.monthly : plan.yearly / 12;
           const cta = ctaForPlan(plan.planKey);
-          const pk = priceKeyFor(plan.planKey, billing);
+          const pk = getPriceKey(plan.planKey, billing);
+          const monthlyEquivalent =
+            billing === "monthly" ? plan.monthlyPrice : plan.yearlyPrice / 12;
+          const unitPrice = monthlyEquivalent / plan.credits;
           return (
             <div
-              key={plan.name}
-              className={`relative rounded-2xl border-2 p-8 ${
+              key={plan.planKey}
+              className={`relative rounded-2xl border-2 bg-white p-7 transition-all duration-300 ${
                 plan.popular
-                  ? "border-stone-700 bg-white shadow-xl"
-                  : "border-stone-200/50 bg-white"
+                  ? "border-stone-700 shadow-lg shadow-stone-200/20"
+                  : "border-stone-200/50 shadow-sm hover:border-stone-300"
               }`}
             >
               {plan.popular && (
@@ -315,21 +305,32 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
               </p>
               <div className="mb-2">
                 <span className="text-4xl font-bold text-stone-900">
-                  ${billing === "monthly" ? plan.monthly : (plan.yearly / 12).toFixed(0)}
+                  ${monthlyEquivalent.toFixed(0)}
                 </span>
                 <span className="text-stone-600">/month</span>
               </div>
               {billing === "yearly" && (
                 <p className="mb-4 text-sm text-stone-500">
-                  Billed ${plan.yearly}/year. Credits issued monthly. Unused
+                  Billed ${plan.yearlyPrice}/year. Credits issued monthly. Unused
                   credits expire after 30 days.
                 </p>
               )}
               {billing === "monthly" && (
-                <p className="mb-4 text-sm text-stone-500">${plan.monthly}/month billed monthly.</p>
+                <p className="mb-4 text-sm text-stone-500">
+                  ${plan.monthlyPrice}/month billed monthly.
+                </p>
               )}
 
-              <ul className="space-y-2 mb-8 text-sm">
+              <div className="mb-6 rounded-xl border border-stone-200/50 bg-stone-50 px-4 py-3">
+                <p className="text-sm font-semibold text-stone-900">
+                  {plan.credits.toLocaleString()} credits / month
+                </p>
+                <p className="mt-1 text-xs text-stone-600">
+                  ${unitPrice.toFixed(2)} per credit · {plan.resolution} output
+                </p>
+              </div>
+
+              <ul className="mb-8 space-y-2 text-sm">
                 {SHARED_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-stone-600" />
@@ -365,6 +366,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         onClose={() => setUpgradeOpen(false)}
         isLoadingQuote={loadingUpgradeQuote}
         chargeLine={upgradeChargeLine}
+        error={upgradeQuoteError}
         onConfirm={() => {
           setUpgradeOpen(false);
           if (upgradeKey) {

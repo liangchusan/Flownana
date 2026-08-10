@@ -1,17 +1,39 @@
 export type VideoModelOptionId = string;
 
-type VideoModelFamily = "kling" | "veo" | "seedance" | "happyhorse";
+type VideoModelFamily = "kling" | "veo" | "seedance" | "happyhorse" | "grok" | "minimax";
+export type VideoAspectRatio =
+  | "Auto"
+  | "16:9"
+  | "9:16"
+  | "1:1"
+  | "4:3"
+  | "3:4"
+  | "3:2"
+  | "2:3";
+export type VideoResolutionOption = "Auto" | "480P" | "720P" | "1080P" | "2K" | "4K";
+export type VideoSoundOption = "Auto" | "On" | "Off";
 
 export type VideoModelOption = {
   id: VideoModelOptionId;
   label: string;
   family: VideoModelFamily;
   providerModel: string;
-  resolution: "480P" | "720P" | "1080P" | "/";
+  imageToVideoProviderModel?: string;
+  requiresImageInput?: boolean;
+  resolution: "480P" | "720P" | "1080P" | "2K" | "4K" | "/";
   duration: number;
   hasAudio?: boolean;
+  aspectRatios?: VideoAspectRatio[];
   credits: number;
 };
+
+export function getVideoModelName(option: VideoModelOption): string {
+  if (option.providerModel.startsWith("happyhorse-1-1/")) return "HappyHorse 1.1";
+  if (option.family === "grok") return "Grok Imagine Video 1.5";
+  if (option.family === "minimax") return "MiniMax H3";
+  if (option.providerModel === "bytedance/seedance-2-fast") return "Seedance 2 Fast";
+  return option.label.split(" · ")[0] || option.label;
+}
 
 const platformVideoCredits = (
   apiCreditsPerSecond: number,
@@ -20,6 +42,60 @@ const platformVideoCredits = (
 
 const SEEDANCE_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
 const HAPPYHORSE_DURATIONS = Array.from({ length: 13 }, (_, index) => index + 3);
+const GROK_DURATIONS = Array.from({ length: 15 }, (_, index) => index + 1);
+const MINIMAX_H3_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
+export const DEFAULT_VIDEO_ASPECT_RATIOS: VideoAspectRatio[] = [
+  "Auto",
+  "16:9",
+  "9:16",
+  "1:1",
+  "4:3",
+  "3:4",
+];
+export const DEFAULT_VIDEO_RESOLUTIONS: VideoResolutionOption[] = [
+  "Auto",
+  "480P",
+  "720P",
+  "1080P",
+  "2K",
+  "4K",
+];
+export const DEFAULT_VIDEO_SOUND_OPTIONS: VideoSoundOption[] = ["Auto", "On", "Off"];
+
+function unique<T>(items: T[]) {
+  return Array.from(new Set(items));
+}
+
+export function formatVideoResolution(
+  resolution: VideoModelOption["resolution"]
+): VideoResolutionOption {
+  return resolution === "/" ? "Auto" : resolution;
+}
+
+export function getDisplayAspectRatios(options: VideoModelOption[]): VideoAspectRatio[] {
+  const supported = unique(
+    options.flatMap((option) => option.aspectRatios || DEFAULT_VIDEO_ASPECT_RATIOS)
+  );
+  return DEFAULT_VIDEO_ASPECT_RATIOS.filter((ratio) => supported.includes(ratio));
+}
+
+export function getDisplayResolutions(options: VideoModelOption[]): VideoResolutionOption[] {
+  const supported = unique(options.map((option) => formatVideoResolution(option.resolution)));
+  return DEFAULT_VIDEO_RESOLUTIONS.filter((resolution) => supported.includes(resolution));
+}
+
+export function getDisplaySoundOptions(options: VideoModelOption[]): VideoSoundOption[] {
+  const supportsAudioOn = options.some((option) => option.hasAudio);
+  const supportsAudioOff = options.some((option) => !option.hasAudio);
+
+  if (supportsAudioOn && supportsAudioOff) {
+    return DEFAULT_VIDEO_SOUND_OPTIONS;
+  }
+  if (supportsAudioOn) {
+    return ["On"];
+  }
+  return [];
+}
 
 function createSeedanceOptions(params: {
   idPrefix: string;
@@ -46,59 +122,74 @@ function createSeedanceOptions(params: {
   );
 }
 
-function createHappyHorseOptions(): VideoModelOption[] {
+function createHappyHorse11Options(): VideoModelOption[] {
   const priceByResolution: Partial<Record<VideoModelOption["resolution"], number>> = {
-    "720P": 28,
-    "1080P": 48,
+    "720P": 22,
+    "1080P": 34,
   };
 
   return Object.entries(priceByResolution).flatMap(
     ([resolution, apiCreditsPerSecond]) =>
       HAPPYHORSE_DURATIONS.map((duration) => ({
-        id: `happyhorse10_${resolution.toLowerCase().replace("p", "")}_${duration}`,
-        label: `HappyHorse 1.0 · ${resolution} · ${duration}s`,
+        id: `happyhorse11_${resolution.toLowerCase().replace("p", "")}_${duration}`,
+        label: `HappyHorse 1.1 · ${resolution} · ${duration}s`,
         family: "happyhorse",
-        providerModel: "happyhorse/text-to-video",
+        providerModel: "happyhorse-1-1/text-to-video",
+        imageToVideoProviderModel: "happyhorse-1-1/image-to-video",
         resolution: resolution as VideoModelOption["resolution"],
         duration,
+        aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
         credits: platformVideoCredits(apiCreditsPerSecond, duration),
       }))
   );
 }
 
-const KLING_API_CREDITS_PER_SECOND = {
-  standard: {
-    noAudio: 14,
-    audio: 20,
-  },
-  pro: {
-    noAudio: 18,
-    audio: 27,
-  },
-};
+function createGrokImagineVideo15Options(): VideoModelOption[] {
+  const priceByResolution: Partial<Record<VideoModelOption["resolution"], number>> = {
+    "480P": 14.5,
+    "720P": 25,
+  };
+
+  return Object.entries(priceByResolution).flatMap(
+    ([resolution, apiCreditsPerSecond]) =>
+      GROK_DURATIONS.map((duration) => ({
+        id: `grok15_${resolution.toLowerCase().replace("p", "")}_${duration}`,
+        label: `Grok Imagine Video 1.5 · ${resolution} · ${duration}s`,
+        family: "grok",
+        providerModel: "grok-imagine-video-1-5-preview",
+        imageToVideoProviderModel: "grok-imagine-video-1-5-preview",
+        requiresImageInput: true,
+        resolution: resolution as VideoModelOption["resolution"],
+        duration,
+        aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
+        credits: platformVideoCredits(apiCreditsPerSecond, duration),
+      }))
+  );
+}
+
+function createMiniMaxH3Options(): VideoModelOption[] {
+  const priceByResolution: Partial<Record<VideoModelOption["resolution"], number>> = {
+    "720P": 18,
+    "2K": 29,
+  };
+
+  return Object.entries(priceByResolution).flatMap(
+    ([resolution, apiCreditsPerSecond]) =>
+      MINIMAX_H3_DURATIONS.map((duration) => ({
+        id: `minimaxh3_${resolution.toLowerCase().replace("p", "")}_${duration}`,
+        label: `MiniMax H3 · ${resolution} · ${duration}s`,
+        family: "minimax",
+        providerModel: "minimax-h3/text-to-video",
+        imageToVideoProviderModel: "minimax-h3/image-to-video",
+        resolution: resolution as VideoModelOption["resolution"],
+        duration,
+        aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
+        credits: platformVideoCredits(apiCreditsPerSecond, duration),
+      }))
+  );
+}
 
 export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
-  { id: "kling30_720_8", label: "Kling 3.0 · 720P · 8s", family: "kling", providerModel: "kling-3.0/video", resolution: "720P", duration: 8, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.standard.noAudio, 8) },
-  { id: "kling30_720_15", label: "Kling 3.0 · 720P · 15s", family: "kling", providerModel: "kling-3.0/video", resolution: "720P", duration: 15, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.standard.noAudio, 15) },
-  { id: "kling30_1080_8", label: "Kling 3.0 · 1080P · 8s", family: "kling", providerModel: "kling-3.0/video", resolution: "1080P", duration: 8, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.pro.noAudio, 8) },
-  { id: "kling30_1080_15", label: "Kling 3.0 · 1080P · 15s", family: "kling", providerModel: "kling-3.0/video", resolution: "1080P", duration: 15, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.pro.noAudio, 15) },
-  { id: "kling30_720_audio_8", label: "Kling 3.0 · 720P(有声音) · 8s", family: "kling", providerModel: "kling-3.0/video", resolution: "720P", duration: 8, hasAudio: true, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.standard.audio, 8) },
-  { id: "kling30_720_audio_15", label: "Kling 3.0 · 720P(有声音) · 15s", family: "kling", providerModel: "kling-3.0/video", resolution: "720P", duration: 15, hasAudio: true, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.standard.audio, 15) },
-  { id: "kling30_1080_audio_8", label: "Kling 3.0 · 1080P(有声音) · 8s", family: "kling", providerModel: "kling-3.0/video", resolution: "1080P", duration: 8, hasAudio: true, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.pro.audio, 8) },
-  { id: "kling30_1080_audio_15", label: "Kling 3.0 · 1080P(有声音) · 15s", family: "kling", providerModel: "kling-3.0/video", resolution: "1080P", duration: 15, hasAudio: true, credits: platformVideoCredits(KLING_API_CREDITS_PER_SECOND.pro.audio, 15) },
-  { id: "veo31_lite_8", label: "VEO 3.1 Lite · 8s", family: "veo", providerModel: "veo3_lite", resolution: "/", duration: 8, credits: Math.round(30 * 0.3) },
-  { id: "veo31_fast_8", label: "VEO 3.1 Fast · 8s", family: "veo", providerModel: "veo3_fast", resolution: "/", duration: 8, credits: Math.round(60 * 0.3) },
-  { id: "veo31_quality_8", label: "VEO 3.1 Quality · 8s", family: "veo", providerModel: "veo3", resolution: "/", duration: 8, credits: Math.round(250 * 0.3) },
-  ...createSeedanceOptions({
-    idPrefix: "seedance20",
-    label: "Seedance 2",
-    providerModel: "bytedance/seedance-2",
-    priceByResolution: {
-      "480P": 19,
-      "720P": 41,
-      "1080P": 102,
-    },
-  }),
   ...createSeedanceOptions({
     idPrefix: "seedance20fast",
     label: "Seedance 2 Fast",
@@ -108,7 +199,9 @@ export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
       "720P": 33,
     },
   }),
-  ...createHappyHorseOptions(),
+  ...createMiniMaxH3Options(),
+  ...createGrokImagineVideo15Options(),
+  ...createHappyHorse11Options(),
 ];
 
 export const VIDEO_MODEL_OPTION_MAP: Record<VideoModelOptionId, VideoModelOption> =
@@ -118,14 +211,15 @@ export const VIDEO_MODEL_OPTION_MAP: Record<VideoModelOptionId, VideoModelOption
   }, {} as Record<VideoModelOptionId, VideoModelOption>);
 
 export type ImageResolutionKey = "1K" | "2K" | "4K";
-export type ImageModelOptionId = "gpt-image-2" | "nano-banana-2";
+export type ImageModelOptionId = "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro";
 
 export type ImageModelOption = {
   id: ImageModelOptionId;
   label: string;
   textToImageModel: string;
   imageToImageModel: string;
-  credits: Record<ImageResolutionKey, number>;
+  credits: Partial<Record<ImageResolutionKey, number>>;
+  resolutions?: ImageResolutionKey[];
 };
 
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
@@ -149,6 +243,17 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
       "1K": 2,
       "2K": 4,
       "4K": 5,
+    },
+  },
+  {
+    id: "qwen-image-3-pro",
+    label: "Qwen Image 3.0 Pro",
+    textToImageModel: "qwen3/pro-text-to-image",
+    imageToImageModel: "qwen3/pro-image-to-image",
+    resolutions: ["1K", "2K"],
+    credits: {
+      "1K": Math.round(6.4 * 0.3),
+      "2K": Math.round(12 * 0.3),
     },
   },
 ];

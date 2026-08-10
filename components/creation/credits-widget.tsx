@@ -26,21 +26,21 @@ type Summary = ClientBillingSummary & {
 
 const PLAN_LABEL: Record<string, string> = {
   free: "Free",
+  starter: "Starter",
   pro: "Pro",
   max: "Max",
 };
 
 const PLAN_COLOR: Record<string, string> = {
   free: "border-stone-200 bg-stone-50 text-stone-700",
-  pro: "border-stone-300 bg-stone-100 text-stone-700",
+  starter: "border-stone-200 bg-stone-100 text-stone-700",
+  pro: "border-stone-300 bg-stone-100 text-stone-800",
   max: "border-zinc-300 bg-zinc-100 text-zinc-700",
 };
 
 export function CreditsWidget({ variant = "default" }: { variant?: "default" | "sidebar" }) {
   const { data: session, status } = useSession();
-  const [summary, setSummary] = useState<Summary | null>(() => {
-    return getCachedBillingSummary() as Summary | null;
-  });
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

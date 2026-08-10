@@ -8,12 +8,14 @@ export function UpgradeModal({
   onConfirm,
   isLoadingQuote,
   chargeLine,
+  error,
 }: {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
   isLoadingQuote?: boolean;
   chargeLine?: string | null;
+  error?: string | null;
 }) {
   if (!open) return null;
 
@@ -44,6 +46,12 @@ export function UpgradeModal({
           </div>
         )}
 
+        {!isLoadingQuote && error && (
+          <p className="mb-5 rounded-xl border border-red-200/70 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
         <ul className="mb-6 space-y-1.5 text-sm text-stone-600">
           <li className="flex items-start gap-2">
             <span className="shrink-0 text-stone-500">•</span>
@@ -63,7 +71,10 @@ export function UpgradeModal({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={!!isLoadingQuote}>
+          <Button
+            onClick={onConfirm}
+            disabled={!!isLoadingQuote || !!error || !chargeLine}
+          >
             Confirm Upgrade
           </Button>
         </div>

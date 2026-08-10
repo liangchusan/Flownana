@@ -2,6 +2,7 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
+import { getTestAuthCreditAmount } from "@/lib/test-auth-config";
 
 if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
   process.env.GLOBAL_AGENT_HTTP_PROXY =
@@ -29,7 +30,7 @@ const testAuthEnabled =
 const testUserId = process.env.TEST_AUTH_USER_ID || "test-user-local";
 const testUserEmail = process.env.TEST_AUTH_EMAIL || "test@flownana.local";
 const testUserName = process.env.TEST_AUTH_NAME || "Test User";
-const testCreditAmount = Number(process.env.TEST_AUTH_CREDITS || 1000);
+const testCreditAmount = getTestAuthCreditAmount(process.env);
 
 async function ensureTestUser() {
   await prisma.user.upsert({

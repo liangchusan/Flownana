@@ -5,7 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { CreationSidebar } from "@/components/layout/creation-sidebar";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { ResultPanel } from "@/components/creation/result-panel";
-import type { CreationHistoryItem } from "@/lib/creation-history";
+import type { PanelGeneration } from "@/components/creation/result-panel";
+import type {
+  CreationHistoryItem,
+} from "@/lib/creation-history";
 
 export function CreateContent({
   mode,
@@ -16,13 +19,12 @@ export function CreateContent({
 }) {
   const searchParams = useSearchParams();
 
-  // Image state
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [currentTaskId, setCurrentTaskId] = useState<string | undefined>(undefined);
-  const [currentPrompt, setCurrentPrompt] = useState<string | undefined>(undefined);
+  const [imageGenerations, setImageGenerations] = useState<PanelGeneration[]>([]);
   const [similarPrompt, setSimilarPrompt] = useState<string | undefined>(undefined);
   const [similarImage, setSimilarImage] = useState<string | undefined>(undefined);
+  const activeImageGenerationCount = imageGenerations.filter(
+    (generation) => generation.isGenerating && !generation.url && !generation.error
+  ).length;
 
   // Sync initial prompt/image from URL (?prompt=... & ?image=...)
   useEffect(() => {
@@ -46,14 +48,67 @@ export function CreateContent({
               AI Image
             </h1>
             <GenerateForm
-              onGenerate={(url, taskId, prompt) => {
-                setGeneratedImage(url);
-                if (taskId) setCurrentTaskId(taskId);
-                if (prompt) setCurrentPrompt(prompt);
+              onGenerationStart={({ optimisticId, prompt, parameters }) => {
+                setImageGenerations((prev) => [
+                  {
+                    url: null,
+                    isGenerating: true,
+                    optimisticId,
+                    prompt,
+                    parameters,
+                  },
+                  ...prev,
+                ]);
               }}
-              isGenerating={isGeneratingImage}
-              setIsGenerating={setIsGeneratingImage}
-              onTaskIdChange={setCurrentTaskId}
+              onGenerate={(url, taskId, prompt, parameters, optimisticId) => {
+                setImageGenerations((prev) =>
+                  prev.map((generation) =>
+                    generation.optimisticId === optimisticId
+                      ? {
+                          ...generation,
+                          url,
+                          isGenerating: false,
+                          taskId,
+                          prompt: prompt || generation.prompt,
+                          parameters: parameters || generation.parameters,
+                          error: undefined,
+                        }
+                      : generation
+                  )
+                );
+              }}
+              onGenerationTaskCreated={({ optimisticId, taskId, prompt }) => {
+                setImageGenerations((prev) =>
+                  prev.map((generation) =>
+                    generation.optimisticId === optimisticId
+                      ? {
+                          ...generation,
+                          taskId,
+                          prompt: prompt || generation.prompt,
+                        }
+                      : generation
+                  )
+                );
+              }}
+              onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => {
+                setImageGenerations((prev) =>
+                  prev.map((generation) =>
+                    generation.optimisticId === optimisticId
+                      ? {
+                          ...generation,
+                          url: null,
+                          isGenerating: false,
+                          prompt,
+                          error,
+                          errorCode,
+                        }
+                      : generation
+                  )
+                );
+              }}
+              isGenerating={activeImageGenerationCount >= 5}
+              setIsGenerating={() => undefined}
+              activeGenerationCount={activeImageGenerationCount}
               initialPrompt={similarPrompt}
               initialImage={similarImage}
             />
@@ -64,12 +119,7 @@ export function CreateContent({
             <ResultPanel
               mode="image"
               initialCreations={initialCreations}
-              currentGeneration={{
-                url: generatedImage,
-                isGenerating: isGeneratingImage,
-                taskId: currentTaskId,
-                prompt: currentPrompt,
-              }}
+              currentGenerations={imageGenerations}
               onGenerateSimilar={(data) => {
                 setSimilarPrompt(data.prompt);
                 setSimilarImage(data.imageUrl);

@@ -13,13 +13,50 @@ import {
 import {
   VIDEO_MODEL_OPTION_MAP,
   VIDEO_MODEL_OPTIONS,
+  formatVideoResolution,
+  getVideoModelName,
   type VideoModelOption,
   type VideoModelOptionId,
 } from "@/lib/generation-pricing";
+import {
+  getKieVideoAspectRatio,
+  getKieMarketVideoTaskBody,
+} from "@/lib/kie-video-request";
 import { parseKieVideoResult, type KieVideoResultData } from "@/lib/kie-video-result";
-import { persistGeneratedMedia } from "@/lib/media-storage";
+import {
+  ProviderGenerationError,
+  getGenerationErrorDisplay,
+  getGenerationErrorHttpStatus,
+  getGenerationErrorPayload,
+  withGenerationCreditOutcome,
+  type GenerationErrorCode,
+} from "@/lib/generation-errors";
+import { persistGeneratedMedia, persistImageInputMedia } from "@/lib/media-storage";
 
 const KIE_API_BASE = "https://api.kie.ai";
+const VIDEO_TASK_TIMEOUT_MS = 45 * 60 * 1000;
+
+function videoErrorResponse(
+  code: GenerationErrorCode,
+  status?: number,
+  overrides?: { message?: string; required?: number; available?: number }
+) {
+  const payload = getGenerationErrorPayload(
+    {
+      errorCode: code,
+      ...(overrides?.message ? { error: overrides.message } : {}),
+    },
+    { mediaType: "video" }
+  );
+  return NextResponse.json(
+    {
+      ...payload,
+      ...(overrides?.required !== undefined ? { required: overrides.required } : {}),
+      ...(overrides?.available !== undefined ? { available: overrides.available } : {}),
+    },
+    { status: status ?? getGenerationErrorHttpStatus(code) }
+  );
+}
 
 const FAMILY_ENDPOINTS: Record<
   VideoModelOption["family"],
@@ -45,6 +82,16 @@ const FAMILY_ENDPOINTS: Record<
     detail: "/api/v1/jobs/recordInfo",
     style: "market",
   },
+  grok: {
+    create: "/api/v1/jobs/createTask",
+    detail: "/api/v1/jobs/recordInfo",
+    style: "market",
+  },
+  minimax: {
+    create: "/api/v1/jobs/createTask",
+    detail: "/api/v1/jobs/recordInfo",
+    style: "market",
+  },
 };
 
 function resolveVideoOption(params: {
@@ -54,17 +101,14 @@ function resolveVideoOption(params: {
   if (params.modelOptionId) {
     const byId = VIDEO_MODEL_OPTION_MAP[params.modelOptionId as VideoModelOptionId];
     if (byId) return byId;
+    return null;
   }
 
-  switch (params.model) {
-    case "veo3_lite":
-      return VIDEO_MODEL_OPTION_MAP.veo31_lite_8;
-    case "veo3_quality":
-      return VIDEO_MODEL_OPTION_MAP.veo31_quality_8;
-    case "veo3_fast":
-    default:
-      return VIDEO_MODEL_OPTION_MAP.veo31_fast_8;
+  if (params.model) {
+    return null;
   }
+
+  return VIDEO_MODEL_OPTIONS[0] || null;
 }
 
 async function createVideoTask(params: {
@@ -83,65 +127,37 @@ async function createVideoTask(params: {
 
   const endpoint = FAMILY_ENDPOINTS[params.option.family].create;
   const endpointStyle = FAMILY_ENDPOINTS[params.option.family].style;
+  const hasImageInput = !!params.imageUrls?.length;
+  const providerModel =
+    hasImageInput && params.option.imageToVideoProviderModel
+      ? params.option.imageToVideoProviderModel
+      : params.option.providerModel;
+  const aspectRatio = getKieVideoAspectRatio({
+    aspectRatio: params.aspectRatio,
+    hasImageInput,
+  });
   let body: Record<string, unknown>;
   if (endpointStyle === "veo") {
     body = {
       prompt: params.prompt,
       imageUrls: params.imageUrls || [],
-      model: params.option.providerModel,
-      aspectRatio: params.aspectRatio || "16:9",
+      model: providerModel,
+      aspectRatio,
       duration: params.option.duration,
       watermark: params.watermark,
       enableTranslation: true,
       generationType:
-        params.imageUrls && params.imageUrls.length > 0
+          hasImageInput
           ? "REFERENCE_2_VIDEO"
           : "TEXT_2_VIDEO",
     };
-  } else if (params.option.family === "kling") {
-    body = {
-      model: params.option.providerModel,
-      input: {
-        prompt: params.prompt,
-        image_urls: params.imageUrls || [],
-        aspect_ratio: params.aspectRatio || "16:9",
-        duration: String(params.option.duration),
-        // Kling 3.0 uses mode tiers; map 1080P to pro, 720P to standard.
-        mode: params.option.resolution === "1080P" ? "pro" : "standard",
-        sound: !!params.option.hasAudio,
-      },
-    };
-  } else if (params.option.family === "happyhorse") {
-    body = {
-      model: params.option.providerModel,
-      input: {
-        prompt: params.prompt,
-        resolution: params.option.resolution === "1080P" ? "1080p" : "720p",
-        aspect_ratio: params.aspectRatio || "16:9",
-        duration: params.option.duration,
-      },
-    };
   } else {
-    const [firstFrameUrl, lastFrameUrl] = params.imageUrls || [];
-
-    body = {
-      model: params.option.providerModel,
-      input: {
-        prompt: params.prompt,
-        first_frame_url: firstFrameUrl,
-        last_frame_url: lastFrameUrl,
-        aspect_ratio: params.aspectRatio || "16:9",
-        resolution:
-          params.option.resolution === "1080P"
-            ? "1080p"
-            : params.option.resolution === "480P"
-              ? "480p"
-              : "720p",
-        duration: params.option.duration,
-        generate_audio: !!params.option.hasAudio,
-        web_search: false,
-      },
-    };
+    body = getKieMarketVideoTaskBody({
+      prompt: params.prompt,
+      imageUrls: params.imageUrls,
+      aspectRatio: params.aspectRatio,
+      option: params.option,
+    });
   }
 
   const res = await fetch(`${KIE_API_BASE}${endpoint}`, {
@@ -156,7 +172,7 @@ async function createVideoTask(params: {
   if (!res.ok) {
     const text = await res.text();
     console.error("Video createTask returned error:", text);
-    throw new Error("Failed to create video generation task. Please try again later.");
+    throw new ProviderGenerationError(text || res.statusText, res.status);
   }
 
   const json = (await res.json()) as {
@@ -167,7 +183,9 @@ async function createVideoTask(params: {
 
   if (json.code !== 200 || !json.data?.taskId) {
     console.error("Video createTask response error:", json);
-    throw new Error(json.msg || "Failed to create video generation task. Please try again later.");
+    throw new ProviderGenerationError(
+      json.msg || "Failed to create video generation task. Please try again later."
+    );
   }
 
   return json.data.taskId;
@@ -203,16 +221,28 @@ async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
 
   const endpoint = FAMILY_ENDPOINTS[option.family].detail;
   const detailUrl = `${KIE_API_BASE}${endpoint}?taskId=${encodeURIComponent(taskId)}`;
-  const res = await fetch(detailUrl, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(detailUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+  } catch (error) {
+    console.error("Video details request failed:", error);
+    return { state: "pending" as const };
+  }
 
   if (!res.ok) {
     const text = await res.text();
     console.error("Video details returned error:", text);
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+      return {
+        state: "failed" as const,
+        error: new ProviderGenerationError(text || res.statusText, res.status).message,
+      };
+    }
     return { state: "pending" as const };
   }
 
@@ -224,10 +254,88 @@ async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
 
   if (json.code !== 200 || !json.data) {
     console.error("Video details response error:", json);
-    return { state: "pending" as const };
+    return {
+      state: "failed" as const,
+      error: json.msg || "Failed to query task status. Please try again later.",
+    };
   }
 
   return parseKieVideoResult(json.data);
+}
+
+async function failVideoGeneration(params: {
+  generation: {
+    id: string;
+    prompt: string;
+    taskId: string | null;
+    creditConsumption: unknown;
+  };
+  error: unknown;
+  source: "app" | "provider";
+}) {
+  const consumedCredits = normalizeCreditConsumptionSnapshot(
+    params.generation.creditConsumption
+  );
+  let creditsRefunded = false;
+  let refundPending = false;
+
+  if (consumedCredits.length > 0) {
+    try {
+      await refundConsumedCredits(consumedCredits);
+      creditsRefunded = true;
+    } catch (refundError) {
+      refundPending = true;
+      console.error("Failed to refund async video credits:", refundError);
+    }
+  }
+
+  const display = withGenerationCreditOutcome(
+    getGenerationErrorDisplay(params.error, {
+      mediaType: "video",
+      source: params.source,
+    }),
+    {
+      creditsConsumed: consumedCredits.length > 0,
+      creditsRefunded,
+      refundPending,
+    }
+  );
+
+  await prisma.generation.update({
+    where: { id: params.generation.id },
+    data: {
+      status: "failed",
+      error: display.message,
+      ...(refundPending ? {} : { creditConsumption: Prisma.JsonNull }),
+    },
+  });
+
+  const payload = getGenerationErrorPayload(
+    {
+      errorCode: display.code,
+      errorTitle: display.title,
+      error: display.message,
+      errorAction: display.action,
+      retryable: display.retryable,
+    },
+    {
+      mediaType: "video",
+      creditsRefunded,
+      refundPending,
+    }
+  );
+
+  return NextResponse.json(
+    {
+      success: false,
+      pending: false,
+      status: "failed",
+      ...payload,
+      prompt: params.generation.prompt,
+      taskId: params.generation.taskId,
+    },
+    { status: getGenerationErrorHttpStatus(display.code) }
+  );
 }
 
 async function settleVideoTask(params: {
@@ -244,7 +352,7 @@ async function settleVideoTask(params: {
   });
 
   if (!generation) {
-    return NextResponse.json({ error: "Generation not found." }, { status: 404 });
+    return videoErrorResponse("task_not_found");
   }
 
   if (generation.status === "success") {
@@ -257,25 +365,27 @@ async function settleVideoTask(params: {
       taskId: generation.taskId,
       creditsCost: generation.creditsCost,
       modelOptionId: generation.modelOptionId,
+      parameters: generation.parameters,
     });
   }
 
   if (generation.status === "failed") {
-    return NextResponse.json(
-      {
-        success: false,
-        pending: false,
-        status: generation.status,
-        error: generation.error || "Generation failed.",
-        prompt: generation.prompt,
-        taskId: generation.taskId,
-      },
-      { status: 500 }
-    );
+    return failVideoGeneration({
+      generation,
+      error: generation.error || "Generation failed.",
+      source: "app",
+    });
   }
 
   const result = await getVideoResultOnce(params.taskId, params.option);
   if (result.state === "pending") {
+    if (Date.now() - generation.createdAt.getTime() >= VIDEO_TASK_TIMEOUT_MS) {
+      return failVideoGeneration({
+        generation,
+        error: { errorCode: "timeout" },
+        source: "app",
+      });
+    }
     return NextResponse.json({
       success: true,
       pending: true,
@@ -284,49 +394,34 @@ async function settleVideoTask(params: {
       taskId: generation.taskId,
       creditsCost: generation.creditsCost,
       modelOptionId: generation.modelOptionId,
+      parameters: generation.parameters,
     });
   }
 
   if (result.state === "failed") {
-    const consumedCredits = normalizeCreditConsumptionSnapshot(
-      generation.creditConsumption
-    );
-    if (consumedCredits.length > 0) {
-      try {
-        await refundConsumedCredits(consumedCredits);
-      } catch (refundError) {
-        console.error("Failed to refund async video credits:", refundError);
-      }
-    }
-
-    await prisma.generation.update({
-      where: { id: generation.id },
-      data: {
-        status: "failed",
-        error: result.error,
-        creditConsumption: Prisma.JsonNull,
-      },
+    return failVideoGeneration({
+      generation,
+      error: result.error,
+      source: "provider",
     });
-
-    return NextResponse.json(
-      {
-        success: false,
-        pending: false,
-        status: "failed",
-        error: result.error,
-        prompt: generation.prompt,
-        taskId: generation.taskId,
-      },
-      { status: 500 }
-    );
   }
 
-  const videoUrl = await persistGeneratedMedia({
-    sourceUrl: result.url,
-    userId: params.userId,
-    taskId: params.taskId,
-    kind: "video",
-  });
+  let videoUrl: string;
+  try {
+    videoUrl = await persistGeneratedMedia({
+      sourceUrl: result.url,
+      userId: params.userId,
+      taskId: params.taskId,
+      kind: "video",
+    });
+  } catch (error) {
+    console.error("Failed to persist completed video:", error);
+    return failVideoGeneration({
+      generation,
+      error: { errorCode: "media_processing_failed" },
+      source: "app",
+    });
+  }
 
   await prisma.generation.update({
     where: { id: generation.id },
@@ -347,6 +442,7 @@ async function settleVideoTask(params: {
     taskId: generation.taskId,
     creditsCost: generation.creditsCost,
     modelOptionId: generation.modelOptionId,
+    parameters: generation.parameters,
   });
 }
 
@@ -355,10 +451,7 @@ export async function GET(request: NextRequest) {
   if (taskId) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Please sign in to view generation status." },
-        { status: 401 }
-      );
+      return videoErrorResponse("auth_required");
     }
 
     const modelOptionId = request.nextUrl.searchParams.get("modelOptionId");
@@ -376,10 +469,7 @@ export async function GET(request: NextRequest) {
       modelOptionId: modelOptionId || generation?.modelOptionId || undefined,
     });
     if (!option) {
-      return NextResponse.json(
-        { error: "Unsupported video model option." },
-        { status: 400 }
-      );
+      return videoErrorResponse("invalid_parameters");
     }
 
     return settleVideoTask({
@@ -400,13 +490,11 @@ export async function POST(request: NextRequest) {
   let taskId: string | undefined;
   let userId: string | undefined;
   let promptForPersistence = "Untitled prompt";
+  let parametersForPersistence: Record<string, string | number> | undefined;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Please sign in to generate videos." },
-        { status: 401 }
-      );
+      return videoErrorResponse("auth_required");
     }
     userId = session.user.id;
 
@@ -428,26 +516,54 @@ export async function POST(request: NextRequest) {
     };
 
     if (!prompt) {
-      return NextResponse.json(
-        { error: "Prompt cannot be empty" },
-        { status: 400 }
-      );
+      return videoErrorResponse("prompt_required");
     }
     promptForPersistence = prompt;
 
     const option = resolveVideoOption({ modelOptionId, model });
     if (!option) {
-      return NextResponse.json(
-        { error: "Unsupported video model option." },
-        { status: 400 }
-      );
+      return videoErrorResponse("invalid_parameters");
     }
+
+    const inputSources = Array.isArray(imageUrls)
+      ? imageUrls.filter((url) => typeof url === "string" && url.trim().length > 0)
+      : [];
+
+    if (option.requiresImageInput && inputSources.length === 0) {
+      return videoErrorResponse("input_image_required");
+    }
+
+    const requestId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const normalizedImageUrls =
+      inputSources.length > 0
+        ? await Promise.all(
+            inputSources.map((source, index) =>
+              persistImageInputMedia({
+                source,
+                userId: session.user.id,
+                requestId: `${requestId}-${index}`,
+              })
+            )
+          )
+        : undefined;
+
+    parametersForPersistence = {
+      model: getVideoModelName(option),
+      resolution: formatVideoResolution(option.resolution),
+      aspectRatio: aspectRatio || "Auto",
+      duration: option.duration,
+      audio: option.hasAudio ? "On" : "Off",
+      mode: normalizedImageUrls?.length ? "Image to video" : "Text to video",
+    };
 
     consumedCredits = await consumeCreditsFIFO(session.user.id, option.credits);
 
     taskId = await createVideoTask({
       prompt,
-      imageUrls,
+      imageUrls: normalizedImageUrls,
       aspectRatio,
       watermark,
       option,
@@ -462,6 +578,7 @@ export async function POST(request: NextRequest) {
         prompt,
         error: null,
         modelOptionId: option.id,
+        parameters: parametersForPersistence as Prisma.InputJsonValue,
         creditsCost: option.credits,
         creditConsumption: consumedCredits as Prisma.InputJsonValue,
       },
@@ -473,6 +590,7 @@ export async function POST(request: NextRequest) {
         prompt,
         taskId,
         modelOptionId: option.id,
+        parameters: parametersForPersistence as Prisma.InputJsonValue,
         creditsCost: option.credits,
         creditConsumption: consumedCredits as Prisma.InputJsonValue,
       },
@@ -486,9 +604,48 @@ export async function POST(request: NextRequest) {
       taskId,
       creditsCost: option.credits,
       modelOptionId: option.id,
+      parameters: parametersForPersistence,
     });
   } catch (error: any) {
     console.error("Error generating video:", error);
+    let creditsRefunded = false;
+    let refundPending = false;
+    if (consumedCredits.length > 0) {
+      try {
+        await refundConsumedCredits(consumedCredits);
+        creditsRefunded = true;
+      } catch (refundError) {
+        refundPending = true;
+        console.error("Failed to refund video credits:", refundError);
+      }
+    }
+
+    let errorDisplay;
+    if (error instanceof InsufficientCreditsError) {
+      errorDisplay = getGenerationErrorDisplay(
+        {
+          errorCode: "insufficient_credits",
+          error: `This generation needs ${error.required} credits, but you have ${error.available}.`,
+        },
+        { mediaType: "video" }
+      );
+    } else if (error instanceof CreditConsumptionConflictError) {
+      errorDisplay = getGenerationErrorDisplay(
+        { errorCode: "credit_conflict" },
+        { mediaType: "video" }
+      );
+    } else {
+      errorDisplay = getGenerationErrorDisplay(error, {
+        mediaType: "video",
+        source: error instanceof ProviderGenerationError ? "provider" : "app",
+      });
+    }
+    errorDisplay = withGenerationCreditOutcome(errorDisplay, {
+      creditsConsumed: consumedCredits.length > 0,
+      creditsRefunded,
+      refundPending,
+    });
+
     if (taskId && userId) {
       try {
         await prisma.generation.upsert({
@@ -496,10 +653,13 @@ export async function POST(request: NextRequest) {
           update: {
             type: "video",
             status: "failed",
-            error:
-              typeof error?.message === "string"
-                ? error.message
-                : "Generation failed.",
+            error: errorDisplay.message,
+            creditConsumption: refundPending
+              ? (consumedCredits as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            ...(parametersForPersistence
+              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
+              : {}),
           },
           create: {
             userId,
@@ -508,47 +668,42 @@ export async function POST(request: NextRequest) {
             urls: [],
             prompt: promptForPersistence,
             taskId,
-            error:
-              typeof error?.message === "string"
-                ? error.message
-                : "Generation failed.",
+            error: errorDisplay.message,
+            creditConsumption: refundPending
+              ? (consumedCredits as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            ...(parametersForPersistence
+              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
+              : {}),
           },
         });
       } catch (persistErr) {
         console.error("Failed to persist video generation failure:", persistErr);
       }
     }
-    if (consumedCredits.length > 0) {
-      try {
-        await refundConsumedCredits(consumedCredits);
-      } catch (refundError) {
-        console.error("Failed to refund video credits:", refundError);
+    const payload = getGenerationErrorPayload(
+      {
+        errorCode: errorDisplay.code,
+        errorTitle: errorDisplay.title,
+        error: errorDisplay.message,
+        errorAction: errorDisplay.action,
+        retryable: errorDisplay.retryable,
+      },
+      {
+        mediaType: "video",
+        creditsRefunded,
+        refundPending,
       }
-    }
+    );
 
-    if (error instanceof InsufficientCreditsError) {
-      return NextResponse.json(
-        {
-          error: `Insufficient credits. Required ${error.required}, available ${error.available}.`,
-          required: error.required,
-          available: error.available,
-        },
-        { status: 402 }
-      );
-    }
-
-    if (error instanceof CreditConsumptionConflictError) {
-      return NextResponse.json(
-        { error: "Credit balance changed. Please retry generation." },
-        { status: 409 }
-      );
-    }
-
-    const message =
-      typeof error?.message === "string"
-        ? error.message
-        : "Error generating video. Please try again later.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        ...payload,
+        ...(error instanceof InsufficientCreditsError
+          ? { required: error.required, available: error.available }
+          : {}),
+      },
+      { status: getGenerationErrorHttpStatus(errorDisplay.code) }
+    );
   }
 }

@@ -5,6 +5,15 @@ import { prisma } from "@/lib/prisma";
 
 const KIE_DOWNLOAD_URL_ENDPOINT = "https://api.kie.ai/api/v1/common/download-url";
 
+function isVercelBlobUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.endsWith(".public.blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -36,6 +45,10 @@ export async function POST(request: NextRequest) {
 
     if (!creation || !creation.urls.includes(url)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (isVercelBlobUrl(url)) {
+      return NextResponse.json({ url });
     }
 
     const apiKey = process.env.NANO_BANANA_API_KEY || process.env.KIE_API_KEY;

@@ -3,16 +3,36 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Download, Trash2, RefreshCw, Loader2, Image as ImageIcon, Video, Music, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock3,
+  Download,
+  FileWarning,
+  Image as ImageIcon,
+  Loader2,
+  Music,
+  RefreshCw,
+  Settings2,
+  ShieldAlert,
+  Trash2,
+  Video,
+  WifiOff,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ImageModal from "./image-modal";
-import VideoModal from "./video-modal";
+import { CreationPreviewDialog } from "@/components/blocks/creation-preview-dialog";
 import {
   creationIdentity,
   mergeCreations,
+  normalizeGenerationParameters,
   type CreationHistoryItem,
   type CreationStatus,
 } from "@/lib/creation-history";
+import {
+  getGenerationErrorDisplay,
+  isGenerationErrorCode,
+  type GenerationErrorCode,
+} from "@/lib/generation-errors";
 import { trackEvent } from "@/lib/analytics";
 import type { PanelGeneration } from "./result-panel";
 
@@ -105,7 +125,28 @@ function normalizeCreation(raw: unknown): Creation | null {
           ? candidate.error
           : "Media not available"
         : undefined,
+    errorCode: isGenerationErrorCode(candidate.errorCode)
+      ? candidate.errorCode
+      : undefined,
+    modelOptionId:
+      typeof candidate.modelOptionId === "string" ? candidate.modelOptionId : undefined,
+    creditsCost:
+      typeof candidate.creditsCost === "number" ? candidate.creditsCost : undefined,
+    parameters: normalizeGenerationParameters(candidate.parameters),
   };
+}
+
+function shouldPersistCreation(creation: Creation) {
+  if (
+    creation.type === "image" &&
+    (creation.status === "pending" ||
+      creation.status === "generating" ||
+      creation.status === "processing")
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 interface MyCreationsTabProps {
@@ -158,6 +199,43 @@ function removeStoredCreation(
       console.error("Error removing stored creation:", error);
     }
   }
+}
+
+function isUserFixableGenerationError(code: GenerationErrorCode) {
+  return [
+    "content_policy",
+    "prompt_required",
+    "input_image_required",
+    "unsupported_file_type",
+    "file_too_large",
+    "invalid_image",
+    "invalid_parameters",
+    "insufficient_credits",
+  ].includes(code);
+}
+
+function GenerationFailureIcon({
+  code,
+  className,
+}: {
+  code: GenerationErrorCode;
+  className: string;
+}) {
+  if (code === "content_policy") return <ShieldAlert className={className} />;
+  if (
+    code === "unsupported_file_type" ||
+    code === "file_too_large" ||
+    code === "invalid_image" ||
+    code === "input_image_required"
+  ) {
+    return <FileWarning className={className} />;
+  }
+  if (code === "invalid_parameters" || code === "prompt_required") {
+    return <Settings2 className={className} />;
+  }
+  if (code === "timeout") return <Clock3 className={className} />;
+  if (code === "network_error") return <WifiOff className={className} />;
+  return <AlertTriangle className={className} />;
 }
 
 function CreationImagePreview({
@@ -233,7 +311,7 @@ function CreationImagePreview({
         ref={imageRef}
         src={displayUrl}
         alt={creation.prompt}
-        className="w-full h-full object-cover cursor-pointer"
+        className="h-full w-full cursor-pointer object-contain"
         onClick={() => {
           if (hasMultiple) {
             onToggleExpand();
@@ -260,6 +338,15 @@ function CreationImagePreview({
   );
 }
 
+function isVercelBlobUrl(url: string) {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.endsWith(".public.blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+}
+
 export function MyCreationsTab({
   mode,
   initialCreations = [],
@@ -269,13 +356,16 @@ export function MyCreationsTab({
   const { data: session, status } = useSession();
   const router = useRouter();
   const [creations, setCreations] = useState<Creation[]>(initialCreations);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [selectedPreview, setSelectedPreview] = useState<{
+    creation: Creation;
+    url: string;
+  } | null>(null);
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
   const [resolvedMediaUrls, setResolvedMediaUrls] = useState<Record<string, string>>({});
   const [refreshingMedia, setRefreshingMedia] = useState<Set<string>>(new Set());
+  const [mediaRetryCounts, setMediaRetryCounts] = useState<Record<string, number>>({});
   const generationItems = useMemo(
     () => currentGenerations ?? (currentGeneration ? [currentGeneration] : []),
     [currentGeneration, currentGenerations]
@@ -316,6 +406,7 @@ export function MyCreationsTab({
             ? parsed
                 .map((item) => normalizeCreation(item))
                 .filter((item): item is Creation => !!item)
+                .filter(shouldPersistCreation)
             : [];
           parsedAll.push(...normalized);
         } catch (error) {
@@ -383,8 +474,10 @@ export function MyCreationsTab({
                   status,
                   urls: generation.url ? [generation.url] : c.urls,
                   prompt: generation.prompt || c.prompt,
+                  parameters: generation.parameters || c.parameters,
                   taskId: taskId || c.taskId || optimisticId,
                   error: generation.error,
+                  errorCode: generation.errorCode,
                 }
               : c
           );
@@ -396,9 +489,11 @@ export function MyCreationsTab({
             status,
             urls: generation.url ? [generation.url] : [],
             prompt: generation.prompt || "",
+            parameters: generation.parameters,
             createdAt: new Date().toISOString(),
             taskId: taskId || optimisticId,
             error: generation.error,
+            errorCode: generation.errorCode,
           };
           return mergeCreations([newCreation], prev);
         }
@@ -417,7 +512,10 @@ export function MyCreationsTab({
     }
 
     const storageKey = `creations_${session.user.id}`;
-    const normalizedCreations = mergeCreations(creations, []);
+    const normalizedCreations = mergeCreations(
+      creations.filter(shouldPersistCreation),
+      []
+    );
 
     if (normalizedCreations.length > 0) {
       localStorage.setItem(storageKey, JSON.stringify(normalizedCreations));
@@ -456,6 +554,9 @@ export function MyCreationsTab({
                         status: "success",
                         urls: [data.videoUrl],
                         prompt: data.prompt || creation.prompt,
+                        parameters:
+                          normalizeGenerationParameters(data.parameters) ||
+                          creation.parameters,
                         error: undefined,
                       }
                     : creation
@@ -576,6 +677,32 @@ export function MyCreationsTab({
     const key = creationIdentity(creation);
     if (!originalUrl || refreshingMedia.has(key)) return;
 
+    if (isVercelBlobUrl(originalUrl)) {
+      const retryCount = mediaRetryCounts[key] || 0;
+      if (retryCount < 3) {
+        setMediaRetryCounts((prev) => ({
+          ...prev,
+          [key]: retryCount + 1,
+        }));
+        setRefreshingMedia((prev) => new Set(prev).add(key));
+        window.setTimeout(() => {
+          setResolvedMediaUrls((prev) => ({
+            ...prev,
+            [key]: `${originalUrl}${originalUrl.includes("?") ? "&" : "?"}retry=${Date.now()}`,
+          }));
+          setRefreshingMedia((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }, 1_500);
+        return;
+      }
+
+      setFailedMedia((prev) => new Set(prev).add(key));
+      return;
+    }
+
     if (resolvedMediaUrls[key]) {
       setFailedMedia((prev) => new Set(prev).add(key));
       return;
@@ -688,6 +815,18 @@ export function MyCreationsTab({
           const hasMultiple = creation.urls.length > 1;
           const mediaFailed = failedMedia.has(key);
           const isRefreshingMedia = refreshingMedia.has(key);
+          const failedErrorDisplay =
+            creation.status === "failed"
+              ? getGenerationErrorDisplay(
+                  creation.errorCode
+                    ? { errorCode: creation.errorCode }
+                    : creation.error,
+                  { mediaType: creation.type === "video" ? "video" : "image" }
+                )
+              : null;
+          const userFixableFailure = failedErrorDisplay
+            ? isUserFixableGenerationError(failedErrorDisplay.code)
+            : false;
 
           return (
             <div
@@ -695,7 +834,7 @@ export function MyCreationsTab({
               className="group relative overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:shadow-md"
             >
               {/* 封面 */}
-              <div className="relative aspect-video bg-stone-100">
+              <div className="relative aspect-square bg-stone-100">
                 {creation.status === "pending" || creation.status === "generating" ? (
                   <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-stone-50">
                     <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-stone-100 via-white to-stone-200" />
@@ -714,9 +853,24 @@ export function MyCreationsTab({
                     <p className="text-xs text-stone-600">Processing...</p>
                   </div>
                 ) : creation.status === "failed" ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
-                    <X className="h-8 w-8 text-red-500 mb-2" />
-                    <p className="text-xs text-red-600">Failed</p>
+                  <div
+                    className={`flex h-full w-full flex-col items-center justify-center px-4 text-center ${
+                      userFixableFailure ? "bg-amber-50" : "bg-rose-50"
+                    }`}
+                  >
+                    <GenerationFailureIcon
+                      code={failedErrorDisplay?.code || "generation_failed"}
+                      className={`mb-2 h-8 w-8 ${
+                        userFixableFailure ? "text-amber-600" : "text-rose-600"
+                      }`}
+                    />
+                    <p
+                      className={`text-xs font-semibold ${
+                        userFixableFailure ? "text-amber-800" : "text-rose-700"
+                      }`}
+                    >
+                      {failedErrorDisplay?.title || "Generation failed"}
+                    </p>
                   </div>
                 ) : displayUrl ? (
                   <>
@@ -729,7 +883,7 @@ export function MyCreationsTab({
                         mediaFailed={mediaFailed}
                         isRefreshingMedia={isRefreshingMedia}
                         onToggleExpand={() => setExpandedTask(isExpanded ? null : key)}
-                        onPreview={setSelectedImage}
+                        onPreview={(url) => setSelectedPreview({ creation, url })}
                         onMediaError={handleMediaError}
                       />
                     ) : creation.type === "video" ? (
@@ -744,11 +898,11 @@ export function MyCreationsTab({
                         <button
                           type="button"
                           className="relative h-full w-full cursor-pointer"
-                          onClick={() => setSelectedVideo(displayUrl)}
+                          onClick={() => setSelectedPreview({ creation, url: displayUrl })}
                         >
                           <video
                             src={displayUrl}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-contain"
                             muted
                             playsInline
                             preload="metadata"
@@ -797,7 +951,7 @@ export function MyCreationsTab({
                   <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition-all duration-300 group-hover:bg-black/40 group-hover:opacity-100">
                     {creation.status === "success" && displayUrl && !mediaFailed && creation.type === "image" && (
                       <button
-                        onClick={() => setSelectedImage(displayUrl)}
+                        onClick={() => setSelectedPreview({ creation, url: displayUrl })}
                         className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
                         title="Preview"
                       >
@@ -806,7 +960,7 @@ export function MyCreationsTab({
                     )}
                     {creation.status === "success" && displayUrl && !mediaFailed && creation.type === "video" && (
                       <button
-                        onClick={() => setSelectedVideo(displayUrl)}
+                        onClick={() => setSelectedPreview({ creation, url: displayUrl })}
                         className="rounded-full bg-white/90 p-2 transition-all duration-300 hover:bg-white"
                         title="Preview"
                       >
@@ -847,17 +1001,39 @@ export function MyCreationsTab({
 
               {/* 失败状态的操作 */}
               {creation.status === "failed" && (
-                <div className="p-3 bg-red-50">
-                  <p className="text-xs text-red-600 mb-2">{creation.error || "Generation failed"}</p>
+                <div className={`p-3 ${userFixableFailure ? "bg-amber-50" : "bg-rose-50"}`}>
+                  <p
+                    className={`mb-1 text-xs font-semibold ${
+                      userFixableFailure ? "text-amber-900" : "text-rose-800"
+                    }`}
+                  >
+                    {failedErrorDisplay?.title || "Generation failed"}
+                  </p>
+                  <p className={`mb-1 text-xs ${userFixableFailure ? "text-amber-800" : "text-rose-700"}`}>
+                    {failedErrorDisplay?.message || "Generation failed"}
+                  </p>
+                  {failedErrorDisplay?.action && (
+                    <p className={`mb-3 text-xs ${userFixableFailure ? "text-amber-700" : "text-rose-600"}`}>
+                      {failedErrorDisplay.action}
+                    </p>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <Button
-                      onClick={() => handleRetry(creation)}
+                      onClick={() =>
+                        failedErrorDisplay?.code === "insufficient_credits"
+                          ? router.push("/pricing")
+                          : handleRetry(creation)
+                      }
                       size="sm"
                       variant="outline"
                       className="w-full text-xs"
                     >
                       <RefreshCw className="h-3 w-3 mr-1" />
-                      Retry
+                      {failedErrorDisplay?.code === "insufficient_credits"
+                        ? "View plans"
+                        : userFixableFailure
+                          ? "Edit request"
+                          : "Try again"}
                     </Button>
                     <Button
                       onClick={() => handleDelete(creation.id)}
@@ -894,8 +1070,13 @@ export function MyCreationsTab({
                     <img
                       src={url}
                       alt={`Creation ${idx + 1}`}
-                      className="w-full aspect-square object-cover cursor-pointer"
-                      onClick={() => setSelectedImage(url)}
+                      className="aspect-square w-full cursor-pointer bg-stone-100 object-contain"
+                      onClick={() => {
+                        const creation = creations.find(
+                          (item) => creationIdentity(item) === expandedTask
+                        );
+                        if (creation) setSelectedPreview({ creation, url });
+                      }}
                     />
                   </div>
                 ))}
@@ -904,17 +1085,24 @@ export function MyCreationsTab({
         </div>
       )}
 
-      {/* 图片预览 Modal */}
-      {selectedImage && (
-        <ImageModal
-          imageUrl={selectedImage}
-          onClose={() => setSelectedImage(null)}
-        />
-      )}
-      {selectedVideo && (
-        <VideoModal
-          videoUrl={selectedVideo}
-          onClose={() => setSelectedVideo(null)}
+      {selectedPreview && (
+        <CreationPreviewDialog
+          creation={selectedPreview.creation}
+          mediaUrl={selectedPreview.url}
+          onClose={() => setSelectedPreview(null)}
+          onRegenerate={() => {
+            const creation = selectedPreview.creation;
+            setSelectedPreview(null);
+            handleRetry(creation);
+          }}
+          onDownload={() =>
+            handleDownload(selectedPreview.creation, selectedPreview.url)
+          }
+          onDelete={() => {
+            const creationId = selectedPreview.creation.id;
+            setSelectedPreview(null);
+            handleDelete(creationId);
+          }}
         />
       )}
       {pendingDeleteId && (

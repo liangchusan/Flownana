@@ -47,18 +47,19 @@ export function CreateContent({
               AI Video
             </h1>
             <VideoCreationForm
-              onGenerationStart={({ optimisticId, prompt }) => {
+              onGenerationStart={({ optimisticId, prompt, parameters }) => {
                 setVideoGenerations((prev) => [
                   {
                     url: null,
                     isGenerating: true,
                     optimisticId,
                     prompt,
+                    parameters,
                   },
                   ...prev,
                 ]);
               }}
-              onGenerate={(url, taskId, prompt, optimisticId) => {
+              onGenerate={(url, taskId, prompt, optimisticId, parameters) => {
                 setVideoGenerations((prev) =>
                   prev.map((generation) =>
                     generation.optimisticId === optimisticId
@@ -68,6 +69,7 @@ export function CreateContent({
                           isGenerating: false,
                           taskId,
                           prompt: prompt || generation.prompt,
+                          parameters: parameters || generation.parameters,
                           error: undefined,
                         }
                       : generation
@@ -87,7 +89,7 @@ export function CreateContent({
                   )
                 );
               }}
-              onGenerationFailure={({ optimisticId, prompt, error }) => {
+              onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => {
                 setVideoGenerations((prev) =>
                   prev.map((generation) =>
                     generation.optimisticId === optimisticId
@@ -97,6 +99,7 @@ export function CreateContent({
                           isGenerating: false,
                           prompt,
                           error,
+                          errorCode,
                         }
                       : generation
                   )

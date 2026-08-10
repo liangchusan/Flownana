@@ -6,6 +6,8 @@ import { PricingPlans } from "@/components/pricing/pricing-plans";
 
 export default function PricingPage() {
   const stripeEnabled = !!(
+    process.env.STRIPE_PRICE_STARTER_MONTHLY &&
+    process.env.STRIPE_PRICE_STARTER_YEARLY &&
     process.env.STRIPE_PRICE_PRO_MONTHLY &&
     process.env.STRIPE_PRICE_PRO_YEARLY &&
     process.env.STRIPE_PRICE_MAX_MONTHLY &&
@@ -19,10 +21,10 @@ export default function PricingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
-              Video subscription & credits
+              Choose your plan
             </h1>
             <p className="mx-auto max-w-2xl text-xl text-stone-600">
-              Subscribe for monthly credits. Pro outputs 720P; Max outputs 1080P.
+              Save 50% with yearly billing. Credits are added monthly on every plan.
             </p>
             {!stripeEnabled && (
               <p className="text-sm text-amber-700 mt-4">

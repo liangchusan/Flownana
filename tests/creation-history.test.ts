@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeCreations, type CreationHistoryItem } from "../lib/creation-history.ts";
+import {
+  mergeCreations,
+  normalizeGenerationParameters,
+  type CreationHistoryItem,
+} from "../lib/creation-history.ts";
 
 function item(overrides: Partial<CreationHistoryItem>): CreationHistoryItem {
   return {
@@ -56,5 +60,25 @@ test("mergeCreations keeps distinct tasks sorted newest first", () => {
   assert.deepEqual(
     merged.map((creation) => creation.id),
     ["newer", "older"]
+  );
+});
+
+test("normalizeGenerationParameters keeps only supported display fields", () => {
+  assert.deepEqual(
+    normalizeGenerationParameters({
+      model: " GPT Image 2 ",
+      resolution: "2K",
+      aspectRatio: "3:4",
+      duration: Number.NaN,
+      privateValue: "hidden",
+    }),
+    {
+      model: "GPT Image 2",
+      resolution: "2K",
+      aspectRatio: "3:4",
+      duration: undefined,
+      audio: undefined,
+      mode: undefined,
+    }
   );
 });

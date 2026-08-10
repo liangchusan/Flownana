@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { PLAN_CREDITS, type PlanKey } from "@/lib/plans";
+import {
+  getPriceKeyFromStripePriceId,
+  PLAN_CREDITS,
+} from "@/lib/plans";
 import {
   getDueYearlyCreditGrantDates,
   getNextYearlyCreditAt,
@@ -44,6 +47,15 @@ export async function GET(request: Request) {
   const failed: string[] = [];
 
   for (const sub of subs) {
+    const parsed = getPriceKeyFromStripePriceId(sub.stripePriceId);
+    if (!parsed || parsed.billing !== "yearly") {
+      console.error(
+        `[cron/monthly-credits] Unrecognized yearly price ${sub.stripePriceId}`
+      );
+      failed.push(sub.id);
+      continue;
+    }
+
     const dueDates = getDueYearlyCreditGrantDates({
       nextCreditAt: sub.nextCreditAt,
       currentPeriodEnd: sub.currentPeriodEnd,
@@ -64,7 +76,7 @@ export async function GET(request: Request) {
             data: { id: grantKey, type: "yearly_monthly_credit_grant" },
           });
 
-          const amount = PLAN_CREDITS[sub.planType as PlanKey];
+          const amount = PLAN_CREDITS[parsed.plan];
           await tx.creditBatch.create({
             data: {
               userId: sub.userId,

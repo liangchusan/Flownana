@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, Upload, X, Loader2 } from "lucide-react";
+import { Check, ChevronDown, Upload, X } from "lucide-react";
 import axios from "axios";
 import {
   IMAGE_MODEL_OPTIONS,
@@ -11,19 +11,46 @@ import {
   type ImageModelOptionId,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
+import { getGenerationErrorDisplay } from "@/lib/generation-errors";
 import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
+import type { GenerationParameters } from "@/lib/creation-history";
 
 const MODEL_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
+const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 interface GenerateFormProps {
-  onGenerate: (imageUrl: string, taskId?: string, prompt?: string) => void;
+  onGenerate: (
+    imageUrl: string,
+    taskId?: string,
+    prompt?: string,
+    parameters?: GenerationParameters,
+    optimisticId?: string
+  ) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
   onTaskIdChange?: (taskId: string) => void;
+  onGenerationStart?: (data: {
+    optimisticId: string;
+    prompt: string;
+    parameters: GenerationParameters;
+  }) => void;
+  onGenerationTaskCreated?: (data: {
+    optimisticId: string;
+    taskId: string;
+    prompt?: string;
+  }) => void;
+  onGenerationFailure?: (data: {
+    optimisticId: string;
+    prompt: string;
+    error: string;
+    errorCode?: string;
+  }) => void;
+  activeGenerationCount?: number;
+  maxConcurrentGenerations?: number;
   initialPrompt?: string;
   initialImage?: string;
 }
@@ -33,6 +60,11 @@ export function GenerateForm({
   isGenerating,
   setIsGenerating,
   onTaskIdChange,
+  onGenerationStart,
+  onGenerationTaskCreated,
+  onGenerationFailure,
+  activeGenerationCount,
+  maxConcurrentGenerations = 5,
   initialPrompt,
   initialImage,
 }: GenerateFormProps) {
@@ -50,11 +82,19 @@ export function GenerateForm({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const optionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const optionsPopupRef = useRef<HTMLDivElement | null>(null);
+  const submitLockRef = useRef(false);
 
   const imageModels = useMemo(() => IMAGE_MODEL_OPTIONS, []);
+  const usesConcurrentGenerationLimit = activeGenerationCount !== undefined;
+  const generationLimitReached = usesConcurrentGenerationLimit
+    ? activeGenerationCount >= maxConcurrentGenerations
+    : isGenerating;
   const ratioOptions = useMemo(
     () =>
       ["auto", "9:16", "16:9", "1:1", "3:4", "4:3"].filter((ratio) => {
+        if (model === "qwen-image-3-pro" && ratio === "auto") {
+          return false;
+        }
         if (model === "gpt-image-2" && ratio === "auto") {
           return resolution === "1K";
         }
@@ -65,7 +105,10 @@ export function GenerateForm({
       }),
     [model, resolution]
   );
-  const resolutionOptions = useMemo(() => ["1K", "2K", "4K"] as ImageResolutionKey[], []);
+  const resolutionOptions = useMemo(() => {
+    const option = imageModels.find((m) => m.id === model);
+    return option?.resolutions ?? (["1K", "2K", "4K"] as ImageResolutionKey[]);
+  }, [imageModels, model]);
   const creditsCost = getImageGenerationCredits(model, resolution);
 
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
@@ -75,6 +118,11 @@ export function GenerateForm({
       setAspectRatio(ratioOptions[0] || "1:1");
     }
   }, [aspectRatio, ratioOptions]);
+  useEffect(() => {
+    if (!resolutionOptions.includes(resolution)) {
+      setResolution(resolutionOptions[0] || "1K");
+    }
+  }, [resolution, resolutionOptions]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -101,6 +149,7 @@ export function GenerateForm({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
     maxFiles: 1,
+    maxSize: MAX_INPUT_IMAGE_BYTES,
     onDrop: (files) => {
       if (files.length > 0) {
         const reader = new FileReader();
@@ -108,28 +157,82 @@ export function GenerateForm({
         reader.readAsDataURL(files[0]);
       }
     },
+    onDropRejected: (rejections) => {
+      const code = rejections.some((rejection) =>
+        rejection.errors.some((error) => error.code === "file-too-large")
+      )
+        ? "file_too_large"
+        : "unsupported_file_type";
+      const display = getGenerationErrorDisplay(
+        { errorCode: code },
+        { mediaType: "image" }
+      );
+      showToast({
+        title: display.title,
+        message: `${display.message} ${display.action}`,
+        variant: "warning",
+      });
+    },
   });
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
+      const display = getGenerationErrorDisplay(
+        { errorCode: "prompt_required" },
+        { mediaType: "image" }
+      );
       showToast({
-        title: "Prompt required",
-        message: "Please enter a prompt",
+        title: display.title,
+        message: `${display.message} ${display.action}`,
         variant: "warning",
       });
       return;
     }
-    setIsGenerating(true);
+    if (generationLimitReached) {
+      showToast({
+        title: "Generation limit reached",
+        message: `You can run up to ${maxConcurrentGenerations} image generations at once.`,
+        variant: "warning",
+      });
+      return;
+    }
+    if (submitLockRef.current) {
+      return;
+    }
+    submitLockRef.current = true;
+    window.setTimeout(() => {
+      submitLockRef.current = false;
+    }, 700);
+
+    const optimisticId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `image-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const mode = uploadedImage ? "image-to-image" : "text-to-image";
+    const optimisticParameters: GenerationParameters = {
+      model: currentModelLabel,
+      resolution,
+      aspectRatio,
+      mode: uploadedImage ? "Image to image" : "Text to image",
+    };
+
+    onGenerationStart?.({
+      optimisticId,
+      prompt,
+      parameters: optimisticParameters,
+    });
+    if (!usesConcurrentGenerationLimit) {
+      setIsGenerating(true);
+    }
     trackEvent("generation_started", {
       type: "image",
       model,
       resolution,
       aspect_ratio: aspectRatio,
       credits_cost: creditsCost,
-      mode: uploadedImage ? "image-to-image" : "text-to-image",
+      mode,
     });
     try {
-      const mode = uploadedImage ? "image-to-image" : "text-to-image";
       const response = await axios.post("/api/generate", {
         prompt,
         imageUrl: uploadedImage,
@@ -149,12 +252,27 @@ export function GenerateForm({
           credits_cost: response.data.creditsCost || creditsCost,
         });
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
-        onGenerate(response.data.imageUrl, taskId, responsePrompt);
+        if (taskId) {
+          onGenerationTaskCreated?.({
+            optimisticId,
+            taskId,
+            prompt: responsePrompt,
+          });
+        }
+        onGenerate(response.data.imageUrl, taskId, responsePrompt, {
+          ...optimisticParameters,
+          ...response.data.parameters,
+        }, optimisticId);
       } else {
         trackEvent("generation_failed", {
           type: "image",
           model,
           error: "unknown",
+        });
+        onGenerationFailure?.({
+          optimisticId,
+          prompt,
+          error: "Generation failed, please try again",
         });
         showToast({
           title: "Generation failed",
@@ -163,7 +281,11 @@ export function GenerateForm({
         });
       }
     } catch (error: any) {
-      const message = error.response?.data?.error || error.message || "Generation failed, please try again";
+      const errorDisplay = getGenerationErrorDisplay(
+        error.response?.data || error,
+        { mediaType: "image", status: error.response?.status }
+      );
+      const message = errorDisplay.message;
       if (error.response?.status === 402) {
         trackEvent("insufficient_credits_shown", {
           type: "image",
@@ -174,15 +296,23 @@ export function GenerateForm({
       trackEvent("generation_failed", {
         type: "image",
         model,
+        error: error.response?.data?.errorCode || errorDisplay.code,
+      });
+      onGenerationFailure?.({
+        optimisticId,
+        prompt,
         error: message,
+        errorCode: errorDisplay.code,
       });
       showToast({
-        title: "Generation failed",
-        message,
-        variant: "error",
+        title: errorDisplay.title,
+        message: `${message} ${errorDisplay.action}`,
+        variant: errorDisplay.retryable ? "error" : "warning",
       });
     } finally {
-      setIsGenerating(false);
+      if (!usesConcurrentGenerationLimit) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -314,13 +444,11 @@ export function GenerateForm({
 
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating || !prompt.trim()}
+          disabled={generationLimitReached || !prompt.trim()}
           className="w-full rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98] disabled:opacity-50"
           size="lg"
         >
-          {isGenerating ? (
-            <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Generating...</>
-          ) : "Generate"}
+          {generationLimitReached ? `Generating ${maxConcurrentGenerations}/${maxConcurrentGenerations}` : "Generate"}
         </Button>
 
         <p className="text-xs text-stone-600">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import {
@@ -15,10 +16,19 @@ import {
   type ImageModelOptionId,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
-import { persistGeneratedMedia } from "@/lib/media-storage";
+import {
+  ProviderGenerationError,
+  getGenerationErrorDisplay,
+  getGenerationErrorHttpStatus,
+  getGenerationErrorPayload,
+  withGenerationCreditOutcome,
+  type GenerationErrorCode,
+} from "@/lib/generation-errors";
+import { persistGeneratedMedia, persistImageInputMedia } from "@/lib/media-storage";
 
 const KIE_API_BASE = "https://api.kie.ai";
 const DEFAULT_IMAGE_MODEL_ID: ImageModelOptionId = "gpt-image-2";
+type PersistedGenerationParameters = Record<string, string | number>;
 const IMAGE_ASPECT_RATIOS = new Set([
   "auto",
   "9:16",
@@ -29,6 +39,28 @@ const IMAGE_ASPECT_RATIOS = new Set([
 ]);
 
 export const maxDuration = 300;
+
+function imageErrorResponse(
+  code: GenerationErrorCode,
+  status?: number,
+  overrides?: { message?: string; required?: number; available?: number }
+) {
+  const payload = getGenerationErrorPayload(
+    {
+      errorCode: code,
+      ...(overrides?.message ? { error: overrides.message } : {}),
+    },
+    { mediaType: "image" }
+  );
+  return NextResponse.json(
+    {
+      ...payload,
+      ...(overrides?.required !== undefined ? { required: overrides.required } : {}),
+      ...(overrides?.available !== undefined ? { available: overrides.available } : {}),
+    },
+    { status: status ?? getGenerationErrorHttpStatus(code) }
+  );
+}
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,6 +82,10 @@ function isValidImageAspectRatio(params: {
     if (params.resolution === "4K" && params.aspectRatio === "1:1") {
       return false;
     }
+  }
+
+  if (params.modelId === "qwen-image-3-pro" && params.aspectRatio === "auto") {
+    return false;
   }
 
   return true;
@@ -78,14 +114,22 @@ async function createImageTask(params: {
 
   const input: Record<string, unknown> = {
     prompt: params.prompt,
-    aspect_ratio: params.aspectRatio?.trim() || "1:1",
-    resolution: params.resolution?.trim() || "1K",
     output_format: fmt,
   };
+
+  if (params.modelId === "qwen-image-3-pro") {
+    input.image_size = params.aspectRatio?.trim() || "1:1";
+    input.resolution = params.resolution?.trim() || "1K";
+  } else {
+    input.aspect_ratio = params.aspectRatio?.trim() || "1:1";
+    input.resolution = params.resolution?.trim() || "1K";
+  }
 
   if (params.inputUrls?.length) {
     if (params.modelId === "nano-banana-2") {
       input.image_input = params.inputUrls;
+    } else if (params.modelId === "qwen-image-3-pro") {
+      input.image_urls = params.inputUrls;
     } else {
       input.input_urls = params.inputUrls;
     }
@@ -112,7 +156,7 @@ async function createImageTask(params: {
   if (!res.ok) {
     const text = await res.text();
     console.error(`${modelOption.label} createTask returned error:`, text);
-    throw new Error("Failed to create generation task. Please try again later.");
+    throw new ProviderGenerationError(text || res.statusText, res.status);
   }
 
   const json = (await res.json()) as {
@@ -123,7 +167,7 @@ async function createImageTask(params: {
 
   if (json.code !== 200 || !json.data?.taskId) {
     console.error(`${modelOption.label} createTask response error:`, json);
-    throw new Error(
+    throw new ProviderGenerationError(
       json.msg || "Failed to create generation task. Please try again later."
     );
   }
@@ -160,7 +204,7 @@ async function pollImageResult(taskId: string, modelLabel: string) {
     if (!res.ok) {
       const text = await res.text();
       console.error(`${modelLabel} recordInfo returned error:`, text);
-      throw new Error("Failed to query task status. Please try again later.");
+      throw new ProviderGenerationError(text || res.statusText, res.status);
     }
 
     const json = (await res.json()) as {
@@ -175,7 +219,7 @@ async function pollImageResult(taskId: string, modelLabel: string) {
 
     if (json.code !== 200 || !json.data) {
       console.error(`${modelLabel} recordInfo response error:`, json);
-      throw new Error(
+      throw new ProviderGenerationError(
         json.msg || "Failed to query task status. Please try again later."
       );
     }
@@ -189,7 +233,7 @@ async function pollImageResult(taskId: string, modelLabel: string) {
 
     if (state === "fail") {
       console.error(`${modelLabel} task failed:`, json.data.failMsg);
-      throw new Error(
+      throw new ProviderGenerationError(
         json.data.failMsg || "Generation failed. Please try again later."
       );
     }
@@ -237,10 +281,11 @@ export async function POST(request: NextRequest) {
   let taskId: string | undefined;
   let userId: string | undefined;
   let promptForPersistence = "Untitled prompt";
+  let parametersForPersistence: PersistedGenerationParameters | undefined;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return imageErrorResponse("auth_required");
     }
     userId = session.user.id;
 
@@ -261,10 +306,7 @@ export async function POST(request: NextRequest) {
     };
 
     if (!prompt) {
-      return NextResponse.json(
-        { error: "Prompt cannot be empty" },
-        { status: 400 }
-      );
+      return imageErrorResponse("prompt_required");
     }
     promptForPersistence = prompt;
 
@@ -276,29 +318,41 @@ export async function POST(request: NextRequest) {
       ? (model as ImageModelOptionId)
       : DEFAULT_IMAGE_MODEL_ID;
     const modelOption = IMAGE_MODEL_OPTION_MAP[modelId];
+    parametersForPersistence = {
+      model: modelOption.label,
+      resolution: res,
+      aspectRatio: ar,
+      mode: imageUrl ? "Image to image" : "Text to image",
+    };
     const cost = getImageGenerationCredits(modelId, res);
     if (!cost) {
-      return NextResponse.json(
-        { error: "Unsupported resolution." },
-        { status: 400 }
-      );
+      return imageErrorResponse("invalid_parameters");
     }
 
     if (
       !isValidImageAspectRatio({ modelId, resolution: res, aspectRatio: ar })
     ) {
-      return NextResponse.json(
-        { error: "Unsupported aspect ratio for this resolution." },
-        { status: 400 }
-      );
+      return imageErrorResponse("invalid_parameters");
     }
 
-    consumedCredits = await consumeCreditsFIFO(session.user.id, cost);
+    const inputSource = imageUrl && String(imageUrl).trim() !== ""
+      ? String(imageUrl).trim()
+      : undefined;
+    const requestId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const inputUrls = inputSource
+      ? [
+          await persistImageInputMedia({
+            source: inputSource,
+            userId: session.user.id,
+            requestId,
+          }),
+        ]
+      : undefined;
 
-    const inputUrls =
-      imageUrl && String(imageUrl).trim() !== ""
-        ? [String(imageUrl).trim()]
-        : undefined;
+    consumedCredits = await consumeCreditsFIFO(session.user.id, cost);
 
     taskId = await createImageTask({
       modelId,
@@ -328,6 +382,7 @@ export async function POST(request: NextRequest) {
         modelOptionId: inputUrls?.length
           ? modelOption.imageToImageModel
           : modelOption.textToImageModel,
+        parameters: parametersForPersistence as Prisma.InputJsonValue,
         creditsCost: cost,
       },
       create: {
@@ -340,6 +395,7 @@ export async function POST(request: NextRequest) {
         modelOptionId: inputUrls?.length
           ? modelOption.imageToImageModel
           : modelOption.textToImageModel,
+        parameters: parametersForPersistence as Prisma.InputJsonValue,
         creditsCost: cost,
       },
     });
@@ -350,9 +406,48 @@ export async function POST(request: NextRequest) {
       prompt,
       taskId,
       creditsCost: cost,
+      parameters: parametersForPersistence,
     });
   } catch (error: any) {
     console.error("Error generating image:", error);
+    let creditsRefunded = false;
+    let refundPending = false;
+    if (consumedCredits.length > 0) {
+      try {
+        await refundConsumedCredits(consumedCredits);
+        creditsRefunded = true;
+      } catch (refundError) {
+        refundPending = true;
+        console.error("Failed to refund image credits:", refundError);
+      }
+    }
+
+    let errorDisplay;
+    if (error instanceof InsufficientCreditsError) {
+      errorDisplay = getGenerationErrorDisplay(
+        {
+          errorCode: "insufficient_credits",
+          error: `This generation needs ${error.required} credits, but you have ${error.available}.`,
+        },
+        { mediaType: "image" }
+      );
+    } else if (error instanceof CreditConsumptionConflictError) {
+      errorDisplay = getGenerationErrorDisplay(
+        { errorCode: "credit_conflict" },
+        { mediaType: "image" }
+      );
+    } else {
+      errorDisplay = getGenerationErrorDisplay(error, {
+        mediaType: "image",
+        source: error instanceof ProviderGenerationError ? "provider" : "app",
+      });
+    }
+    errorDisplay = withGenerationCreditOutcome(errorDisplay, {
+      creditsConsumed: consumedCredits.length > 0,
+      creditsRefunded,
+      refundPending,
+    });
+
     if (taskId && userId) {
       try {
         await prisma.generation.upsert({
@@ -360,10 +455,10 @@ export async function POST(request: NextRequest) {
           update: {
             type: "image",
             status: "failed",
-            error:
-              typeof error?.message === "string"
-                ? error.message
-                : "Generation failed.",
+            error: errorDisplay.message,
+            ...(parametersForPersistence
+              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
+              : {}),
           },
           create: {
             userId,
@@ -372,10 +467,10 @@ export async function POST(request: NextRequest) {
             urls: [],
             prompt: promptForPersistence,
             taskId,
-            error:
-              typeof error?.message === "string"
-                ? error.message
-                : "Generation failed.",
+            error: errorDisplay.message,
+            ...(parametersForPersistence
+              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
+              : {}),
           },
         });
       } catch (persistErr) {
@@ -383,40 +478,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (consumedCredits.length > 0) {
-      try {
-        await refundConsumedCredits(consumedCredits);
-      } catch (refundError) {
-        console.error("Failed to refund image credits:", refundError);
+    const payload = getGenerationErrorPayload(
+      {
+        errorCode: errorDisplay.code,
+        errorTitle: errorDisplay.title,
+        error: errorDisplay.message,
+        errorAction: errorDisplay.action,
+        retryable: errorDisplay.retryable,
+      },
+      {
+        mediaType: "image",
+        creditsRefunded,
+        refundPending,
       }
-    }
-
-    if (error instanceof InsufficientCreditsError) {
-      return NextResponse.json(
-        {
-          error: `Insufficient credits. Required ${error.required}, available ${error.available}.`,
-          required: error.required,
-          available: error.available,
-        },
-        { status: 402 }
-      );
-    }
-
-    if (error instanceof CreditConsumptionConflictError) {
-      return NextResponse.json(
-        { error: "Credit balance changed. Please retry generation." },
-        { status: 409 }
-      );
-    }
-
-    const message =
-      typeof error?.message === "string"
-        ? error.message
-        : "Error generating image. Please try again later.";
-
+    );
     return NextResponse.json(
-      { error: message },
-      { status: 500 }
+      {
+        ...payload,
+        ...(error instanceof InsufficientCreditsError
+          ? { required: error.required, available: error.available }
+          : {}),
+      },
+      { status: getGenerationErrorHttpStatus(errorDisplay.code) }
     );
   }
 }
