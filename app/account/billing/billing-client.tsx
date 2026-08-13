@@ -83,8 +83,8 @@ export function BillingClient({
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFDF9]">
-      <header className="flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-6 py-4">
+    <div className="min-h-screen bg-background">
+      <header className="flex items-center justify-between border-b border-border bg-background px-6 py-4">
         <Link href="/" className="flex items-center gap-2">
           <Logo size="sm" />
         </Link>

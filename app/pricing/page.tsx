@@ -15,7 +15,7 @@ export default function PricingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FDFDF9] to-stone-50">
+    <div className="min-h-screen bg-gradient-to-b from-background to-surface-soft">
       <Header showBackground />
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">

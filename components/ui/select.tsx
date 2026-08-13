@@ -12,9 +12,9 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       <select
         ref={ref}
         className={cn(
-          "w-full rounded-xl border border-stone-200/50 bg-white px-3 py-2 text-xs text-stone-900 transition-all duration-300",
-          "focus:border-transparent focus:outline-none focus:ring-2 focus:ring-stone-500",
-          "hover:border-stone-300",
+          "w-full rounded-ui border border-input bg-background px-3 py-2 text-xs text-foreground transition-all duration-300",
+          "focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30",
+          "hover:border-primary/50",
           "disabled:cursor-not-allowed disabled:opacity-60",
           className
         )}

@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils";
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "outline" | "secondary" | "ghost";
-  size?: "default" | "sm" | "lg";
+  variant?: "default" | "outline" | "secondary" | "ghost" | "destructive";
+  size?: "default" | "sm" | "lg" | "icon";
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -12,15 +12,21 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center rounded-ui text-sm font-medium transition-all duration-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
           {
-            "bg-stone-800 text-white hover:bg-stone-800/90": variant === "default",
-            "border border-stone-200/50 bg-white text-stone-700 hover:bg-stone-50": variant === "outline",
-            "bg-stone-100 text-stone-900 hover:bg-stone-200": variant === "secondary",
-            "hover:bg-stone-100 text-stone-900": variant === "ghost",
+            "bg-primary text-primary-foreground hover:bg-primary-active":
+              variant === "default",
+            "border border-border bg-background text-foreground hover:bg-surface-soft":
+              variant === "outline",
+            "bg-secondary text-secondary-foreground hover:bg-surface-strong":
+              variant === "secondary",
+            "text-foreground hover:bg-surface-soft": variant === "ghost",
+            "bg-destructive text-destructive-foreground hover:bg-destructive/90":
+              variant === "destructive",
             "h-10 px-4 py-2": size === "default",
             "h-9 px-3 text-sm": size === "sm",
             "h-12 px-6 text-base": size === "lg",
+            "h-10 w-10": size === "icon",
           },
           className
         )}
@@ -33,6 +39,5 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export { Button };
-
 
 

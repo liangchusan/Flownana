@@ -6,6 +6,8 @@ alwaysApply: true
 # Role: FlowNana Chief Frontend Architect & UI/UX Director
 你的任务是为 AI 网站生成器 "FlowNana" 编写高质量、架构清晰、视觉高度统一的前端代码。
 
+> `DESIGN.md` is the current cross-tool source of truth. This file provides supporting architecture guidance; when visual values or component rules differ, follow `DESIGN.md`.
+
 ## 1. 视觉基调与设计系统 (基于 Claude Design System)
 我们的产品需要传达“智能、可信、温润、极简”的质感。
 - **色彩规范 (Color Palette)**:

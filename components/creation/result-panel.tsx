@@ -66,15 +66,15 @@ export function ResultPanel({
   }, [generationItems, session]);
 
   return (
-    <div className="flex h-full flex-col bg-[#FDFDF9]">
+    <div className="flex h-full flex-col bg-background">
       <div className="flex w-full items-center px-6 pb-2 pt-4">
         <div className="flex gap-3">
           <button
             onClick={() => setActiveTab("explore")}
             className={`rounded-xl px-2 py-1 text-[10px] font-normal transition-all duration-300 ${
               activeTab === "explore"
-                ? "bg-stone-100 text-stone-700"
-                : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+                ? "bg-surface-soft text-foreground"
+                : "text-muted-foreground hover:bg-surface-soft hover:text-foreground"
             }`}
           >
             Explore
@@ -83,8 +83,8 @@ export function ResultPanel({
             onClick={() => setActiveTab("creations")}
             className={`rounded-xl px-2 py-1 text-[10px] font-normal transition-all duration-300 ${
               activeTab === "creations"
-                ? "bg-stone-100 text-stone-700"
-                : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+                ? "bg-surface-soft text-foreground"
+                : "text-muted-foreground hover:bg-surface-soft hover:text-foreground"
             }`}
           >
             My Creations

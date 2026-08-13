@@ -40,11 +40,11 @@ export function CreateContent({
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="ml-[60px] flex-1 overflow-y-auto bg-[#FDFDF9]">
-        <div className="flex h-screen">
+      <main className="ml-[60px] flex-1 overflow-y-auto bg-background">
+        <div className="flex min-h-screen flex-col lg:h-screen lg:flex-row">
           {/* Left: Creation Form */}
-          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-stone-200/50 bg-[#FDFDF9] p-8">
-            <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">
+          <div className="w-full shrink-0 border-b border-border bg-background p-6 lg:max-w-lg lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-8">
+            <h1 className="mb-8 font-display text-3xl font-medium text-foreground md:text-display-md">
               AI Image
             </h1>
             <GenerateForm
@@ -116,7 +116,7 @@ export function CreateContent({
           </div>
 
           {/* Right: Result Panel */}
-          <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
+          <div className="min-h-[70vh] flex-1 overflow-hidden bg-background lg:min-h-0">
             <ResultPanel
               mode="image"
               initialCreations={initialCreations}

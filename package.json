@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "design:check": "node scripts/check-design-system.mjs",
     "test": "node --test --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/*.test.ts",
     "smoke:prod": "bash scripts/smoke-prod.sh"
   },

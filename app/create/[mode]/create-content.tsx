@@ -57,9 +57,9 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-[#FDFDF9]">
+      <main className="flex-1 overflow-y-auto bg-background">
         {/* Top Bar with Logo and User Info - Full width, above sidebar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-stone-200/50 bg-[#FDFDF9] px-8 py-2">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background px-8 py-2">
           <Link href="/" className="flex-shrink-0">
             <Logo size="md" />
           </Link>
@@ -89,7 +89,7 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
         {/* Content area with left margin for sidebar */}
         <div className="ml-16 flex h-[calc(100vh-73px)]">
           {/* Left: Creation Form */}
-          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-stone-200/50 bg-[#FDFDF9] p-8">
+          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-border bg-background p-8">
             <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">
               {getTitle()}
             </h1>
@@ -117,7 +117,7 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
           </div>
 
           {/* Right: Preview - Full Screen */}
-          <div className="flex-1 overflow-y-auto bg-[#FDFDF9] p-8">
+          <div className="flex-1 overflow-y-auto bg-background p-8">
             {mode === "video" && (
               <VideoPreview
                 videoUrl={generatedVideo}

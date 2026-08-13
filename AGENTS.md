@@ -19,14 +19,16 @@ Working rules:
 - Do not deploy production without explicit approval.
 
 UI and frontend guardrails (cross-tool baseline):
-- Follow `.cursor/rules/frontend-design.mdc` as the source of truth for UI style and frontend architecture.
-- Visual tone: warm, trustworthy, minimal. Prefer Stone/Zinc palette; avoid Slate/Gray drift.
+- Read and follow `DESIGN.md`; it is the source of truth for UI style, tokens, component contracts, and page templates.
+- Visual direction is Claude-inspired but Flownana-branded: warm, trustworthy, editorial, minimal, and media-first.
+- Use semantic Tailwind tokens first. Stone/Zinc are compatible local neutrals; Slate/Gray drift is prohibited.
 - Prefer shadcn primitives in `@/components/ui/`; compose business sections in `@/components/blocks/`.
 - Keep `@/app/` page files focused on data + composition; avoid long page-level UI logic.
 - No inline `style={{}}`; use Tailwind classes only.
 - Mobile-first responsive layouts; avoid hard-coded fixed widths like `w-[800px]`.
 - Keep interaction consistency: `transition-all duration-300`, clear hover/active/focus states.
 - Use `lucide-react` icons with consistent sizing (`w-4 h-4` / `w-5 h-5`) and muted Stone tones.
+- Run `npm run design:check` for every UI change and visually inspect changed surfaces at mobile and desktop widths.
 
 Before finishing any task:
 1. summarize what changed
