@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Check, ChevronDown, Upload, X } from "lucide-react";
 import axios from "axios";
 import {
@@ -416,11 +417,11 @@ export function GenerateForm({
       {/* Prompt */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-stone-900">Prompt</label>
-        <textarea
+        <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="Describe the image you want to generate or edit..."
-          className="h-36 w-full resize-none rounded-2xl border border-stone-200/50 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition-all duration-300 placeholder:text-stone-400 focus:border-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-300"
+          className="h-36 resize-none rounded-ui-xl px-4 py-3"
           maxLength={5000}
         />
       </div>
@@ -446,7 +447,7 @@ export function GenerateForm({
         <Button
           onClick={handleGenerate}
           disabled={generationLimitReached || !prompt.trim()}
-          className="w-full rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98] disabled:opacity-50"
+          className="w-full"
           size="lg"
         >
           {generationLimitReached ? `Generating ${maxConcurrentGenerations}/${maxConcurrentGenerations}` : "Generate"}

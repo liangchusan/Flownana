@@ -107,7 +107,7 @@ export function CreationPreviewDialog({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] lg:overflow-hidden">
-        <section className="flex min-h-[46vh] items-center justify-center bg-[#11110f] p-4 sm:p-8 lg:min-h-0 lg:p-10">
+        <section className="flex min-h-[46vh] items-center justify-center bg-surface-dark p-4 sm:p-8 lg:min-h-0 lg:p-10">
           {creation.type === "video" ? (
             <video
               ref={videoRef}

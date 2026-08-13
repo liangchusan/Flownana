@@ -321,8 +321,8 @@ export function CreateContent({
   return (
     <div className="h-screen overflow-hidden">
       <CreationSidebar />
-      <main className="ml-[60px] h-screen overflow-y-auto bg-[#FDFDF9]">
-        <div className="min-h-screen bg-[linear-gradient(180deg,#FDFDF9_0%,#FAFAF6_48%,#FDFDF9_100%)]">
+      <main className="ml-[60px] h-screen overflow-y-auto bg-background">
+        <div className="min-h-screen bg-gradient-to-b from-background via-surface-soft/30 to-background">
           {/* ---------- 模块1: 顶部大 Banner 卡片（图片/视频，横向滑动） ---------- */}
           <section className="border-b border-stone-100/70">
             <div className="mx-auto w-full max-w-[1680px] px-4 py-5 md:px-8 md:py-6 xl:px-10">
@@ -413,7 +413,7 @@ export function CreateContent({
           {/* ---------- 模块2: 引导创作入口 ---------- */}
           <section className="px-4 py-10 md:px-8 md:py-12">
             <div className="mx-auto w-full max-w-[1280px]">
-              <h1 className="mx-auto mb-6 max-w-5xl text-center text-3xl font-bold leading-tight text-stone-900 md:text-5xl">
+              <h1 className="mx-auto mb-6 max-w-5xl text-center font-display text-3xl font-medium leading-tight text-foreground md:text-display-lg">
                 What will you create today?
               </h1>
 

@@ -39,10 +39,10 @@ export function CreateContent({
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="ml-[60px] flex-1 overflow-y-auto bg-[#FDFDF9]">
+      <main className="ml-[60px] flex-1 overflow-y-auto bg-background">
         <div className="flex h-screen">
           {/* Left: Creation Form */}
-          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-stone-200/50 bg-[#FDFDF9] p-8">
+          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-border bg-background p-8">
             <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">
               AI Video
             </h1>
@@ -114,7 +114,7 @@ export function CreateContent({
           </div>
 
           {/* Right: Result Panel */}
-          <div className="flex-1 overflow-hidden bg-[#FDFDF9]">
+          <div className="flex-1 overflow-hidden bg-background">
             <ResultPanel
               mode="video"
               initialCreations={initialCreations}

@@ -14,6 +14,14 @@ The broader brand message may include video / image / music, but current MVP pri
 - Stripe
 - KIE GPT Image 2, Nano Banana 2, and Qwen Image 3.0 Pro image generation APIs
 
+## UI Design System (as of 2026-08-13)
+- `DESIGN.md` is the cross-tool visual source of truth for AI-assisted UI work.
+- Direction is Claude-inspired, adapted for Flownana: warm cream canvas, warm ink, restrained coral primary actions, editorial display type, quiet surface hierarchy, and media-first creation/results.
+- The Claude reference is an independent public analysis from getdesign.md, not an official Anthropic component library; do not copy Claude names, marks, or proprietary assets.
+- Semantic tokens live in `app/globals.css` and are exposed by `tailwind.config.ts`; UI code should prefer classes such as `bg-background`, `text-foreground`, `bg-primary`, and `border-border` over raw values.
+- Base primitives belong in `components/ui/`, business compositions in `components/blocks/`, and rendered visual QA is available at `/design-system` with search indexing disabled.
+- Run `npm run design:check` for UI changes, then inspect touched surfaces at mobile and desktop widths.
+
 ## Current Core Routes
 - / : landing page
 - /generate : redirects to /ai-image

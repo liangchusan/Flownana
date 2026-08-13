@@ -28,7 +28,7 @@ function ErrorContent() {
   const error = searchParams.get("error") || "Default";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FDFDF9] px-6 py-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-8">
       <div className="w-full max-w-md rounded-2xl border border-stone-200/50 bg-white p-8 shadow-sm">
         <div className="mb-6 flex items-center justify-center">
           <div className="rounded-full bg-red-100 p-3">
@@ -79,7 +79,7 @@ export default function AuthErrorPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#FDFDF9] px-6 py-8">
+        <div className="flex min-h-screen items-center justify-center bg-background px-6 py-8">
           <Skeleton className="h-64 w-full max-w-md rounded-2xl" />
         </div>
       }

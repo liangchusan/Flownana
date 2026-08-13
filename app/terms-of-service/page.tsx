@@ -9,7 +9,7 @@ export default function TermsOfServicePage() {
   const lastUpdated = "January 20, 2026";
 
   return (
-    <div className="min-h-screen bg-[#FDFDF9]">
+    <div className="min-h-screen bg-background">
       <Header showBackground />
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
@@ -138,4 +138,3 @@ export default function TermsOfServicePage() {
     </div>
   );
 }
-

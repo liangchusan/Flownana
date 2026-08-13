@@ -7,7 +7,7 @@ import { Mail } from "lucide-react";
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-[#FDFDF9]">
+    <div className="min-h-screen bg-background">
       <Header showBackground />
 
       <main className="max-w-3xl mx-auto px-6 sm:px-8 lg:px-8 py-8 sm:py-14">
@@ -58,4 +58,3 @@ export default function ContactPage() {
     </div>
   );
 }
-
