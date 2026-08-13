@@ -145,6 +145,9 @@ function normalizeCreation(raw: unknown): Creation | null {
   const urls = [...urlsFromArray, ...urlsFromLegacy].filter(
     (url, index, list) => list.indexOf(url) === index
   );
+  const inputUrls = Array.isArray(candidate.inputUrls)
+    ? candidate.inputUrls.filter(isValidMediaUrl)
+    : [];
 
   const rawStatus = typeof candidate.status === "string" ? candidate.status.toLowerCase() : "";
   const mappedStatus = LEGACY_STATUS_MAP[rawStatus];
@@ -155,6 +158,7 @@ function normalizeCreation(raw: unknown): Creation | null {
     type,
     status,
     urls,
+    inputUrls,
     prompt: typeof candidate.prompt === "string" ? candidate.prompt : "",
     createdAt:
       typeof candidate.createdAt === "string" && candidate.createdAt.trim().length > 0

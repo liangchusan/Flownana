@@ -18,6 +18,7 @@ model User {
   subscriptions    Subscription[]
   creditBatches    CreditBatch[]
   generations      Generation[]
+  mediaAssets      MediaAsset[]
 }
 
 model Subscription {
@@ -68,6 +69,7 @@ model Generation {
   type              String
   status            String
   urls              String[] @default([])
+  inputUrls         String[] @default([])
   prompt            String
   taskId            String?  @unique
   error             String?
@@ -77,8 +79,39 @@ model Generation {
   creditConsumption Json?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  media             GenerationMedia[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, type, createdAt(sort: Desc)])
   @@index([type, createdAt(sort: Desc)])
+}
+
+model MediaAsset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  url         String
+  contentType String?
+  sizeBytes   Int?
+  origin      String
+  createdAt   DateTime @default(now())
+  generations GenerationMedia[]
+
+  @@unique([userId, url])
+  @@index([userId, type, createdAt(sort: Desc)])
+}
+
+model GenerationMedia {
+  generationId String
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  role         String
+  position     Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@id([generationId, mediaAssetId, role])
+  @@index([generationId, role, position])
+  @@index([mediaAssetId])
 }

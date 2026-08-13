@@ -12,6 +12,7 @@ const CREATION_SELECT = {
   type: true,
   status: true,
   urls: true,
+  inputUrls: true,
   prompt: true,
   createdAt: true,
   taskId: true,
@@ -19,6 +20,11 @@ const CREATION_SELECT = {
   modelOptionId: true,
   creditsCost: true,
   parameters: true,
+  media: {
+    where: { role: "input" },
+    orderBy: { position: "asc" },
+    select: { mediaAsset: { select: { url: true } } },
+  },
 } as const;
 
 function toCreationHistoryItem(creation: {
@@ -26,6 +32,7 @@ function toCreationHistoryItem(creation: {
   type: string;
   status: string;
   urls: string[];
+  inputUrls: string[];
   prompt: string;
   createdAt: Date;
   taskId: string | null;
@@ -33,12 +40,17 @@ function toCreationHistoryItem(creation: {
   modelOptionId: string | null;
   creditsCost: number | null;
   parameters: unknown;
+  media: Array<{ mediaAsset: { url: string } }>;
 }): CreationHistoryItem {
   return {
     id: creation.id,
     type: creation.type as CreationType,
     status: creation.status as CreationHistoryItem["status"],
     urls: creation.urls,
+    inputUrls:
+      creation.media.length > 0
+        ? creation.media.map((item) => item.mediaAsset.url)
+        : creation.inputUrls,
     prompt: creation.prompt,
     createdAt: creation.createdAt.toISOString(),
     taskId: creation.taskId ?? undefined,

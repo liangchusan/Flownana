@@ -36,14 +36,20 @@ interface VideoCreationFormProps {
     taskId?: string,
     prompt?: string,
     optimisticId?: string,
-    parameters?: GenerationParameters
+    parameters?: GenerationParameters,
+    inputUrls?: string[]
   ) => void;
   onGenerationStart?: (data: {
     optimisticId: string;
     prompt: string;
     parameters: GenerationParameters;
   }) => void;
-  onGenerationTaskCreated?: (data: { optimisticId: string; taskId: string; prompt: string }) => void;
+  onGenerationTaskCreated?: (data: {
+    optimisticId: string;
+    taskId: string;
+    prompt: string;
+    inputUrls?: string[];
+  }) => void;
   onGenerationFailure?: (data: {
     optimisticId: string;
     prompt: string;
@@ -286,7 +292,8 @@ export function VideoCreationForm({
           response.data.taskId || params.taskId,
           response.data.prompt || params.prompt,
           params.optimisticId,
-          response.data.parameters || params.parameters
+          response.data.parameters || params.parameters,
+          response.data.inputUrls
         );
         return;
       }
@@ -383,6 +390,7 @@ export function VideoCreationForm({
             optimisticId,
             taskId,
             prompt: responsePrompt,
+            inputUrls: response.data.inputUrls,
           });
           await pollGenerationStatus({
             taskId,
@@ -406,7 +414,8 @@ export function VideoCreationForm({
             taskId,
             responsePrompt,
             optimisticId,
-            response.data.parameters || generationParameters
+            response.data.parameters || generationParameters,
+            response.data.inputUrls
           );
           return;
         }

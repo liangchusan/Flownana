@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   mergeCreations,
+  getRegenerationInputImage,
   normalizeGenerationParameters,
   type CreationHistoryItem,
 } from "../lib/creation-history.ts";
@@ -12,6 +13,7 @@ function item(overrides: Partial<CreationHistoryItem>): CreationHistoryItem {
     type: "image",
     status: "pending",
     urls: [],
+    inputUrls: [],
     prompt: "prompt",
     createdAt: "2026-05-18T00:00:00.000Z",
     ...overrides,
@@ -61,6 +63,32 @@ test("mergeCreations keeps distinct tasks sorted newest first", () => {
     merged.map((creation) => creation.id),
     ["newer", "older"]
   );
+});
+
+test("regeneration reuses saved inputs instead of generated outputs", () => {
+  const video = item({
+    type: "video",
+    status: "success",
+    urls: ["https://blob.example/generated.mp4"],
+    inputUrls: ["https://blob.example/original.png"],
+  });
+
+  assert.equal(
+    getRegenerationInputImage(video),
+    "https://blob.example/original.png"
+  );
+  assert.notEqual(getRegenerationInputImage(video), video.urls[0]);
+});
+
+test("regeneration does not treat legacy video output as an input image", () => {
+  const legacyVideo = item({
+    type: "video",
+    status: "success",
+    urls: ["https://blob.example/generated.mp4"],
+    inputUrls: [],
+  });
+
+  assert.equal(getRegenerationInputImage(legacyVideo), undefined);
 });
 
 test("normalizeGenerationParameters keeps only supported display fields", () => {

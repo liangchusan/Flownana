@@ -19,6 +19,7 @@ interface ResultPanelProps {
 
 export interface PanelGeneration {
   url: string | null;
+  inputUrls?: string[];
   isGenerating: boolean;
   taskId?: string;
   optimisticId?: string;

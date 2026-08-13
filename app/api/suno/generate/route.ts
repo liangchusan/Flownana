@@ -9,6 +9,7 @@ import {
   type CreditConsumptionSnapshot,
 } from "@/lib/credit-consumption";
 import { persistGeneratedMedia } from "@/lib/media-storage";
+import { syncGenerationMediaAssets } from "@/lib/media-assets";
 
 const MUSIC_CREDITS = 10;
 
@@ -188,19 +189,19 @@ export async function POST(request: NextRequest) {
     });
 
     const providerAudioUrl = await pollSunoResult(taskId);
-    const audioUrl = await persistGeneratedMedia({
+    const generatedAudio = await persistGeneratedMedia({
       sourceUrl: providerAudioUrl,
       userId: session.user.id,
       taskId,
       kind: "music",
     });
 
-    await prisma.generation.upsert({
+    const generation = await prisma.generation.upsert({
       where: { taskId },
       update: {
         type: "music",
         status: "success",
-        urls: [audioUrl],
+        urls: [generatedAudio.url],
         prompt,
         error: null,
       },
@@ -208,15 +209,22 @@ export async function POST(request: NextRequest) {
         userId,
         type: "music",
         status: "success",
-        urls: [audioUrl],
+        urls: [generatedAudio.url],
         prompt,
         taskId,
       },
     });
+    await syncGenerationMediaAssets({
+      generationId: generation.id,
+      userId,
+      assets: [
+        { media: generatedAudio, role: "output", type: "music", position: 0 },
+      ],
+    });
 
     return NextResponse.json({
       success: true,
-      audioUrl,
+      audioUrl: generatedAudio.url,
       prompt,
       taskId,
     });

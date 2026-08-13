@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { CreationPreviewDialog } from "@/components/blocks/creation-preview-dialog";
 import {
   creationIdentity,
+  getRegenerationInputImage,
   mergeCreations,
   normalizeGenerationParameters,
   type CreationHistoryItem,
@@ -34,6 +35,7 @@ import {
   type GenerationErrorCode,
 } from "@/lib/generation-errors";
 import { trackEvent } from "@/lib/analytics";
+import { useToast } from "@/components/blocks/app-toast-provider";
 import type { PanelGeneration } from "./result-panel";
 
 type Creation = CreationHistoryItem;
@@ -97,6 +99,9 @@ function normalizeCreation(raw: unknown): Creation | null {
   const urls = [...urlsFromArray, ...urlsFromLegacy].filter(
     (url, index, list) => list.indexOf(url) === index
   );
+  const inputUrls = Array.isArray(candidate.inputUrls)
+    ? candidate.inputUrls.filter(isValidMediaUrl).map((url) => url.trim())
+    : [];
 
   const rawStatus = typeof candidate.status === "string" ? candidate.status.toLowerCase() : "";
   const mappedStatus = LEGACY_STATUS_MAP[rawStatus];
@@ -113,6 +118,7 @@ function normalizeCreation(raw: unknown): Creation | null {
     type,
     status: normalizedStatus,
     urls,
+    inputUrls,
     prompt: typeof candidate.prompt === "string" ? candidate.prompt : "",
     createdAt:
       typeof candidate.createdAt === "string" && candidate.createdAt.trim().length > 0
@@ -354,6 +360,7 @@ export function MyCreationsTab({
   currentGenerations,
 }: MyCreationsTabProps) {
   const { data: session, status } = useSession();
+  const { showToast } = useToast();
   const router = useRouter();
   const [creations, setCreations] = useState<Creation[]>(initialCreations);
   const [selectedPreview, setSelectedPreview] = useState<{
@@ -473,6 +480,7 @@ export function MyCreationsTab({
                   id: taskId || c.id,
                   status,
                   urls: generation.url ? [generation.url] : c.urls,
+                  inputUrls: generation.inputUrls || c.inputUrls,
                   prompt: generation.prompt || c.prompt,
                   parameters: generation.parameters || c.parameters,
                   taskId: taskId || c.taskId || optimisticId,
@@ -488,6 +496,7 @@ export function MyCreationsTab({
             type: mode,
             status,
             urls: generation.url ? [generation.url] : [],
+            inputUrls: generation.inputUrls || [],
             prompt: generation.prompt || "",
             parameters: generation.parameters,
             createdAt: new Date().toISOString(),
@@ -553,6 +562,9 @@ export function MyCreationsTab({
                         ...creation,
                         status: "success",
                         urls: [data.videoUrl],
+                        inputUrls: Array.isArray(data.inputUrls)
+                          ? data.inputUrls
+                          : creation.inputUrls,
                         prompt: data.prompt || creation.prompt,
                         parameters:
                           normalizeGenerationParameters(data.parameters) ||
@@ -644,8 +656,18 @@ export function MyCreationsTab({
       params.set("prompt", creation.prompt);
     }
 
-    if (creation.type !== "music" && creation.urls[0]) {
-      params.set("image", creation.urls[0]);
+    const inputImage = getRegenerationInputImage(creation);
+    if (inputImage) {
+      params.set("image", inputImage);
+    } else if (
+      creation.type !== "music" &&
+      creation.parameters?.mode?.toLowerCase().includes("image to")
+    ) {
+      showToast({
+        title: "Original image unavailable",
+        message: "This older creation did not save its input image. Upload the original image before generating again.",
+        variant: "warning",
+      });
     }
 
     const basePath =

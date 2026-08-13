@@ -28,7 +28,8 @@ interface GenerateFormProps {
     taskId?: string,
     prompt?: string,
     parameters?: GenerationParameters,
-    optimisticId?: string
+    optimisticId?: string,
+    inputUrls?: string[]
   ) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
@@ -262,7 +263,7 @@ export function GenerateForm({
         onGenerate(response.data.imageUrl, taskId, responsePrompt, {
           ...optimisticParameters,
           ...response.data.parameters,
-        }, optimisticId);
+        }, optimisticId, response.data.inputUrls);
       } else {
         trackEvent("generation_failed", {
           type: "image",

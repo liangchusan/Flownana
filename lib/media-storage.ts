@@ -1,6 +1,11 @@
 import { put } from "@vercel/blob";
 
 type MediaKind = "image" | "video" | "music";
+export interface StoredMedia {
+  url: string;
+  contentType?: string;
+  sizeBytes?: number;
+}
 const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
@@ -81,7 +86,7 @@ export async function persistGeneratedMedia(params: {
   userId: string;
   taskId: string;
   kind: MediaKind;
-}): Promise<string> {
+}): Promise<StoredMedia> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error("Generated media storage is not configured.");
   }
@@ -93,6 +98,7 @@ export async function persistGeneratedMedia(params: {
     }
 
     const contentType = response.headers.get("content-type");
+    const contentLength = Number(response.headers.get("content-length") || 0);
     if (!isExpectedContentType(params.kind, contentType)) {
       throw new Error(
         `Unexpected ${params.kind} content type while downloading generated media: ${contentType}`
@@ -119,7 +125,11 @@ export async function persistGeneratedMedia(params: {
       multipart: true,
     });
 
-    return blob.url;
+    return {
+      url: blob.url,
+      contentType: contentType?.split(";")[0] || undefined,
+      sizeBytes: contentLength > 0 ? contentLength : undefined,
+    };
   } catch (error) {
     console.error("Failed to persist generated media to Vercel Blob:", error);
     throw new Error("Failed to persist generated media.");
@@ -130,7 +140,7 @@ export async function persistImageInputMedia(params: {
   source: string;
   userId: string;
   requestId: string;
-}): Promise<string> {
+}): Promise<StoredMedia> {
   const source = params.source.trim();
   if (!source) {
     throw new Error("Input image is empty.");
@@ -138,13 +148,14 @@ export async function persistImageInputMedia(params: {
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     if (source.startsWith("http://") || source.startsWith("https://")) {
-      return source;
+      return { url: source };
     }
     throw new Error("Image upload storage is not configured.");
   }
 
   let body: Blob | ReadableStream<Uint8Array>;
   let contentType: string | null = null;
+  let sizeBytes: number | undefined;
   let sourceForExtension = source;
 
   const dataUrl = parseDataUrl(source);
@@ -156,6 +167,7 @@ export async function persistImageInputMedia(params: {
       type: dataUrl.contentType,
     });
     contentType = dataUrl.contentType;
+    sizeBytes = dataUrl.bytes.byteLength;
     sourceForExtension = `input.${extensionFor({
       contentType,
       sourceUrl: "input.png",
@@ -184,6 +196,7 @@ export async function persistImageInputMedia(params: {
       throw new Error("Input image exceeds the maximum file size of 20 MB.");
     }
     body = response.body;
+    sizeBytes = contentLength > 0 ? contentLength : undefined;
   }
 
   if (!isExpectedContentType("image", contentType)) {
@@ -209,5 +222,9 @@ export async function persistImageInputMedia(params: {
     multipart: true,
   });
 
-  return blob.url;
+  return {
+    url: blob.url,
+    contentType: contentType?.split(";")[0] || undefined,
+    sizeBytes,
+  };
 }

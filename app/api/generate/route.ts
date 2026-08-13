@@ -24,7 +24,12 @@ import {
   withGenerationCreditOutcome,
   type GenerationErrorCode,
 } from "@/lib/generation-errors";
-import { persistGeneratedMedia, persistImageInputMedia } from "@/lib/media-storage";
+import { persistGeneratedMedia } from "@/lib/media-storage";
+import type { StoredMedia } from "@/lib/media-storage";
+import {
+  persistOrReuseImageInput,
+  syncGenerationMediaAssets,
+} from "@/lib/media-assets";
 
 const KIE_API_BASE = "https://api.kie.ai";
 const DEFAULT_IMAGE_MODEL_ID: ImageModelOptionId = "gpt-image-2";
@@ -282,6 +287,8 @@ export async function POST(request: NextRequest) {
   let userId: string | undefined;
   let promptForPersistence = "Untitled prompt";
   let parametersForPersistence: PersistedGenerationParameters | undefined;
+  let inputUrlsForPersistence: string[] = [];
+  let inputMediaForPersistence: StoredMedia[] = [];
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -342,15 +349,18 @@ export async function POST(request: NextRequest) {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const inputUrls = inputSource
+    const inputMedia = inputSource
       ? [
-          await persistImageInputMedia({
+          await persistOrReuseImageInput({
             source: inputSource,
             userId: session.user.id,
             requestId,
           }),
         ]
       : undefined;
+    const inputUrls = inputMedia?.map((media) => media.url);
+    inputUrlsForPersistence = inputUrls || [];
+    inputMediaForPersistence = inputMedia || [];
 
     consumedCredits = await consumeCreditsFIFO(session.user.id, cost);
 
@@ -364,19 +374,21 @@ export async function POST(request: NextRequest) {
     });
 
     const providerImageUrl = await pollImageResult(taskId, modelOption.label);
-    const generatedImageUrl = await persistGeneratedMedia({
+    const generatedImage = await persistGeneratedMedia({
       sourceUrl: providerImageUrl,
       userId: session.user.id,
       taskId,
       kind: "image",
     });
+    const generatedImageUrl = generatedImage.url;
 
-    await prisma.generation.upsert({
+    const generation = await prisma.generation.upsert({
       where: { taskId },
       update: {
         type: "image",
         status: "success",
         urls: [generatedImageUrl],
+        inputUrls: inputUrlsForPersistence,
         prompt,
         error: null,
         modelOptionId: inputUrls?.length
@@ -390,6 +402,7 @@ export async function POST(request: NextRequest) {
         type: "image",
         status: "success",
         urls: [generatedImageUrl],
+        inputUrls: inputUrlsForPersistence,
         prompt,
         taskId,
         modelOptionId: inputUrls?.length
@@ -399,6 +412,19 @@ export async function POST(request: NextRequest) {
         creditsCost: cost,
       },
     });
+    await syncGenerationMediaAssets({
+      generationId: generation.id,
+      userId,
+      assets: [
+        ...inputMediaForPersistence.map((media, position) => ({
+          media,
+          role: "input" as const,
+          type: "image" as const,
+          position,
+        })),
+        { media: generatedImage, role: "output", type: "image", position: 0 },
+      ],
+    });
 
     return NextResponse.json({
       success: true,
@@ -407,6 +433,7 @@ export async function POST(request: NextRequest) {
       taskId,
       creditsCost: cost,
       parameters: parametersForPersistence,
+      inputUrls: inputUrlsForPersistence,
     });
   } catch (error: any) {
     console.error("Error generating image:", error);
@@ -450,12 +477,13 @@ export async function POST(request: NextRequest) {
 
     if (taskId && userId) {
       try {
-        await prisma.generation.upsert({
+        const generation = await prisma.generation.upsert({
           where: { taskId },
           update: {
             type: "image",
             status: "failed",
             error: errorDisplay.message,
+            inputUrls: inputUrlsForPersistence,
             ...(parametersForPersistence
               ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
               : {}),
@@ -465,6 +493,7 @@ export async function POST(request: NextRequest) {
             type: "image",
             status: "failed",
             urls: [],
+            inputUrls: inputUrlsForPersistence,
             prompt: promptForPersistence,
             taskId,
             error: errorDisplay.message,
@@ -472,6 +501,16 @@ export async function POST(request: NextRequest) {
               ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
               : {}),
           },
+        });
+        await syncGenerationMediaAssets({
+          generationId: generation.id,
+          userId,
+          assets: inputMediaForPersistence.map((media, position) => ({
+            media,
+            role: "input",
+            type: "image",
+            position,
+          })),
         });
       } catch (persistErr) {
         console.error("Failed to persist image generation failure:", persistErr);

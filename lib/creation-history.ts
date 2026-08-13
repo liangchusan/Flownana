@@ -48,6 +48,7 @@ export interface CreationHistoryItem {
   type: "image" | "video" | "music";
   status: CreationStatus;
   urls: string[];
+  inputUrls: string[];
   prompt: string;
   createdAt: string;
   taskId?: string;
@@ -60,6 +61,13 @@ export interface CreationHistoryItem {
 
 export function creationIdentity(creation: CreationHistoryItem): string {
   return creation.taskId || creation.id;
+}
+
+export function getRegenerationInputImage(
+  creation: CreationHistoryItem
+): string | undefined {
+  if (creation.type === "music") return undefined;
+  return creation.inputUrls[0];
 }
 
 function statusRank(status: CreationStatus): number {

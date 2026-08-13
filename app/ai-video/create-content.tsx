@@ -59,7 +59,7 @@ export function CreateContent({
                   ...prev,
                 ]);
               }}
-              onGenerate={(url, taskId, prompt, optimisticId, parameters) => {
+              onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => {
                 setVideoGenerations((prev) =>
                   prev.map((generation) =>
                     generation.optimisticId === optimisticId
@@ -70,13 +70,14 @@ export function CreateContent({
                           taskId,
                           prompt: prompt || generation.prompt,
                           parameters: parameters || generation.parameters,
+                          inputUrls: inputUrls || generation.inputUrls,
                           error: undefined,
                         }
                       : generation
                   )
                 );
               }}
-              onGenerationTaskCreated={({ optimisticId, taskId, prompt }) => {
+              onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => {
                 setVideoGenerations((prev) =>
                   prev.map((generation) =>
                     generation.optimisticId === optimisticId
@@ -84,6 +85,7 @@ export function CreateContent({
                           ...generation,
                           taskId,
                           prompt: prompt || generation.prompt,
+                          inputUrls: inputUrls || generation.inputUrls,
                         }
                       : generation
                   )

@@ -31,7 +31,12 @@ import {
   withGenerationCreditOutcome,
   type GenerationErrorCode,
 } from "@/lib/generation-errors";
-import { persistGeneratedMedia, persistImageInputMedia } from "@/lib/media-storage";
+import { persistGeneratedMedia } from "@/lib/media-storage";
+import type { StoredMedia } from "@/lib/media-storage";
+import {
+  persistOrReuseImageInput,
+  syncGenerationMediaAssets,
+} from "@/lib/media-assets";
 
 const KIE_API_BASE = "https://api.kie.ai";
 const VIDEO_TASK_TIMEOUT_MS = 45 * 60 * 1000;
@@ -366,6 +371,7 @@ async function settleVideoTask(params: {
       creditsCost: generation.creditsCost,
       modelOptionId: generation.modelOptionId,
       parameters: generation.parameters,
+      inputUrls: generation.inputUrls,
     });
   }
 
@@ -395,6 +401,7 @@ async function settleVideoTask(params: {
       creditsCost: generation.creditsCost,
       modelOptionId: generation.modelOptionId,
       parameters: generation.parameters,
+      inputUrls: generation.inputUrls,
     });
   }
 
@@ -406,28 +413,34 @@ async function settleVideoTask(params: {
     });
   }
 
-  let videoUrl: string;
+  let generatedVideo: StoredMedia;
   try {
-    videoUrl = await persistGeneratedMedia({
+    generatedVideo = await persistGeneratedMedia({
       sourceUrl: result.url,
       userId: params.userId,
       taskId: params.taskId,
       kind: "video",
     });
+    await syncGenerationMediaAssets({
+      generationId: generation.id,
+      userId: params.userId,
+      assets: [
+        { media: generatedVideo, role: "output", type: "video", position: 0 },
+      ],
+    });
   } catch (error) {
-    console.error("Failed to persist completed video:", error);
+    console.error("Failed to persist or register completed video:", error);
     return failVideoGeneration({
       generation,
       error: { errorCode: "media_processing_failed" },
       source: "app",
     });
   }
-
   await prisma.generation.update({
     where: { id: generation.id },
     data: {
       status: "success",
-      urls: [videoUrl],
+      urls: [generatedVideo.url],
       error: null,
       creditConsumption: Prisma.JsonNull,
     },
@@ -437,12 +450,13 @@ async function settleVideoTask(params: {
     success: true,
     pending: false,
     status: "success",
-    videoUrl,
+    videoUrl: generatedVideo.url,
     prompt: generation.prompt,
     taskId: generation.taskId,
     creditsCost: generation.creditsCost,
     modelOptionId: generation.modelOptionId,
     parameters: generation.parameters,
+    inputUrls: generation.inputUrls,
   });
 }
 
@@ -491,6 +505,8 @@ export async function POST(request: NextRequest) {
   let userId: string | undefined;
   let promptForPersistence = "Untitled prompt";
   let parametersForPersistence: Record<string, string | number> | undefined;
+  let inputUrlsForPersistence: string[] = [];
+  let inputMediaForPersistence: StoredMedia[] = [];
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -537,11 +553,11 @@ export async function POST(request: NextRequest) {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const normalizedImageUrls =
+    const normalizedImageMedia =
       inputSources.length > 0
         ? await Promise.all(
             inputSources.map((source, index) =>
-              persistImageInputMedia({
+              persistOrReuseImageInput({
                 source,
                 userId: session.user.id,
                 requestId: `${requestId}-${index}`,
@@ -549,6 +565,9 @@ export async function POST(request: NextRequest) {
             )
           )
         : undefined;
+    const normalizedImageUrls = normalizedImageMedia?.map((media) => media.url);
+    inputUrlsForPersistence = normalizedImageUrls || [];
+    inputMediaForPersistence = normalizedImageMedia || [];
 
     parametersForPersistence = {
       model: getVideoModelName(option),
@@ -569,12 +588,13 @@ export async function POST(request: NextRequest) {
       option,
     });
 
-    await prisma.generation.upsert({
+    const generation = await prisma.generation.upsert({
       where: { taskId },
       update: {
         type: "video",
         status: "generating",
         urls: [],
+        inputUrls: inputUrlsForPersistence,
         prompt,
         error: null,
         modelOptionId: option.id,
@@ -587,6 +607,7 @@ export async function POST(request: NextRequest) {
         type: "video",
         status: "generating",
         urls: [],
+        inputUrls: inputUrlsForPersistence,
         prompt,
         taskId,
         modelOptionId: option.id,
@@ -594,6 +615,16 @@ export async function POST(request: NextRequest) {
         creditsCost: option.credits,
         creditConsumption: consumedCredits as Prisma.InputJsonValue,
       },
+    });
+    await syncGenerationMediaAssets({
+      generationId: generation.id,
+      userId,
+      assets: inputMediaForPersistence.map((media, position) => ({
+        media,
+        role: "input",
+        type: "image",
+        position,
+      })),
     });
 
     return NextResponse.json({
@@ -605,6 +636,7 @@ export async function POST(request: NextRequest) {
       creditsCost: option.credits,
       modelOptionId: option.id,
       parameters: parametersForPersistence,
+      inputUrls: inputUrlsForPersistence,
     });
   } catch (error: any) {
     console.error("Error generating video:", error);
@@ -648,12 +680,13 @@ export async function POST(request: NextRequest) {
 
     if (taskId && userId) {
       try {
-        await prisma.generation.upsert({
+        const generation = await prisma.generation.upsert({
           where: { taskId },
           update: {
             type: "video",
             status: "failed",
             error: errorDisplay.message,
+            inputUrls: inputUrlsForPersistence,
             creditConsumption: refundPending
               ? (consumedCredits as Prisma.InputJsonValue)
               : Prisma.JsonNull,
@@ -666,6 +699,7 @@ export async function POST(request: NextRequest) {
             type: "video",
             status: "failed",
             urls: [],
+            inputUrls: inputUrlsForPersistence,
             prompt: promptForPersistence,
             taskId,
             error: errorDisplay.message,
@@ -676,6 +710,16 @@ export async function POST(request: NextRequest) {
               ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
               : {}),
           },
+        });
+        await syncGenerationMediaAssets({
+          generationId: generation.id,
+          userId,
+          assets: inputMediaForPersistence.map((media, position) => ({
+            media,
+            role: "input",
+            type: "image",
+            position,
+          })),
         });
       } catch (persistErr) {
         console.error("Failed to persist video generation failure:", persistErr);
