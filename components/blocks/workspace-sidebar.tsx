@@ -32,7 +32,7 @@ interface WorkspaceSidebarProps {
 
 export function WorkspaceMobileHeader({ onOpen }: { onOpen: () => void }) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-background px-3 lg:hidden">
+    <header className="flex h-14 items-center justify-between bg-background px-3 lg:hidden">
       <button type="button" onClick={onOpen} className="flex h-11 w-11 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="Open navigation">
         <Menu className="h-5 w-5" />
       </button>
@@ -63,7 +63,7 @@ export function WorkspaceSidebar({
     <>
       {mobileOpen && <button type="button" className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-[1px] lg:hidden" onClick={() => onMobileOpenChange(false)} aria-label="Close navigation" />}
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-60 -translate-x-full flex-col border-r border-border bg-surface-soft transition-all duration-300 lg:static lg:translate-x-0 ${widthClass} ${mobileOpen ? "translate-x-0" : ""}`}>
-        <div className={`flex h-16 items-center border-b border-border px-3 ${collapsed ? "lg:justify-center" : "justify-between"}`}>
+        <div className={`flex h-16 items-center px-3 ${collapsed ? "lg:justify-center" : "justify-between"}`}>
           <Link href="/home" className="min-w-0" aria-label="Flownana home">
             <Logo size="md" showText={!collapsed} />
           </Link>

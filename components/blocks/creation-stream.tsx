@@ -188,7 +188,7 @@ export function CreationStream({
 
   if (runs.length === 0) {
     return (
-      <div className="flex min-h-[45vh] flex-col items-center justify-center px-6 text-center">
+      <div className="flex min-h-[45vh] flex-col items-center justify-center px-6 pb-72 text-center sm:pb-64">
         <div className="flex h-14 w-14 items-center justify-center rounded-ui-xl bg-surface-soft text-muted-foreground"><ImageIcon className="h-6 w-6" /></div>
         <h2 className="mt-5 font-display text-2xl font-medium text-foreground">Create your first piece</h2>
         <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">Describe an image, video, or sound below. Every request stays paired with its result.</p>
@@ -197,7 +197,7 @@ export function CreationStream({
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-12 px-4 pb-8 pt-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-5xl space-y-12 px-4 pb-96 pt-8 sm:px-6 sm:pb-80 lg:px-8 lg:pb-72">
       {runs.map((run) => {
         const requestedCount = Math.max(...run.creations.map((item) => item.parameters?.outputCount || 1));
         const cells = [...run.creations];
