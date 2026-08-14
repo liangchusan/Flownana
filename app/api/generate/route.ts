@@ -303,6 +303,9 @@ export async function POST(request: NextRequest) {
       model,
       resolution,
       aspectRatio,
+      runId,
+      outputIndex,
+      outputCount,
     } = body as {
       prompt?: string;
       imageUrl?: string | null;
@@ -310,6 +313,9 @@ export async function POST(request: NextRequest) {
       model?: string;
       resolution?: string;
       aspectRatio?: string;
+      runId?: string;
+      outputIndex?: number;
+      outputCount?: number;
     };
 
     if (!prompt) {
@@ -330,6 +336,15 @@ export async function POST(request: NextRequest) {
       resolution: res,
       aspectRatio: ar,
       mode: imageUrl ? "Image to image" : "Text to image",
+      ...(typeof runId === "string" && runId.trim().length > 0
+        ? { runId: runId.trim().slice(0, 120) }
+        : {}),
+      ...(Number.isInteger(outputIndex) && Number(outputIndex) >= 0
+        ? { outputIndex: Number(outputIndex) }
+        : {}),
+      ...(Number.isInteger(outputCount) && Number(outputCount) >= 1 && Number(outputCount) <= 4
+        ? { outputCount: Number(outputCount) }
+        : {}),
     };
     const cost = getImageGenerationCredits(modelId, res);
     if (!cost) {

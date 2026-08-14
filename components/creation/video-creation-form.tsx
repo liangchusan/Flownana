@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, Loader2, Upload, X } from "lucide-react";
+import { Check, ChevronDown, ImagePlus, Loader2, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import {
@@ -63,6 +63,8 @@ interface VideoCreationFormProps {
   onTaskIdChange?: (taskId: string) => void;
   initialPrompt?: string;
   initialImage?: string;
+  initialParameters?: GenerationParameters;
+  variant?: "panel" | "composer";
 }
 
 export function VideoCreationForm({
@@ -77,6 +79,8 @@ export function VideoCreationForm({
   onTaskIdChange,
   initialPrompt,
   initialImage,
+  initialParameters,
+  variant = "panel",
 }: VideoCreationFormProps) {
   const { showToast } = useToast();
   const { data: session, status } = useSession();
@@ -207,6 +211,14 @@ export function VideoCreationForm({
   }, [activeGenerationCount]);
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
   useEffect(() => { if (initialImage !== undefined) setUploadedImage(initialImage); }, [initialImage]);
+  useEffect(() => {
+    if (!initialParameters) return;
+    if (initialParameters.model) setSelectedModelName(initialParameters.model);
+    if (initialParameters.aspectRatio) setAspectRatio(initialParameters.aspectRatio as VideoAspectRatio);
+    if (initialParameters.resolution) setResolution(initialParameters.resolution as VideoResolutionOption);
+    if (initialParameters.duration) setDuration(initialParameters.duration);
+    if (initialParameters.audio) setSound(initialParameters.audio as VideoSoundOption);
+  }, [initialParameters]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -365,6 +377,8 @@ export function VideoCreationForm({
       prompt: requestPrompt,
       parameters: generationParameters,
     });
+    setPrompt("");
+    setUploadedImage(null);
     setIsGenerating?.(true);
     const requestAspectRatio = aspectRatio === "Auto" ? undefined : aspectRatio;
     trackEvent("generation_started", {
@@ -380,6 +394,7 @@ export function VideoCreationForm({
         imageUrls: uploadedImage ? [uploadedImage] : undefined,
         modelOptionId: selectedOption.id,
         aspectRatio: requestAspectRatio,
+        runId: optimisticId,
       });
       if (response.data.success) {
         const taskId = response.data.taskId;
@@ -593,6 +608,54 @@ export function VideoCreationForm({
       </div>
     </div>
   );
+
+  if (variant === "composer") {
+    return (
+      <div className="space-y-3">
+        {uploadedImage && (
+          <div className="flex items-center gap-2 rounded-ui-lg border border-border bg-surface-soft px-2 py-2">
+            <img src={uploadedImage} alt="Reference" className="h-12 w-12 rounded-ui object-cover" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">Reference image</p>
+              <p className="text-[11px] text-muted-foreground">Used as the opening reference</p>
+            </div>
+            <button type="button" onClick={() => setUploadedImage(null)} className="rounded-full p-2 text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground" aria-label="Remove reference image">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        <textarea
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="Describe the video you want to create..."
+          className="min-h-20 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          maxLength={500}
+        />
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <div {...getRootProps()} className="flex h-9 cursor-pointer items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-muted-foreground transition-all duration-300 hover:text-foreground">
+            <input {...getInputProps()} />
+            <ImagePlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add image</span>
+          </div>
+          <div className="relative">
+            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-44 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+              <span className="truncate">{selectedModelName}</span><ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {modelPopup}
+          </div>
+          <div className="relative">
+            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+              <SlidersHorizontal className="h-3.5 w-3.5" />{aspectRatio} · {resolution} · {duration}s
+            </button>
+            {optionsPopup}
+          </div>
+          <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || !prompt.trim() || !selectedOption))} className="ml-auto h-10 gap-2 px-4">
+            {!session ? getSignInLabel() : <><span>{selectedOption?.credits ?? 0} credits</span><Send className="h-4 w-4" /></>}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

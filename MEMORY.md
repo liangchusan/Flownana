@@ -27,6 +27,16 @@ The broader brand message may include video / image / music, but current MVP pri
 - /generate : redirects to /ai-image
 - /ai-image : main current creation entry
 
+## Media Creation Workspace P0 (as of 2026-08-14)
+- `/ai-image`, `/ai-video`, and `/ai-music` now share one responsive media creation workspace. Each route selects its corresponding initial composer type, while the central Create stream loads recent image, video, and music generations together.
+- The workspace uses a collapsible Create/Assets sidebar, a chronological Prompt + Result stream, a bottom composer with Image/Video/Audio switching, and an optional right details panel. There is no user-visible Session or Project system in P0.
+- One Prompt maps to one Result Block. Image requests can produce 1–4 separately billed outputs grouped by `parameters.runId`; video and music remain single-output. `outputIndex` and `outputCount` are stored in `Generation.parameters` without a schema migration. The existing maximum of five concurrent tasks counts every requested image output.
+- Reprompt directly replaces the current draft and restores saved prompt, original input image, model, parameters, and output count where available. A successful submit clears prompt and attachments but preserves generator type and settings.
+- Active image and video models accept at most one image input; Grok Imagine Video 1.5 requires it. Suno accepts no media input. Referenced video/audio or an image switched into Audio stays visibly marked incompatible, triggers a warning Toast, blocks generation, and offers Remove incompatible.
+- Deleting media changes the generation to a deleted placeholder when no outputs remain and removes it from Assets. The output relationship is removed; an unreferenced Vercel Blob and its `MediaAsset` row are deleted, while media still reused as another generation input is retained. More → Remove from recent writes `hiddenFromRecent` into `Generation.parameters`, hiding the Prompt + Result record while preserving successful media in Assets.
+- Assets is a flat grid of successful, undeleted generated outputs with All/Images/Videos/Audio filters, prompt search, Newest/Oldest sorting, preview, download, delete, and Reference back into Create. Uploaded inputs are not automatically saved as Assets.
+- No new GA4 event names were added. Existing generation and result download events remain in place. The approved specification is `docs/prd-media-creation-workspace-p0.md`.
+
 ## Current Core Business Logic
 - user login required for generation
 - generation consumes credits

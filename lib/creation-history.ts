@@ -3,7 +3,8 @@ export type CreationStatus =
   | "generating"
   | "processing"
   | "success"
-  | "failed";
+  | "failed"
+  | "deleted";
 
 export interface GenerationParameters {
   model?: string;
@@ -12,6 +13,10 @@ export interface GenerationParameters {
   duration?: number;
   audio?: string;
   mode?: string;
+  runId?: string;
+  outputIndex?: number;
+  outputCount?: number;
+  hiddenFromRecent?: boolean;
 }
 
 function readParameterString(value: unknown): string | undefined {
@@ -29,6 +34,16 @@ export function normalizeGenerationParameters(
     typeof durationValue === "number" && Number.isFinite(durationValue)
       ? durationValue
       : undefined;
+  const outputIndexValue = candidate.outputIndex;
+  const outputIndex =
+    typeof outputIndexValue === "number" && Number.isInteger(outputIndexValue)
+      ? outputIndexValue
+      : undefined;
+  const outputCountValue = candidate.outputCount;
+  const outputCount =
+    typeof outputCountValue === "number" && Number.isInteger(outputCountValue)
+      ? outputCountValue
+      : undefined;
   const parameters: GenerationParameters = {
     model: readParameterString(candidate.model),
     resolution: readParameterString(candidate.resolution),
@@ -36,6 +51,14 @@ export function normalizeGenerationParameters(
     duration,
     audio: readParameterString(candidate.audio),
     mode: readParameterString(candidate.mode),
+    ...(readParameterString(candidate.runId)
+      ? { runId: readParameterString(candidate.runId) }
+      : {}),
+    ...(outputIndex !== undefined ? { outputIndex } : {}),
+    ...(outputCount !== undefined ? { outputCount } : {}),
+    ...(typeof candidate.hiddenFromRecent === "boolean"
+      ? { hiddenFromRecent: candidate.hiddenFromRecent }
+      : {}),
   };
 
   return Object.values(parameters).some((item) => item !== undefined)
@@ -82,6 +105,8 @@ function statusRank(status: CreationStatus): number {
       return 2;
     case "pending":
       return 1;
+    case "deleted":
+      return 0;
     default:
       return 0;
   }
