@@ -134,10 +134,10 @@ export function MediaCreationWorkspace({
         {view === "assets" ? <div className="min-h-0 flex-1 overflow-y-auto"><AssetsLibrary creations={creations} onReference={referenceAsset} onChange={updateCreation} /></div> : (
           <div className="flex min-h-0 flex-1">
             <main className="relative flex min-w-0 flex-1 flex-col">
-              <header className="hidden h-16 shrink-0 items-center justify-between border-b border-border px-6 lg:flex"><div><h1 className="text-sm font-medium text-foreground">Create</h1><p className="text-xs text-muted-foreground">Recent generations across image, video, and audio</p></div>{detailsRun && <button type="button" onClick={() => setDetailsRun(null)} className="flex h-9 items-center gap-2 rounded-ui px-3 text-xs text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground"><PanelRightClose className="h-4 w-4" />Close details</button>}</header>
+              <header className="hidden h-16 shrink-0 items-center justify-between px-6 lg:flex"><div><h1 className="text-sm font-medium text-foreground">Create</h1><p className="text-xs text-muted-foreground">Recent generations across image, video, and audio</p></div>{detailsRun && <button type="button" onClick={() => setDetailsRun(null)} className="flex h-9 items-center gap-2 rounded-ui px-3 text-xs text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground"><PanelRightClose className="h-4 w-4" />Close details</button>}</header>
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={setDetailsRun} onChange={updateCreation} /></div>
-              <div className="shrink-0 border-t border-border bg-background/95 px-3 pb-3 pt-2 backdrop-blur sm:px-5 sm:pb-5">
-                <div className="mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background p-3 shadow-float sm:p-4">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6">
+                <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/95 p-3 shadow-float backdrop-blur-xl sm:p-4">
                   <div className="mb-3 flex items-center gap-1" role="tablist" aria-label="Generation type">
                     {([
                       ["image", "Image", ImageIcon], ["video", "Video", Video], ["music", "Audio", Music],
