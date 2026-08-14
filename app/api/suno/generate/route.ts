@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import {
   consumeCreditsFIFO,
   refundConsumedCredits,
@@ -163,11 +164,13 @@ export async function POST(request: NextRequest) {
       title,
       tags,
       makeInstrumental,
+      runId,
     } = body as {
       prompt?: string;
       title?: string;
       tags?: string;
       makeInstrumental?: boolean;
+      runId?: string;
     };
 
     if (!prompt) {
@@ -204,6 +207,14 @@ export async function POST(request: NextRequest) {
         urls: [generatedAudio.url],
         prompt,
         error: null,
+        parameters: {
+          model: "Suno",
+          mode: makeInstrumental ? "Instrumental" : "Music",
+          ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120) } : {}),
+          outputIndex: 0,
+          outputCount: 1,
+        } as Prisma.InputJsonValue,
+        creditsCost: MUSIC_CREDITS,
       },
       create: {
         userId,
@@ -212,6 +223,14 @@ export async function POST(request: NextRequest) {
         urls: [generatedAudio.url],
         prompt,
         taskId,
+        parameters: {
+          model: "Suno",
+          mode: makeInstrumental ? "Instrumental" : "Music",
+          ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120) } : {}),
+          outputIndex: 0,
+          outputCount: 1,
+        } as Prisma.InputJsonValue,
+        creditsCost: MUSIC_CREDITS,
       },
     });
     await syncGenerationMediaAssets({

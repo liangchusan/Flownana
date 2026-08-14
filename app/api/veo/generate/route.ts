@@ -522,6 +522,7 @@ export async function POST(request: NextRequest) {
       model,
       aspectRatio,
       watermark,
+      runId,
     } = body as {
       prompt?: string;
       imageUrls?: string[];
@@ -529,6 +530,7 @@ export async function POST(request: NextRequest) {
       model?: string;
       aspectRatio?: string;
       watermark?: string;
+      runId?: string;
     };
 
     if (!prompt) {
@@ -576,6 +578,9 @@ export async function POST(request: NextRequest) {
       duration: option.duration,
       audio: option.hasAudio ? "On" : "Off",
       mode: normalizedImageUrls?.length ? "Image to video" : "Text to video",
+      ...(typeof runId === "string" && runId.trim()
+        ? { runId: runId.trim().slice(0, 120), outputIndex: 0, outputCount: 1 }
+        : {}),
     };
 
     consumedCredits = await consumeCreditsFIFO(session.user.id, option.credits);

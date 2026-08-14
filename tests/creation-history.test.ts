@@ -110,3 +110,27 @@ test("normalizeGenerationParameters keeps only supported display fields", () => 
     }
   );
 });
+
+test("normalizeGenerationParameters preserves workspace run metadata", () => {
+  assert.deepEqual(
+    normalizeGenerationParameters({
+      model: "GPT Image 2",
+      runId: "run-123",
+      outputIndex: 2,
+      outputCount: 4,
+      hiddenFromRecent: true,
+    }),
+    {
+      model: "GPT Image 2",
+      resolution: undefined,
+      aspectRatio: undefined,
+      duration: undefined,
+      audio: undefined,
+      mode: undefined,
+      runId: "run-123",
+      outputIndex: 2,
+      outputCount: 4,
+      hiddenFromRecent: true,
+    }
+  );
+});

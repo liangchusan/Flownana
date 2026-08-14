@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, ChevronDown, Upload, X } from "lucide-react";
+import { Check, ChevronDown, ImagePlus, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
 import {
   IMAGE_MODEL_OPTIONS,
@@ -30,7 +30,8 @@ interface GenerateFormProps {
     prompt?: string,
     parameters?: GenerationParameters,
     optimisticId?: string,
-    inputUrls?: string[]
+    inputUrls?: string[],
+    outputIndex?: number
   ) => void;
   isGenerating: boolean;
   setIsGenerating: (value: boolean) => void;
@@ -39,22 +40,27 @@ interface GenerateFormProps {
     optimisticId: string;
     prompt: string;
     parameters: GenerationParameters;
+    outputCount?: number;
   }) => void;
   onGenerationTaskCreated?: (data: {
     optimisticId: string;
     taskId: string;
     prompt?: string;
+    outputIndex?: number;
   }) => void;
   onGenerationFailure?: (data: {
     optimisticId: string;
     prompt: string;
     error: string;
     errorCode?: string;
+    outputIndex?: number;
   }) => void;
   activeGenerationCount?: number;
   maxConcurrentGenerations?: number;
   initialPrompt?: string;
   initialImage?: string;
+  initialParameters?: GenerationParameters;
+  variant?: "panel" | "composer";
 }
 
 export function GenerateForm({
@@ -69,6 +75,8 @@ export function GenerateForm({
   maxConcurrentGenerations = 5,
   initialPrompt,
   initialImage,
+  initialParameters,
+  variant = "panel",
 }: GenerateFormProps) {
   const { showToast } = useToast();
   const [prompt, setPrompt] = useState(initialPrompt || "");
@@ -76,6 +84,7 @@ export function GenerateForm({
   const [model, setModel] = useState<ImageModelOptionId>("gpt-image-2");
   const [resolution, setResolution] = useState<ImageResolutionKey>("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [outputCount, setOutputCount] = useState(1);
 
   const [modelOpen, setModelOpen] = useState(false);
   const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -89,7 +98,7 @@ export function GenerateForm({
   const imageModels = useMemo(() => IMAGE_MODEL_OPTIONS, []);
   const usesConcurrentGenerationLimit = activeGenerationCount !== undefined;
   const generationLimitReached = usesConcurrentGenerationLimit
-    ? activeGenerationCount >= maxConcurrentGenerations
+    ? activeGenerationCount + outputCount > maxConcurrentGenerations
     : isGenerating;
   const ratioOptions = useMemo(
     () =>
@@ -115,6 +124,20 @@ export function GenerateForm({
 
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
   useEffect(() => { if (initialImage !== undefined) setUploadedImage(initialImage); }, [initialImage]);
+  useEffect(() => {
+    if (!initialParameters) return;
+    const matchedModel = imageModels.find(
+      (option) => option.label === initialParameters.model
+    );
+    if (matchedModel) setModel(matchedModel.id);
+    if (initialParameters.resolution) {
+      setResolution(initialParameters.resolution.toUpperCase() as ImageResolutionKey);
+    }
+    if (initialParameters.aspectRatio) setAspectRatio(initialParameters.aspectRatio);
+    if (initialParameters.outputCount) {
+      setOutputCount(Math.min(4, Math.max(1, initialParameters.outputCount)));
+    }
+  }, [imageModels, initialParameters]);
   useEffect(() => {
     if (!ratioOptions.includes(aspectRatio)) {
       setAspectRatio(ratioOptions[0] || "1:1");
@@ -210,18 +233,23 @@ export function GenerateForm({
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `image-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const mode = uploadedImage ? "image-to-image" : "text-to-image";
+    const requestPrompt = prompt.trim();
+    const requestImage = uploadedImage;
+    const mode = requestImage ? "image-to-image" : "text-to-image";
     const optimisticParameters: GenerationParameters = {
       model: currentModelLabel,
       resolution,
       aspectRatio,
-      mode: uploadedImage ? "Image to image" : "Text to image",
+      mode: requestImage ? "Image to image" : "Text to image",
+      runId: optimisticId,
+      outputCount,
     };
 
     onGenerationStart?.({
       optimisticId,
-      prompt,
+      prompt: requestPrompt,
       parameters: optimisticParameters,
+      outputCount,
     });
     if (!usesConcurrentGenerationLimit) {
       setIsGenerating(true);
@@ -233,19 +261,27 @@ export function GenerateForm({
       aspect_ratio: aspectRatio,
       credits_cost: creditsCost,
       mode,
+      output_count: outputCount,
     });
-    try {
-      const response = await axios.post("/api/generate", {
-        prompt,
-        imageUrl: uploadedImage,
-        mode,
-        model,
-        resolution,
-        aspectRatio,
-      });
-      if (response.data.success) {
+    setPrompt("");
+    setUploadedImage(null);
+
+    const generateOne = async (outputIndex: number) => {
+      try {
+        const response = await axios.post("/api/generate", {
+          prompt: requestPrompt,
+          imageUrl: requestImage,
+          mode,
+          model,
+          resolution,
+          aspectRatio,
+          runId: optimisticId,
+          outputIndex,
+          outputCount,
+        });
+        if (!response.data.success) throw new Error("Generation failed");
         const taskId = response.data.taskId;
-        const responsePrompt = response.data.prompt || prompt;
+        const responsePrompt = response.data.prompt || requestPrompt;
         trackEvent("generation_success", {
           type: "image",
           model,
@@ -259,58 +295,52 @@ export function GenerateForm({
             optimisticId,
             taskId,
             prompt: responsePrompt,
+            outputIndex,
           });
         }
-        onGenerate(response.data.imageUrl, taskId, responsePrompt, {
-          ...optimisticParameters,
-          ...response.data.parameters,
-        }, optimisticId, response.data.inputUrls);
-      } else {
+        onGenerate(
+          response.data.imageUrl,
+          taskId,
+          responsePrompt,
+          { ...optimisticParameters, ...response.data.parameters, outputIndex },
+          optimisticId,
+          response.data.inputUrls,
+          outputIndex
+        );
+      } catch (error: any) {
+        const errorDisplay = getGenerationErrorDisplay(
+          error.response?.data || error,
+          { mediaType: "image", status: error.response?.status }
+        );
+        if (error.response?.status === 402) {
+          trackEvent("insufficient_credits_shown", {
+            type: "image",
+            required: error.response?.data?.required,
+            available: error.response?.data?.available,
+          });
+        }
         trackEvent("generation_failed", {
           type: "image",
           model,
-          error: "unknown",
+          error: error.response?.data?.errorCode || errorDisplay.code,
         });
         onGenerationFailure?.({
           optimisticId,
-          prompt,
-          error: "Generation failed, please try again",
+          prompt: requestPrompt,
+          error: errorDisplay.message,
+          errorCode: errorDisplay.code,
+          outputIndex,
         });
         showToast({
-          title: "Generation failed",
-          message: "Generation failed, please try again",
-          variant: "error",
+          title: errorDisplay.title,
+          message: `${errorDisplay.message} ${errorDisplay.action}`,
+          variant: errorDisplay.retryable ? "error" : "warning",
         });
       }
-    } catch (error: any) {
-      const errorDisplay = getGenerationErrorDisplay(
-        error.response?.data || error,
-        { mediaType: "image", status: error.response?.status }
-      );
-      const message = errorDisplay.message;
-      if (error.response?.status === 402) {
-        trackEvent("insufficient_credits_shown", {
-          type: "image",
-          required: error.response?.data?.required,
-          available: error.response?.data?.available,
-        });
-      }
-      trackEvent("generation_failed", {
-        type: "image",
-        model,
-        error: error.response?.data?.errorCode || errorDisplay.code,
-      });
-      onGenerationFailure?.({
-        optimisticId,
-        prompt,
-        error: message,
-        errorCode: errorDisplay.code,
-      });
-      showToast({
-        title: errorDisplay.title,
-        message: `${message} ${errorDisplay.action}`,
-        variant: errorDisplay.retryable ? "error" : "warning",
-      });
+    };
+
+    try {
+      await Promise.all(Array.from({ length: outputCount }, (_, index) => generateOne(index)));
     } finally {
       if (!usesConcurrentGenerationLimit) {
         setIsGenerating(false);
@@ -331,8 +361,63 @@ export function GenerateForm({
 
   const currentModelLabel = imageModels.find((m) => m.id === model)?.label ?? model;
 
+  if (variant === "composer") {
+    return (
+      <div className="space-y-3">
+        {uploadedImage && (
+          <div className="flex items-center gap-2 rounded-ui-lg border border-border bg-surface-soft px-2 py-2">
+            <img src={uploadedImage} alt="Reference" className="h-12 w-12 rounded-ui object-cover" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">Reference image</p>
+              <p className="text-[11px] text-muted-foreground">Compatible with {currentModelLabel}</p>
+            </div>
+            <button type="button" onClick={() => setUploadedImage(null)} className="rounded-full p-2 text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground" aria-label="Remove reference image">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        <Textarea
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="Describe the image you want to create..."
+          className="min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
+          maxLength={5000}
+        />
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <div {...getRootProps()} className="flex h-9 cursor-pointer items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-muted-foreground transition-all duration-300 hover:text-foreground">
+            <input {...getInputProps()} />
+            <ImagePlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add image</span>
+          </div>
+          <div className="relative">
+            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-40 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+              <span className="truncate">{currentModelLabel}</span><ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {renderModelPopup()}
+          </div>
+          <div className="relative">
+            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+              <SlidersHorizontal className="h-3.5 w-3.5" />{aspectRatio} · {resolution}
+            </button>
+            {renderOptionsPopup()}
+          </div>
+          <label className="flex h-9 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground">
+            <span>Results</span>
+            <select value={outputCount} onChange={(event) => setOutputCount(Number(event.target.value))} className="bg-transparent font-medium outline-none" aria-label="Number of image results">
+              {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
+            </select>
+          </label>
+          <Button type="button" onClick={handleGenerate} disabled={generationLimitReached || !prompt.trim()} className="ml-auto h-10 gap-2 px-4">
+            <span>{(creditsCost ?? 0) * outputCount} credits</span><Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // ── Model popup ──────────────────────────────────────────────────────────
-  const modelPopup = modelOpen && (
+  function renderModelPopup() {
+    return modelOpen && (
     <div
       ref={modelPopupRef}
       className={`${MODEL_POPUP_CLS} w-[min(220px,calc(100vw-2rem))] py-1.5`}
@@ -354,10 +439,12 @@ export function GenerateForm({
         </button>
       ))}
     </div>
-  );
+    );
+  }
 
   // ── Options popup ────────────────────────────────────────────────────────
-  const optionsPopup = optionsOpen && (
+  function renderOptionsPopup() {
+    return optionsOpen && (
     <div
       ref={optionsPopupRef}
       className={`${OPTIONS_POPUP_CLS} w-[min(280px,calc(100vw-2rem))] px-4 py-3`}
@@ -381,7 +468,8 @@ export function GenerateForm({
         </div>
       </div>
     </div>
-  );
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -433,14 +521,14 @@ export function GenerateForm({
               <span className="truncate">{currentModelLabel}</span>
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
             </button>
-            {modelPopup}
+            {renderModelPopup()}
           </div>
           <div className="relative flex-1">
             <button ref={optionsTriggerRef} type="button" onClick={openOptions} className={triggerCls}>
               <span className="truncate">{aspectRatio} | {resolution}</span>
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
             </button>
-            {optionsPopup}
+            {renderOptionsPopup()}
           </div>
         </div>
 

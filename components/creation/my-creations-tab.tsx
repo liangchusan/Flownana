@@ -40,7 +40,7 @@ import type { PanelGeneration } from "./result-panel";
 
 type Creation = CreationHistoryItem;
 
-const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
+const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed", "deleted"];
 const LEGACY_STATUS_MAP: Record<string, CreationStatus> = {
   completed: "success",
   done: "success",

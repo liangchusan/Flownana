@@ -9,7 +9,7 @@ import { getCreationHistory } from "@/lib/creations";
 export default async function AIImagePage() {
   const session = await getServerSession(authOptions);
   const initialCreations = session?.user?.id
-    ? await getCreationHistory({ userId: session.user.id, type: "image" })
+    ? await getCreationHistory({ userId: session.user.id })
     : [];
 
   return (
