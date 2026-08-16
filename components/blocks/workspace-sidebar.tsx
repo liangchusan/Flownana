@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
-  ChevronLeft,
-  ChevronRight,
   FolderOpen,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Sparkles,
   UserCircle,
@@ -64,9 +64,18 @@ export function WorkspaceSidebar({
       {mobileOpen && <button type="button" className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-[1px] lg:hidden" onClick={() => onMobileOpenChange(false)} aria-label="Close navigation" />}
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-60 -translate-x-full flex-col border-r border-border bg-surface-soft transition-all duration-300 lg:static lg:translate-x-0 ${widthClass} ${mobileOpen ? "translate-x-0" : ""}`}>
         <div className={`flex h-16 items-center px-3 ${collapsed ? "lg:justify-center" : "justify-between"}`}>
-          <Link href="/home" className="min-w-0" aria-label="Flownana home">
+          <Link href="/home" className={`min-w-0 ${collapsed ? "lg:hidden" : ""}`} aria-label="Flownana home">
             <Logo size="md" showText={!collapsed} />
           </Link>
+          <button
+            type="button"
+            onClick={() => onCollapsedChange(!collapsed)}
+            className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground lg:flex"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
           <button type="button" onClick={() => onMobileOpenChange(false)} className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground lg:hidden" aria-label="Close navigation">
             <X className="h-5 w-5" />
           </button>
@@ -99,18 +108,15 @@ export function WorkspaceSidebar({
           {status === "loading" ? (
             <div className="h-10 animate-pulse rounded-ui bg-background/70" />
           ) : session ? (
-            <div className={`flex items-center ${collapsed ? "lg:flex-col lg:gap-2" : "gap-2"}`}>
+            <div className={`flex flex-col gap-2 ${collapsed ? "lg:items-center" : ""}`}>
               <CreditsWidget variant="sidebar" />
-              <UserMenu align="left" compact user={{ name: session.user?.name, email: session.user?.email, image: session.user?.image }} />
+              <UserMenu align="left" compact={collapsed} variant="sidebar" user={{ name: session.user?.name, email: session.user?.email, image: session.user?.image }} />
             </div>
           ) : (
             <button type="button" onClick={() => { trackEvent("signup_started", { source: "sidebar_avatar" }); signInForCurrentEnvironment(); }} className={`flex h-10 w-full items-center rounded-ui text-sm text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground ${collapsed ? "lg:justify-center" : "gap-2 px-3"}`}>
               <UserCircle className="h-5 w-5" /><span className={collapsed ? "lg:hidden" : ""}>Sign in</span>
             </button>
           )}
-          <button type="button" onClick={() => onCollapsedChange(!collapsed)} className="mt-3 hidden h-9 w-full items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground lg:flex" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <><ChevronLeft className="mr-2 h-4 w-4" /><span className="text-xs">Collapse</span></>}
-          </button>
         </div>
       </aside>
     </>

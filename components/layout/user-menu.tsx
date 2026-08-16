@@ -40,9 +40,10 @@ interface UserMenuProps {
   };
   align?: "left" | "right";
   compact?: boolean;
+  variant?: "default" | "sidebar";
 }
 
-export function UserMenu({ user, align = "right", compact = false }: UserMenuProps) {
+export function UserMenu({ user, align = "right", compact = false, variant = "default" }: UserMenuProps) {
   const { update } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -133,12 +134,13 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className={`relative ${variant === "sidebar" ? "w-full" : ""}`} ref={menuRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center transition-all duration-300 hover:opacity-80 active:scale-[0.98] ${
           compact ? "justify-center" : "space-x-2"
-        }`}
+        } ${variant === "sidebar" ? "min-h-10 w-full rounded-ui px-2 py-1.5 text-left hover:bg-background" : ""}`}
         aria-label="Open account menu"
       >
         {user.image && !compact ? (
@@ -152,12 +154,15 @@ export function UserMenu({ user, align = "right", compact = false }: UserMenuPro
             {avatarInitial}
           </span>
         )}
-        {displayName && !compact && (
-          <span className="hidden text-sm text-stone-700 sm:inline">
-            {displayName}
+        {!compact && variant === "sidebar" ? (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-foreground">{displayName || "Account"}</span>
+            {user.email && <span className="block truncate text-xs text-muted-foreground">{user.email}</span>}
           </span>
-        )}
-        {!compact && <ChevronDown className="hidden h-4 w-4 text-stone-500 sm:inline" />}
+        ) : displayName && !compact ? (
+          <span className="hidden text-sm text-stone-700 sm:inline">{displayName}</span>
+        ) : null}
+        {!compact && <ChevronDown className={`h-4 w-4 shrink-0 text-stone-500 ${variant === "sidebar" ? "" : "hidden sm:inline"}`} />}
       </button>
 
       {isOpen && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Music, PanelRightClose, Trash2, Video, X } from "lucide-react";
+import { Image as ImageIcon, Music, PanelRightClose, PanelRightOpen, Trash2, Video, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
 import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
@@ -42,6 +42,7 @@ export function MediaCreationWorkspace({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [detailsRun, setDetailsRun] = useState<WorkspaceRun | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,7 +64,13 @@ export function MediaCreationWorkspace({
   const handleNewCreate = () => {
     setView("create");
     setDetailsRun(null);
+    setDetailsOpen(false);
     resetDraft();
+  };
+
+  const openDetails = (run: WorkspaceRun) => {
+    setDetailsRun(run);
+    setDetailsOpen(true);
   };
 
   const setType = (nextType: ComposerType) => {
@@ -128,14 +135,28 @@ export function MediaCreationWorkspace({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <WorkspaceSidebar view={view} onViewChange={(nextView) => { setView(nextView); setDetailsRun(null); }} onNewCreate={handleNewCreate} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
+      <WorkspaceSidebar view={view} onViewChange={(nextView) => { setView(nextView); setDetailsRun(null); setDetailsOpen(false); }} onNewCreate={handleNewCreate} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceMobileHeader onOpen={() => setMobileSidebarOpen(true)} />
         {view === "assets" ? <div className="min-h-0 flex-1 overflow-y-auto"><AssetsLibrary creations={creations} onReference={referenceAsset} onChange={updateCreation} /></div> : (
           <div className="flex min-h-0 flex-1">
             <main className="relative flex min-w-0 flex-1 flex-col">
-              <header className="hidden h-16 shrink-0 items-center justify-between px-6 lg:flex"><div><h1 className="text-sm font-medium text-foreground">Create</h1><p className="text-xs text-muted-foreground">Recent generations across image, video, and audio</p></div>{detailsRun && <button type="button" onClick={() => setDetailsRun(null)} className="flex h-9 items-center gap-2 rounded-ui px-3 text-xs text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground"><PanelRightClose className="h-4 w-4" />Close details</button>}</header>
-              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={setDetailsRun} onChange={updateCreation} /></div>
+              <header className="hidden h-16 shrink-0 items-center justify-between px-6 lg:flex">
+                <div><h1 className="text-sm font-medium text-foreground">Create</h1><p className="text-xs text-muted-foreground">Recent generations across image, video, and audio</p></div>
+                {!detailsOpen && (
+                  <button
+                    type="button"
+                    onClick={() => detailsRun && setDetailsOpen(true)}
+                    disabled={!detailsRun}
+                    className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
+                    aria-label="Open details sidebar"
+                    title={detailsRun ? "Open details sidebar" : "Select Details on a result first"}
+                  >
+                    <PanelRightOpen className="h-5 w-5" />
+                  </button>
+                )}
+              </header>
+              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} /></div>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6">
                 <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/95 p-3 shadow-float backdrop-blur-xl sm:p-4">
                   <div className="mb-3 flex items-center gap-1" role="tablist" aria-label="Generation type">
@@ -148,7 +169,7 @@ export function MediaCreationWorkspace({
                 </div>
               </div>
             </main>
-            {detailsRun && <DetailsPanel run={detailsRun} onClose={() => setDetailsRun(null)} />}
+            {detailsRun && detailsOpen && <DetailsPanel run={detailsRun} onClose={() => setDetailsOpen(false)} />}
           </div>
         )}
       </div>
@@ -171,7 +192,7 @@ function DetailsPanel({ run, onClose }: { run: WorkspaceRun; onClose: () => void
   ];
   return (
     <aside className="fixed inset-0 z-50 flex flex-col bg-background lg:static lg:z-auto lg:w-80 lg:border-l lg:border-border xl:w-96">
-      <div className="flex h-16 items-center justify-between border-b border-border px-5"><div><h2 className="text-sm font-medium text-foreground">Generation details</h2><p className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</p></div><button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="Close details"><X className="h-4 w-4" /></button></div>
+      <div className="flex h-16 items-center justify-between border-b border-border px-5"><div><h2 className="text-sm font-medium text-foreground">Generation details</h2><p className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</p></div><button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="Close details sidebar" title="Close details sidebar"><X className="h-4 w-4 lg:hidden" /><PanelRightClose className="hidden h-5 w-5 lg:block" /></button></div>
       <div className="flex-1 space-y-6 overflow-y-auto p-5"><section><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Prompt</p><p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{run.prompt}</p></section>{first.inputUrls.length > 0 && <section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Inputs</p><div className="mt-3 flex gap-2">{first.inputUrls.map((url) => <img key={url} src={url} alt="Input asset" className="h-16 w-16 rounded-ui object-cover" />)}</div></section>}<section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Parameters</p><dl className="mt-3 space-y-1">{details.filter((item): item is [string, string | number] => item[1] !== undefined).map(([label, value]) => <div key={label} className="flex items-start justify-between gap-4 rounded-ui px-2 py-2 text-xs odd:bg-surface-soft"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium capitalize text-foreground">{value}</dd></div>)}</dl></section></div>
     </aside>
   );
