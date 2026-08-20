@@ -152,6 +152,17 @@ export function creationIdentity(creation: CreationHistoryItem): string {
   return creation.taskId || creation.id;
 }
 
+export function getCreationTimelineKey(creations: CreationHistoryItem[]) {
+  return creations
+    .map((creation) => {
+      const runId = creation.parameters?.runId;
+      return runId
+        ? `${runId}:${creation.parameters?.outputIndex ?? 0}`
+        : creation.id;
+    })
+    .join("|");
+}
+
 export function getCreationRunRemovalTarget(creation: CreationHistoryItem) {
   return {
     id: creationIdentity(creation),

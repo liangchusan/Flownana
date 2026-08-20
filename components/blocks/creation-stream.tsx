@@ -258,8 +258,8 @@ function ResultActions({
   return (
     <div className="absolute right-2 top-2 z-20 flex items-center gap-1 opacity-100 transition-all duration-300 sm:translate-y-1 sm:opacity-0 sm:group-hover/result:translate-y-0 sm:group-hover/result:opacity-100 sm:group-focus-within/result:translate-y-0 sm:group-focus-within/result:opacity-100">
       {[
-        { label: "Download", icon: Download, action: download },
         { label: "Reference", icon: AtSign, action: onReference },
+        { label: "Download", icon: Download, action: download },
         { label: "Delete", icon: Trash2, action: onDelete },
       ].map((item) => {
         const Icon = item.icon;
@@ -321,18 +321,7 @@ function PendingResult({
     );
   }
 
-  const aspectRatio = creation.parameters?.aspectRatio;
-  const layoutClassName = aspectRatio === "9:16"
-    ? compactPortrait
-      ? "aspect-[9/16] w-full"
-      : "aspect-[9/16] h-[min(30rem,70vh)] max-w-full"
-    : aspectRatio === "3:4"
-      ? "aspect-[3/4] h-[min(30rem,70vh)] max-w-full"
-      : aspectRatio === "16:9" || (creation.type === "video" && (!aspectRatio || aspectRatio === "Auto" || aspectRatio === "auto"))
-        ? "aspect-video w-full max-w-lg"
-        : aspectRatio === "4:3"
-          ? "aspect-[4/3] w-full max-w-lg"
-          : "aspect-square w-full max-w-lg";
+  const layoutClassName = getResultFrameLayoutClassName(creation, compactPortrait);
 
   return (
     <div className={`creation-loading-sea relative flex items-center justify-center overflow-hidden rounded-ui-lg ${layoutClassName}`}>
@@ -340,6 +329,47 @@ function PendingResult({
       <span className="sr-only">Creating {creation.type}</span>
     </div>
   );
+}
+
+function DeletedResult({
+  creation,
+  compactPortrait = false,
+}: {
+  creation: CreationHistoryItem;
+  compactPortrait?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-center rounded-ui-lg border border-dashed border-border bg-surface-soft px-4 text-center text-muted-foreground ${getResultFrameLayoutClassName(creation, compactPortrait)}`}
+    >
+      <div className="flex flex-col items-center gap-2">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background">
+          <Trash2 className="h-4 w-4" />
+        </span>
+        <span className="text-xs font-medium">Media deleted</span>
+      </div>
+    </div>
+  );
+}
+
+function getResultFrameLayoutClassName(
+  creation: CreationHistoryItem,
+  compactPortrait = false
+) {
+  const aspectRatio = creation.parameters?.aspectRatio;
+  return aspectRatio === "9:16"
+    ? compactPortrait
+      ? "aspect-[9/16] w-full"
+      : "aspect-[9/16] h-[min(30rem,70vh)] max-w-full"
+    : aspectRatio === "3:4"
+      ? "aspect-[3/4] h-[min(30rem,70vh)] max-w-full"
+      : aspectRatio === "16:9" ||
+          (creation.type === "video" &&
+            (!aspectRatio || aspectRatio === "Auto" || aspectRatio === "auto"))
+        ? "aspect-video w-full max-w-lg"
+        : aspectRatio === "4:3"
+          ? "aspect-[4/3] w-full max-w-lg"
+          : "aspect-square w-full max-w-lg";
 }
 
 function getRunMetadata(run: WorkspaceRun) {
@@ -505,7 +535,13 @@ export function CreationStream({
                   const url = creation.urls[0];
                   const key = `${creationIdentity(creation)}-${index}`;
                   if (creation.status === "deleted") {
-                    return <div key={key} className="flex h-full min-h-36 items-center justify-center rounded-ui-lg border border-dashed border-border bg-surface-soft px-4 text-center text-muted-foreground"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-background"><Trash2 className="h-4 w-4" /></span><span className="text-xs font-medium">Media deleted</span></div></div>;
+                    return (
+                      <DeletedResult
+                        key={key}
+                        creation={creation}
+                        compactPortrait={isFourPortraits}
+                      />
+                    );
                   }
                   if (ACTIVE_STATUSES.has(creation.status)) {
                     return <PendingResult key={key} creation={creation} compactPortrait={isFourPortraits} />;

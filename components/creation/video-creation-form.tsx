@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Check, ChevronDown, Loader2, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
@@ -115,13 +116,22 @@ export function VideoCreationForm({
   const [uploadedImages, setUploadedImages] = useState<string[]>(
     initialImages || (initialImage ? [initialImage] : [])
   );
-  const [selectedModelName, setSelectedModelName] = useState<string>(getVideoModelName(defaultOption));
-  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("Auto");
-  const [resolution, setResolution] = useState<VideoResolutionOption>(
-    formatVideoResolution(defaultOption.resolution)
+  const [selectedModelName, setSelectedModelName] = useState<string>(
+    initialParameters?.model || getVideoModelName(defaultOption)
   );
-  const [duration, setDuration] = useState<VideoModelOption["duration"]>(defaultOption.duration);
-  const [sound, setSound] = useState<VideoSoundOption>("Auto");
+  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>(
+    (initialParameters?.aspectRatio as VideoAspectRatio) || "Auto"
+  );
+  const [resolution, setResolution] = useState<VideoResolutionOption>(
+    (initialParameters?.resolution as VideoResolutionOption) ||
+      formatVideoResolution(defaultOption.resolution)
+  );
+  const [duration, setDuration] = useState<VideoModelOption["duration"]>(
+    initialParameters?.duration || defaultOption.duration
+  );
+  const [sound, setSound] = useState<VideoSoundOption>(
+    (initialParameters?.audio as VideoSoundOption) || "Auto"
+  );
 
   const [modelOpen, setModelOpen] = useState(false);
   const localActiveGenerationCountRef = useRef(activeGenerationCount ?? 0);
@@ -265,14 +275,6 @@ export function VideoCreationForm({
   }, [initialImage, initialImagesKey]);
   useEffect(() => { capabilityChangeRef.current = onInputCapabilityChange; }, [onInputCapabilityChange]);
   useEffect(() => { parametersChangeRef.current = onParametersChange; }, [onParametersChange]);
-  useEffect(() => {
-    if (!initialParameters) return;
-    if (initialParameters.model) setSelectedModelName(initialParameters.model);
-    if (initialParameters.aspectRatio) setAspectRatio(initialParameters.aspectRatio as VideoAspectRatio);
-    if (initialParameters.resolution) setResolution(initialParameters.resolution as VideoResolutionOption);
-    if (initialParameters.duration) setDuration(initialParameters.duration);
-    if (initialParameters.audio) setSound(initialParameters.audio as VideoSoundOption);
-  }, [initialParameters]);
   useEffect(() => {
     capabilityChangeRef.current?.(inputCapabilities);
   }, [inputCapabilities]);
@@ -680,24 +682,25 @@ export function VideoCreationForm({
   if (variant === "composer") {
     return (
       <div className="mt-2 space-y-2">
-        <textarea
+        <Textarea
           value={prompt}
           onChange={(event) => updatePrompt(event.target.value)}
           placeholder="Describe the video you want to create..."
-          className="min-h-16 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
           maxLength={500}
         />
-        <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
+        <div className="flex min-h-12 flex-wrap items-center gap-1 border-t border-border pt-2">
           {toolbarLeading}
-          <div className="relative">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-44 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+          <div className="relative w-36 sm:w-40">
+            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
               <span className="truncate">{selectedModelName}</span><ChevronDown className="h-3.5 w-3.5" />
             </button>
             {modelPopup}
           </div>
-          <div className="relative">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
-              <SlidersHorizontal className="h-3.5 w-3.5" />{aspectRatio} · {resolution} · {duration}s
+          <div className="relative w-40 sm:w-48">
+            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
+              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{aspectRatio} · {resolution} · {duration}s</span>
             </button>
             {optionsPopup}
           </div>

@@ -77,39 +77,40 @@ export function ComposerAttachments({
             : attachment.kind === "video"
               ? capabilities.acceptsVideo
               : capabilities.acceptsAudio;
-        const role =
-          attachment.kind === "image"
-            ? capabilities.imageRoles[currentImageIndex] || `Reference ${currentImageIndex + 1}`
-            : mediaLabel(attachment.kind);
-
         return (
           <div
             key={attachment.id}
-            className={`relative flex h-14 w-36 shrink-0 items-center gap-2 rounded-ui border p-1.5 transition-all duration-300 ${
+            className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-ui border transition-colors duration-300 ${
               compatible
-                ? "border-border bg-surface-soft/60"
+                ? "border-border bg-surface-soft"
                 : "border-destructive/30 bg-destructive/5"
             }`}
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-ui bg-background">
+            <div className="flex h-full w-full items-center justify-center overflow-hidden bg-background">
               {attachment.kind === "image" ? (
                 <img src={attachment.url} alt="" className="h-full w-full object-cover" />
               ) : attachment.kind === "video" ? (
-                <Video className="h-4 w-4 text-muted-foreground" />
+                <video
+                  src={attachment.url}
+                  aria-label={attachment.name}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <FileAudio className="h-4 w-4 text-muted-foreground" />
               )}
             </div>
-            <div className="min-w-0 pr-4">
-              <p className="truncate text-[11px] font-medium text-foreground">{role}</p>
-              <p className={`truncate text-[10px] ${compatible ? "text-muted-foreground" : "text-destructive"}`}>
-                {compatible ? attachment.name : "Not supported"}
-              </p>
-            </div>
+            {!compatible && (
+              <span className="absolute inset-x-0 bottom-0 bg-destructive/90 px-1 py-0.5 text-center text-[9px] font-medium text-white">
+                Unsupported
+              </span>
+            )}
             <button
               type="button"
               onClick={() => onRemove(attachment.id)}
-              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground"
+              className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground transition-colors duration-300 hover:text-foreground"
               aria-label={`Remove ${attachment.name}`}
             >
               <X className="h-3.5 w-3.5" />
@@ -363,7 +364,7 @@ export function ComposerToolbarLeading({
             setAddOpen(false);
             setAssetView(false);
           }}
-          className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs font-medium text-foreground transition-all duration-300 hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="flex h-9 w-24 items-center gap-1.5 rounded-ui px-2 text-xs font-medium text-foreground transition-colors duration-300 hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Generation type"
           aria-expanded={typeOpen}
         >

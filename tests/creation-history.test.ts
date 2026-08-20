@@ -4,6 +4,7 @@ import {
   formatProcessingDuration,
   formatConversationTimestamp,
   getCreationRunRemovalTarget,
+  getCreationTimelineKey,
   mergeCreations,
   getRegenerationInputImage,
   normalizeGenerationParameters,
@@ -178,6 +179,30 @@ test("remove-from-recent can target a local failed run before task id recovery",
       parameters: { runId: "run-2" },
     })),
     { id: "run-2-0", runId: "run-2" }
+  );
+});
+
+test("timeline key changes for new outputs but not media deletion", () => {
+  const original = item({
+    id: "db-1",
+    taskId: "task-1",
+    status: "success",
+    urls: ["https://blob.example/image.png"],
+    parameters: { runId: "run-1", outputIndex: 0 },
+  });
+  const deleted = { ...original, status: "deleted" as const, urls: [] };
+  const nextOutput = item({
+    id: "db-2",
+    parameters: { runId: "run-2", outputIndex: 0 },
+  });
+
+  assert.equal(
+    getCreationTimelineKey([original]),
+    getCreationTimelineKey([deleted])
+  );
+  assert.notEqual(
+    getCreationTimelineKey([original]),
+    getCreationTimelineKey([original, nextOutput])
   );
 });
 

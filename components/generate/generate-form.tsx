@@ -110,10 +110,17 @@ export function GenerateForm({
   const [uploadedImages, setUploadedImages] = useState<string[]>(
     initialImages || (initialImage ? [initialImage] : [])
   );
-  const [model, setModel] = useState<ImageModelOptionId>("gpt-image-2");
-  const [resolution, setResolution] = useState<ImageResolutionKey>("1K");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [outputCount, setOutputCount] = useState(1);
+  const [model, setModel] = useState<ImageModelOptionId>(() =>
+    IMAGE_MODEL_OPTIONS.find((option) => option.label === initialParameters?.model)?.id ??
+    "gpt-image-2"
+  );
+  const [resolution, setResolution] = useState<ImageResolutionKey>(() =>
+    (initialParameters?.resolution?.toUpperCase() as ImageResolutionKey) || "1K"
+  );
+  const [aspectRatio, setAspectRatio] = useState(initialParameters?.aspectRatio || "1:1");
+  const [outputCount, setOutputCount] = useState(() =>
+    Math.min(4, Math.max(1, initialParameters?.outputCount || 1))
+  );
 
   const [modelOpen, setModelOpen] = useState(false);
   const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -176,20 +183,6 @@ export function GenerateForm({
   }, [initialImage, initialImagesKey]);
   useEffect(() => { capabilityChangeRef.current = onInputCapabilityChange; }, [onInputCapabilityChange]);
   useEffect(() => { parametersChangeRef.current = onParametersChange; }, [onParametersChange]);
-  useEffect(() => {
-    if (!initialParameters) return;
-    const matchedModel = imageModels.find(
-      (option) => option.label === initialParameters.model
-    );
-    if (matchedModel) setModel(matchedModel.id);
-    if (initialParameters.resolution) {
-      setResolution(initialParameters.resolution.toUpperCase() as ImageResolutionKey);
-    }
-    if (initialParameters.aspectRatio) setAspectRatio(initialParameters.aspectRatio);
-    if (initialParameters.outputCount) {
-      setOutputCount(Math.min(4, Math.max(1, initialParameters.outputCount)));
-    }
-  }, [imageModels, initialParameters]);
   useEffect(() => {
     if (!ratioOptions.includes(aspectRatio)) {
       setAspectRatio(ratioOptions[0] || "1:1");
@@ -428,29 +421,24 @@ export function GenerateForm({
           value={prompt}
           onChange={(event) => updatePrompt(event.target.value)}
           placeholder="Describe the image you want to create..."
-          className="min-h-16 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
+          className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
           maxLength={5000}
         />
-        <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
+        <div className="flex min-h-12 flex-wrap items-center gap-1 border-t border-border pt-2">
           {toolbarLeading}
-          <div className="relative">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-40 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+          <div className="relative w-36 sm:w-40">
+            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
               <span className="truncate">{currentModelLabel}</span><ChevronDown className="h-3.5 w-3.5" />
             </button>
             {renderModelPopup()}
           </div>
-          <div className="relative">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
-              <SlidersHorizontal className="h-3.5 w-3.5" />{aspectRatio} · {resolution}
+          <div className="relative w-40 sm:w-48">
+            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
+              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{aspectRatio} · {resolution} · {outputCount}</span>
             </button>
             {renderOptionsPopup()}
           </div>
-          <label className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
-            <span>Results</span>
-            <select value={outputCount} onChange={(event) => setOutputCount(Number(event.target.value))} className="bg-transparent font-medium outline-none" aria-label="Number of image results">
-              {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
-            </select>
-          </label>
           <Button type="button" onClick={handleGenerate} disabled={generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
             <span>{(creditsCost ?? 0) * outputCount} credits</span><Send className="h-4 w-4" />
           </Button>
@@ -502,11 +490,26 @@ export function GenerateForm({
             ))}
           </div>
         </div>
-        <div className="pt-3">
+        <div className="py-3">
           <p className="mb-2 text-xs font-medium text-stone-400">Resolution</p>
           <div className="flex flex-wrap gap-1.5">
             {resolutionOptions.map((r) => (
               <button key={r} type="button" onClick={() => setResolution(r)} className={chipCls(resolution === r)}>{r}</button>
+            ))}
+          </div>
+        </div>
+        <div className="pt-3">
+          <p className="mb-2 text-xs font-medium text-stone-400">Results</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[1, 2, 3, 4].map((count) => (
+              <button
+                key={count}
+                type="button"
+                onClick={() => setOutputCount(count)}
+                className={chipCls(outputCount === count)}
+              >
+                {count}
+              </button>
             ))}
           </div>
         </div>

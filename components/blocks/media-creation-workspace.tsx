@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PanelRightClose, PanelRightOpen, Trash2, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
@@ -8,7 +8,7 @@ import { CreationStream, type WorkspaceRun } from "@/components/blocks/creation-
 import { AssetsLibrary } from "@/components/blocks/assets-library";
 import { WorkspaceMobileHeader, WorkspaceSidebar, type WorkspaceView } from "@/components/blocks/workspace-sidebar";
 import { useToast } from "@/components/blocks/app-toast-provider";
-import { creationIdentity, mergeCreations, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
+import { creationIdentity, getCreationTimelineKey, mergeCreations, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
 import {
   ComposerAttachments,
   ComposerToolbarLeading,
@@ -65,12 +65,20 @@ export function MediaCreationWorkspace({
   const [detailsRun, setDetailsRun] = useState<WorkspaceRun | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const preservedScrollTopRef = useRef<number | null>(null);
+  const creationTimelineKey = getCreationTimelineKey(creations);
+
+  useLayoutEffect(() => {
+    if (preservedScrollTopRef.current === null || !scrollRef.current) return;
+    scrollRef.current.scrollTop = preservedScrollTopRef.current;
+    preservedScrollTopRef.current = null;
+  }, [creations]);
 
   useEffect(() => {
     const target = scrollRef.current;
     if (!target || view !== "create") return;
     target.scrollTop = target.scrollHeight;
-  }, [creations, view]);
+  }, [creationTimelineKey, view]);
 
   useEffect(() => {
     window.localStorage.setItem(COMPOSER_TYPE_STORAGE_KEY, composerType);
@@ -80,6 +88,9 @@ export function MediaCreationWorkspace({
   const activeVideoCount = creations.filter((creation) => creation.type === "video" && ["pending", "generating", "processing"].includes(creation.status)).length;
 
   const updateCreation = (identity: string, patch: Partial<CreationHistoryItem>) => {
+    if (view === "create" && scrollRef.current) {
+      preservedScrollTopRef.current = scrollRef.current.scrollTop;
+    }
     setCreations((current) => current.map((creation) => creationIdentity(creation) === identity ? { ...creation, ...patch } : creation));
   };
 
@@ -262,7 +273,7 @@ export function MediaCreationWorkspace({
               )}
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} /></div>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6">
-                <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/98 p-2.5 shadow-soft sm:p-3">
+                <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background p-2.5 shadow-float sm:p-3">
                   <ComposerAttachments attachments={draft.attachments} capabilities={inputCapabilities} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />
                   {attachmentIncompatible && <div className="mt-2 flex items-center gap-2 rounded-ui bg-destructive/5 px-2 py-1.5"><Trash2 className="h-3.5 w-3.5 text-destructive" /><p className="min-w-0 flex-1 text-[11px] text-destructive">Remove inputs marked as unsupported before creating.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachments: filterCompatibleAttachments(current.attachments, inputCapabilities) }))} className="text-[11px] font-medium text-destructive underline underline-offset-2">Remove unsupported</button></div>}
                   {composer}

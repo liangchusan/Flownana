@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
+import { buildVercelBlobDownloadUrl } from "@/lib/creation-download";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,14 @@ export async function GET(request: Request) {
 
     if (!creation) {
       return NextResponse.json({ error: "Creation not found" }, { status: 404 });
+    }
+
+    const directDownloadUrl = buildVercelBlobDownloadUrl(url);
+    if (directDownloadUrl) {
+      return NextResponse.redirect(directDownloadUrl, {
+        status: 307,
+        headers: { "Cache-Control": "private, no-store" },
+      });
     }
 
     const mediaRes = await fetch(url);
