@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronDown, ImagePlus, Loader2, Send, SlidersHorizontal, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import {
@@ -23,12 +23,24 @@ import { useToast } from "@/components/blocks/app-toast-provider";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
 import type { GenerationParameters } from "@/lib/creation-history";
+import {
+  getVideoInputCapabilities,
+  type GenerationInputCapabilities,
+} from "@/lib/generation-input-capabilities";
 
 const MODEL_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
-const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface VideoCreationFormProps {
   onGenerate: (
@@ -63,8 +75,15 @@ interface VideoCreationFormProps {
   onTaskIdChange?: (taskId: string) => void;
   initialPrompt?: string;
   initialImage?: string;
+  initialImages?: string[];
   initialParameters?: GenerationParameters;
   variant?: "panel" | "composer";
+  toolbarLeading?: ReactNode;
+  submissionBlocked?: boolean;
+  onPromptChange?: (prompt: string) => void;
+  onInputImagesChange?: (urls: string[]) => void;
+  onInputCapabilityChange?: (capabilities: GenerationInputCapabilities) => void;
+  onParametersChange?: (parameters: GenerationParameters) => void;
 }
 
 export function VideoCreationForm({
@@ -79,14 +98,23 @@ export function VideoCreationForm({
   onTaskIdChange,
   initialPrompt,
   initialImage,
+  initialImages,
   initialParameters,
   variant = "panel",
+  toolbarLeading,
+  submissionBlocked = false,
+  onPromptChange,
+  onInputImagesChange,
+  onInputCapabilityChange,
+  onParametersChange,
 }: VideoCreationFormProps) {
   const { showToast } = useToast();
   const { data: session, status } = useSession();
   const defaultOption = VIDEO_MODEL_OPTIONS[0];
   const [prompt, setPrompt] = useState(initialPrompt || "");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>(
+    initialImages || (initialImage ? [initialImage] : [])
+  );
   const [selectedModelName, setSelectedModelName] = useState<string>(getVideoModelName(defaultOption));
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("Auto");
   const [resolution, setResolution] = useState<VideoResolutionOption>(
@@ -103,26 +131,39 @@ export function VideoCreationForm({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const optionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const optionsPopupRef = useRef<HTMLDivElement | null>(null);
+  const capabilityChangeRef = useRef(onInputCapabilityChange);
+  const parametersChangeRef = useRef(onParametersChange);
+  const initialImagesKey = initialImages?.join("\u0000");
+
+  const updatePrompt = (value: string) => {
+    setPrompt(value);
+    onPromptChange?.(value);
+  };
+
+  const updateImages = (urls: string[]) => {
+    setUploadedImages(urls);
+    onInputImagesChange?.(urls);
+  };
 
   const modelNameOptions = useMemo(() => {
     const seen = new Set<string>();
     const names: string[] = [];
     for (const option of VIDEO_MODEL_OPTIONS) {
-      if (option.requiresImageInput && !uploadedImage) continue;
+      if (option.requiresImageInput && uploadedImages.length === 0) continue;
       const name = getVideoModelName(option);
       if (!seen.has(name)) { seen.add(name); names.push(name); }
     }
     return names;
-  }, [uploadedImage]);
+  }, [uploadedImages.length]);
 
   const optionsForModel = useMemo(
     () =>
       VIDEO_MODEL_OPTIONS.filter(
         (o) =>
           getVideoModelName(o) === selectedModelName &&
-          (!o.requiresImageInput || !!uploadedImage)
+          (!o.requiresImageInput || uploadedImages.length > 0)
       ),
-    [selectedModelName, uploadedImage]
+    [selectedModelName, uploadedImages.length]
   );
 
   const aspectRatioOptions = useMemo(() => {
@@ -143,6 +184,11 @@ export function VideoCreationForm({
     durationOptions.every((value, index) => index === 0 || value === durationOptions[index - 1] + 1);
   const soundOptions = useMemo(() => getDisplaySoundOptions(optionsForModel), [optionsForModel]);
   const showSound = soundOptions.length > 0;
+  const inputCapabilities = useMemo(
+    () => getVideoInputCapabilities(selectedModelName),
+    [selectedModelName]
+  );
+  const imagesOverLimit = uploadedImages.length > inputCapabilities.maxImages;
 
   const selectedOption = useMemo(() => {
     const matchingSettingOptions = optionsForModel.filter(
@@ -210,7 +256,15 @@ export function VideoCreationForm({
     }
   }, [activeGenerationCount]);
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
-  useEffect(() => { if (initialImage !== undefined) setUploadedImage(initialImage); }, [initialImage]);
+  useEffect(() => {
+    if (initialImagesKey !== undefined) {
+      setUploadedImages(initialImagesKey ? initialImagesKey.split("\u0000") : []);
+    } else if (initialImage !== undefined) {
+      setUploadedImages(initialImage ? [initialImage] : []);
+    }
+  }, [initialImage, initialImagesKey]);
+  useEffect(() => { capabilityChangeRef.current = onInputCapabilityChange; }, [onInputCapabilityChange]);
+  useEffect(() => { parametersChangeRef.current = onParametersChange; }, [onParametersChange]);
   useEffect(() => {
     if (!initialParameters) return;
     if (initialParameters.model) setSelectedModelName(initialParameters.model);
@@ -219,6 +273,18 @@ export function VideoCreationForm({
     if (initialParameters.duration) setDuration(initialParameters.duration);
     if (initialParameters.audio) setSound(initialParameters.audio as VideoSoundOption);
   }, [initialParameters]);
+  useEffect(() => {
+    capabilityChangeRef.current?.(inputCapabilities);
+  }, [inputCapabilities]);
+  useEffect(() => {
+    parametersChangeRef.current?.({
+      model: selectedModelName,
+      resolution,
+      aspectRatio,
+      duration,
+      audio: showSound ? sound : undefined,
+    });
+  }, [aspectRatio, duration, resolution, selectedModelName, showSound, sound]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -244,14 +310,11 @@ export function VideoCreationForm({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
-    maxFiles: 1,
-    maxSize: MAX_INPUT_IMAGE_BYTES,
+    maxFiles: inputCapabilities.maxImages,
+    maxSize: inputCapabilities.maxImageBytes,
     onDrop: (files) => {
-      if (files.length > 0) {
-        const reader = new FileReader();
-        reader.onload = () => setUploadedImage(reader.result as string);
-        reader.readAsDataURL(files[0]);
-      }
+      if (files.length === 0) return;
+      Promise.all(files.map(readFileAsDataUrl)).then(updateImages);
     },
     onDropRejected: (rejections) => {
       const code = rejections.some((rejection) =>
@@ -317,6 +380,7 @@ export function VideoCreationForm({
   };
 
   const handleGenerate = async () => {
+    if (submissionBlocked || imagesOverLimit) return;
     if (status === "loading") {
       return;
     }
@@ -370,15 +434,19 @@ export function VideoCreationForm({
       aspectRatio,
       duration,
       audio: showSound ? (selectedOption.hasAudio ? "On" : "Off") : undefined,
-      mode: uploadedImage ? "Image to video" : "Text to video",
+      mode: uploadedImages.length === 2
+        ? "First and last frame to video"
+        : uploadedImages.length === 1
+          ? "Image to video"
+          : "Text to video",
     };
     onGenerationStart?.({
       optimisticId,
       prompt: requestPrompt,
       parameters: generationParameters,
     });
-    setPrompt("");
-    setUploadedImage(null);
+    updatePrompt("");
+    updateImages([]);
     setIsGenerating?.(true);
     const requestAspectRatio = aspectRatio === "Auto" ? undefined : aspectRatio;
     trackEvent("generation_started", {
@@ -391,7 +459,7 @@ export function VideoCreationForm({
     try {
       const response = await axios.post("/api/veo/generate", {
         prompt: requestPrompt,
-        imageUrls: uploadedImage ? [uploadedImage] : undefined,
+        imageUrls: uploadedImages.length > 0 ? uploadedImages : undefined,
         modelOptionId: selectedOption.id,
         aspectRatio: requestAspectRatio,
         runId: optimisticId,
@@ -611,45 +679,29 @@ export function VideoCreationForm({
 
   if (variant === "composer") {
     return (
-      <div className="space-y-3">
-        {uploadedImage && (
-          <div className="flex items-center gap-2 rounded-ui-lg border border-border bg-surface-soft px-2 py-2">
-            <img src={uploadedImage} alt="Reference" className="h-12 w-12 rounded-ui object-cover" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-foreground">Reference image</p>
-              <p className="text-[11px] text-muted-foreground">Used as the opening reference</p>
-            </div>
-            <button type="button" onClick={() => setUploadedImage(null)} className="rounded-full p-2 text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground" aria-label="Remove reference image">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+      <div className="mt-2 space-y-2">
         <textarea
           value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
+          onChange={(event) => updatePrompt(event.target.value)}
           placeholder="Describe the video you want to create..."
-          className="min-h-20 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          className="min-h-16 w-full resize-none border-0 bg-transparent px-1 py-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
           maxLength={500}
         />
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <div {...getRootProps()} className="flex h-9 cursor-pointer items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-muted-foreground transition-all duration-300 hover:text-foreground">
-            <input {...getInputProps()} />
-            <ImagePlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add image</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
+          {toolbarLeading}
           <div className="relative">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-44 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-44 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
               <span className="truncate">{selectedModelName}</span><ChevronDown className="h-3.5 w-3.5" />
             </button>
             {modelPopup}
           </div>
           <div className="relative">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
               <SlidersHorizontal className="h-3.5 w-3.5" />{aspectRatio} · {resolution} · {duration}s
             </button>
             {optionsPopup}
           </div>
-          <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || !prompt.trim() || !selectedOption))} className="ml-auto h-10 gap-2 px-4">
+          <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || !prompt.trim() || !selectedOption || submissionBlocked || imagesOverLimit))} className="ml-auto h-10 gap-2 px-4">
             {!session ? getSignInLabel() : <><span>{selectedOption?.credits ?? 0} credits</span><Send className="h-4 w-4" /></>}
           </Button>
         </div>
@@ -662,11 +714,11 @@ export function VideoCreationForm({
       {/* Image Upload */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-stone-900">Image</label>
-        {uploadedImage ? (
+        {uploadedImages.length > 0 ? (
           <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-stone-200/50 bg-stone-50 shadow-sm">
-            <img src={uploadedImage} alt="Uploaded" className="w-full h-full object-contain" />
+            <img src={uploadedImages[0]} alt="Uploaded" className="w-full h-full object-contain" />
             <button
-              onClick={() => setUploadedImage(null)}
+              onClick={() => updateImages([])}
               className="absolute right-2 top-2 rounded-full border border-stone-200/50 bg-white p-1.5 text-stone-600 shadow-sm transition-all duration-300 hover:text-stone-900 hover:shadow-md active:scale-[0.98]"
             >
               <X className="h-4 w-4" />
@@ -693,7 +745,7 @@ export function VideoCreationForm({
         <label className="block text-sm font-medium text-stone-900">Prompt</label>
         <textarea
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => updatePrompt(e.target.value)}
           placeholder="Describe the video you want to create..."
           className="h-36 w-full resize-none rounded-2xl border border-stone-200/50 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition-all duration-300 placeholder:text-stone-400 focus:border-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-300"
           maxLength={500}
@@ -724,7 +776,7 @@ export function VideoCreationForm({
           onClick={handleGenerate}
           disabled={
             status === "loading" ||
-            (!!session && (generationLimitReached || !prompt.trim() || !selectedOption))
+            (!!session && (generationLimitReached || !prompt.trim() || !selectedOption || imagesOverLimit))
           }
           className="w-full rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98] disabled:opacity-50"
           size="lg"

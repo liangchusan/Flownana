@@ -18,6 +18,7 @@ import {
   type VideoModelOption,
   type VideoModelOptionId,
 } from "@/lib/generation-pricing";
+import { getVideoInputCapabilities } from "@/lib/generation-input-capabilities";
 import {
   getKieVideoAspectRatio,
   getKieMarketVideoTaskBody,
@@ -574,6 +575,11 @@ export async function POST(request: NextRequest) {
     const inputSources = Array.isArray(imageUrls)
       ? imageUrls.filter((url) => typeof url === "string" && url.trim().length > 0)
       : [];
+    const inputCapabilities = getVideoInputCapabilities(getVideoModelName(option));
+
+    if (inputSources.length > inputCapabilities.maxImages) {
+      return videoErrorResponse("invalid_parameters");
+    }
 
     if (option.requiresImageInput && inputSources.length === 0) {
       return videoErrorResponse("input_image_required");
@@ -605,7 +611,12 @@ export async function POST(request: NextRequest) {
       aspectRatio: aspectRatio || "Auto",
       duration: option.duration,
       audio: option.hasAudio ? "On" : "Off",
-      mode: normalizedImageUrls?.length ? "Image to video" : "Text to video",
+      mode:
+        normalizedImageUrls?.length === 2
+          ? "First and last frame to video"
+          : normalizedImageUrls?.length === 1
+            ? "Image to video"
+            : "Text to video",
       ...(typeof runId === "string" && runId.trim()
         ? { runId: runId.trim().slice(0, 120), outputIndex: 0, outputCount: 1 }
         : {}),

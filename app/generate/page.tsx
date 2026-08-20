@@ -3,12 +3,19 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  COMPOSER_TYPE_STORAGE_KEY,
+  parseComposerPreference,
+} from "@/lib/composer-preference";
 
 export default function GeneratePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/ai-image");
+    const preferredType = parseComposerPreference(
+      window.localStorage.getItem(COMPOSER_TYPE_STORAGE_KEY)
+    );
+    router.replace(preferredType === "image" ? "/ai-image" : "/ai-video");
   }, [router]);
 
   return (

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, ChevronDown, ImagePlus, Send, SlidersHorizontal, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
 import {
   IMAGE_MODEL_OPTIONS,
@@ -16,12 +16,24 @@ import { getGenerationErrorDisplay } from "@/lib/generation-errors";
 import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import type { GenerationParameters } from "@/lib/creation-history";
+import {
+  getImageInputCapabilities,
+  type GenerationInputCapabilities,
+} from "@/lib/generation-input-capabilities";
 
 const MODEL_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
-const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface GenerateFormProps {
   onGenerate: (
@@ -60,8 +72,15 @@ interface GenerateFormProps {
   maxConcurrentGenerations?: number;
   initialPrompt?: string;
   initialImage?: string;
+  initialImages?: string[];
   initialParameters?: GenerationParameters;
   variant?: "panel" | "composer";
+  toolbarLeading?: ReactNode;
+  submissionBlocked?: boolean;
+  onPromptChange?: (prompt: string) => void;
+  onInputImagesChange?: (urls: string[]) => void;
+  onInputCapabilityChange?: (capabilities: GenerationInputCapabilities) => void;
+  onParametersChange?: (parameters: GenerationParameters) => void;
 }
 
 export function GenerateForm({
@@ -76,12 +95,21 @@ export function GenerateForm({
   maxConcurrentGenerations = 5,
   initialPrompt,
   initialImage,
+  initialImages,
   initialParameters,
   variant = "panel",
+  toolbarLeading,
+  submissionBlocked = false,
+  onPromptChange,
+  onInputImagesChange,
+  onInputCapabilityChange,
+  onParametersChange,
 }: GenerateFormProps) {
   const { showToast } = useToast();
   const [prompt, setPrompt] = useState(initialPrompt || "");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(initialImage || null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>(
+    initialImages || (initialImage ? [initialImage] : [])
+  );
   const [model, setModel] = useState<ImageModelOptionId>("gpt-image-2");
   const [resolution, setResolution] = useState<ImageResolutionKey>("1K");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -95,6 +123,8 @@ export function GenerateForm({
   const optionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const optionsPopupRef = useRef<HTMLDivElement | null>(null);
   const submitLockRef = useRef(false);
+  const capabilityChangeRef = useRef(onInputCapabilityChange);
+  const parametersChangeRef = useRef(onParametersChange);
 
   const imageModels = useMemo(() => IMAGE_MODEL_OPTIONS, []);
   const usesConcurrentGenerationLimit = activeGenerationCount !== undefined;
@@ -122,9 +152,30 @@ export function GenerateForm({
     return option?.resolutions ?? (["1K", "2K", "4K"] as ImageResolutionKey[]);
   }, [imageModels, model]);
   const creditsCost = getImageGenerationCredits(model, resolution);
+  const currentModelLabel = imageModels.find((m) => m.id === model)?.label ?? model;
+  const inputCapabilities = useMemo(() => getImageInputCapabilities(model), [model]);
+  const imagesOverLimit = uploadedImages.length > inputCapabilities.maxImages;
+  const initialImagesKey = initialImages?.join("\u0000");
+
+  const updatePrompt = (value: string) => {
+    setPrompt(value);
+    onPromptChange?.(value);
+  };
+
+  const updateImages = (urls: string[]) => {
+    setUploadedImages(urls);
+    onInputImagesChange?.(urls);
+  };
 
   useEffect(() => { if (initialPrompt !== undefined) setPrompt(initialPrompt); }, [initialPrompt]);
-  useEffect(() => { if (initialImage !== undefined) setUploadedImage(initialImage); }, [initialImage]);
+  useEffect(() => {
+    if (initialImagesKey !== undefined) {
+      setUploadedImages(initialImagesKey ? initialImagesKey.split("\u0000") : []);
+    }
+    else if (initialImage !== undefined) setUploadedImages(initialImage ? [initialImage] : []);
+  }, [initialImage, initialImagesKey]);
+  useEffect(() => { capabilityChangeRef.current = onInputCapabilityChange; }, [onInputCapabilityChange]);
+  useEffect(() => { parametersChangeRef.current = onParametersChange; }, [onParametersChange]);
   useEffect(() => {
     if (!initialParameters) return;
     const matchedModel = imageModels.find(
@@ -149,6 +200,17 @@ export function GenerateForm({
       setResolution(resolutionOptions[0] || "1K");
     }
   }, [resolution, resolutionOptions]);
+  useEffect(() => {
+    capabilityChangeRef.current?.(inputCapabilities);
+  }, [inputCapabilities]);
+  useEffect(() => {
+    parametersChangeRef.current?.({
+      model: currentModelLabel,
+      resolution,
+      aspectRatio,
+      outputCount,
+    });
+  }, [aspectRatio, currentModelLabel, outputCount, resolution]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -174,14 +236,11 @@ export function GenerateForm({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
-    maxFiles: 1,
-    maxSize: MAX_INPUT_IMAGE_BYTES,
+    maxFiles: inputCapabilities.maxImages,
+    maxSize: inputCapabilities.maxImageBytes,
     onDrop: (files) => {
-      if (files.length > 0) {
-        const reader = new FileReader();
-        reader.onload = () => setUploadedImage(reader.result as string);
-        reader.readAsDataURL(files[0]);
-      }
+      if (files.length === 0) return;
+      Promise.all(files.map(readFileAsDataUrl)).then(updateImages);
     },
     onDropRejected: (rejections) => {
       const code = rejections.some((rejection) =>
@@ -202,6 +261,7 @@ export function GenerateForm({
   });
 
   const handleGenerate = async () => {
+    if (submissionBlocked || imagesOverLimit) return;
     if (!prompt.trim()) {
       const display = getGenerationErrorDisplay(
         { errorCode: "prompt_required" },
@@ -235,13 +295,13 @@ export function GenerateForm({
         ? crypto.randomUUID()
         : `image-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const requestPrompt = prompt.trim();
-    const requestImage = uploadedImage;
-    const mode = requestImage ? "image-to-image" : "text-to-image";
+    const requestImages = uploadedImages;
+    const mode = requestImages.length > 0 ? "image-to-image" : "text-to-image";
     const optimisticParameters: GenerationParameters = {
       model: currentModelLabel,
       resolution,
       aspectRatio,
-      mode: requestImage ? "Image to image" : "Text to image",
+      mode: requestImages.length > 0 ? "Image to image" : "Text to image",
       runId: optimisticId,
       outputCount,
     };
@@ -264,14 +324,14 @@ export function GenerateForm({
       mode,
       output_count: outputCount,
     });
-    setPrompt("");
-    setUploadedImage(null);
+    updatePrompt("");
+    updateImages([]);
 
     const generateOne = async (outputIndex: number) => {
       try {
         const response = await axios.post("/api/generate", {
           prompt: requestPrompt,
-          imageUrl: requestImage,
+          imageUrls: requestImages,
           mode,
           model,
           resolution,
@@ -361,55 +421,37 @@ export function GenerateForm({
         : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
     }`;
 
-  const currentModelLabel = imageModels.find((m) => m.id === model)?.label ?? model;
-
   if (variant === "composer") {
     return (
-      <div className="space-y-3">
-        {uploadedImage && (
-          <div className="flex items-center gap-2 rounded-ui-lg border border-border bg-surface-soft px-2 py-2">
-            <img src={uploadedImage} alt="Reference" className="h-12 w-12 rounded-ui object-cover" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-foreground">Reference image</p>
-              <p className="text-[11px] text-muted-foreground">Compatible with {currentModelLabel}</p>
-            </div>
-            <button type="button" onClick={() => setUploadedImage(null)} className="rounded-full p-2 text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground" aria-label="Remove reference image">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+      <div className="mt-2 space-y-2">
         <Textarea
           value={prompt}
-          onChange={(event) => setPrompt(event.target.value)}
+          onChange={(event) => updatePrompt(event.target.value)}
           placeholder="Describe the image you want to create..."
-          className="min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
+          className="min-h-16 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
           maxLength={5000}
         />
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <div {...getRootProps()} className="flex h-9 cursor-pointer items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-muted-foreground transition-all duration-300 hover:text-foreground">
-            <input {...getInputProps()} />
-            <ImagePlus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add image</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-1 border-t border-border pt-2">
+          {toolbarLeading}
           <div className="relative">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-40 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 max-w-40 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
               <span className="truncate">{currentModelLabel}</span><ChevronDown className="h-3.5 w-3.5" />
             </button>
             {renderModelPopup()}
           </div>
           <div className="relative">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
+            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
               <SlidersHorizontal className="h-3.5 w-3.5" />{aspectRatio} · {resolution}
             </button>
             {renderOptionsPopup()}
           </div>
-          <label className="flex h-9 items-center gap-1.5 rounded-ui border border-border bg-background px-2.5 text-xs text-foreground">
+          <label className="flex h-9 items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-all duration-300 hover:bg-surface-soft">
             <span>Results</span>
             <select value={outputCount} onChange={(event) => setOutputCount(Number(event.target.value))} className="bg-transparent font-medium outline-none" aria-label="Number of image results">
               {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count}</option>)}
             </select>
           </label>
-          <Button type="button" onClick={handleGenerate} disabled={generationLimitReached || !prompt.trim()} className="ml-auto h-10 gap-2 px-4">
+          <Button type="button" onClick={handleGenerate} disabled={generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
             <span>{(creditsCost ?? 0) * outputCount} credits</span><Send className="h-4 w-4" />
           </Button>
         </div>
@@ -478,11 +520,11 @@ export function GenerateForm({
       {/* Image Upload */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-stone-900">Image</label>
-        {uploadedImage ? (
+        {uploadedImages.length > 0 ? (
           <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-stone-200/50 bg-stone-50 shadow-sm">
-            <img src={uploadedImage} alt="Uploaded" className="w-full h-full object-contain" />
+            <img src={uploadedImages[0]} alt="Uploaded" className="w-full h-full object-contain" />
             <button
-              onClick={() => setUploadedImage(null)}
+              onClick={() => updateImages([])}
               className="absolute right-2 top-2 rounded-full border border-stone-200/50 bg-white p-1.5 text-stone-600 shadow-sm transition-all duration-300 hover:text-stone-900 hover:shadow-md active:scale-[0.98]"
             >
               <X className="h-4 w-4" />
@@ -509,7 +551,7 @@ export function GenerateForm({
         <label className="block text-sm font-medium text-stone-900">Prompt</label>
         <Textarea
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => updatePrompt(e.target.value)}
           placeholder="Describe the image you want to generate or edit..."
           className="h-36 resize-none rounded-ui-xl px-4 py-3"
           maxLength={5000}
@@ -536,7 +578,7 @@ export function GenerateForm({
 
         <Button
           onClick={handleGenerate}
-          disabled={generationLimitReached || !prompt.trim()}
+          disabled={generationLimitReached || !prompt.trim() || imagesOverLimit}
           className="w-full"
           size="lg"
         >

@@ -43,7 +43,8 @@ The durable user deliverable is the generated media asset. The Create stream is 
 
 ## Composer
 
-- The composer stays at the bottom of Create and contains Image and Video generation type controls.
+- The composer stays at the bottom of Create. A single Image/Video dropdown sits before the model; explicit `/ai-image` and `/ai-video` routes keep their named default, while generic `/generate` restores the last choice and defaults a new user to Video. Audio generation is not selectable.
+- A lightweight plus menu offers image upload and Choose from Assets. Video and audio input rows remain visible but disabled with `Current model doesn’t support ... input` for the active P0 models. The composer owns one shared multi-attachment draft, so deleting an attachment persists across media-type switches.
 - Model and settings use progressive disclosure.
 - The Generate action displays the total estimated credit cost.
 - After a valid submission starts, prompt and attachments clear; the current media type and generator settings remain.
@@ -56,12 +57,12 @@ The durable user deliverable is the generated media asset. The Create stream is 
 | --- | --- | --- | --- |
 | GPT Image 2 | Image | 1 | Input optional |
 | Nano Banana 2 | Image | 1 | Input optional |
-| Qwen Image 3.0 Pro | Image | 1 | Input optional |
-| MiniMax H3 | Image | 1 | Input optional |
+| Qwen Image 3.0 Pro | Image | 3 | Input optional; 10 MB each |
+| MiniMax H3 | Image | 2 | Optional first and last frame |
 | Grok Imagine Video 1.5 | Image | 1 | Input required |
 | HappyHorse 1.1 | Image | 1 | Input optional |
 
-Video and audio files are not valid composer inputs for the currently active models. Referencing one keeps it visible as incompatible, shows one warning Toast, blocks generation, and offers Remove incompatible. Compatible attachments are never deleted automatically during a generator switch. Suno generation is retired; historical audio remains viewable, downloadable, and deletable, and audio Reprompt explains that generation is unavailable.
+Video and audio files are not valid composer inputs for the currently active models. They remain visible but disabled in the plus menu. Referencing one keeps it visible as incompatible, shows one warning Toast, blocks generation, and offers Remove unsupported. Images beyond the selected model's limit use the same blocked state. Compatible attachments are never deleted automatically during a generator switch. Suno generation is retired; historical audio remains viewable, downloadable, and deletable, and audio Reprompt explains that generation is unavailable.
 
 ## Assets
 

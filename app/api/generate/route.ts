@@ -16,6 +16,7 @@ import {
   type ImageModelOptionId,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
+import { getImageInputCapabilities } from "@/lib/generation-input-capabilities";
 import {
   ProviderGenerationError,
   getGenerationErrorDisplay,
@@ -301,6 +302,7 @@ export async function POST(request: NextRequest) {
     const {
       prompt,
       imageUrl,
+      imageUrls,
       model,
       resolution,
       aspectRatio,
@@ -310,6 +312,7 @@ export async function POST(request: NextRequest) {
     } = body as {
       prompt?: string;
       imageUrl?: string | null;
+      imageUrls?: string[];
       mode?: "text-to-image" | "image-to-image";
       model?: string;
       resolution?: string;
@@ -332,11 +335,23 @@ export async function POST(request: NextRequest) {
       ? (model as ImageModelOptionId)
       : DEFAULT_IMAGE_MODEL_ID;
     const modelOption = IMAGE_MODEL_OPTION_MAP[modelId];
+    const inputSources = (
+      Array.isArray(imageUrls)
+        ? imageUrls
+        : imageUrl
+          ? [imageUrl]
+          : []
+    ).filter((url): url is string => typeof url === "string" && url.trim().length > 0)
+      .map((url) => url.trim());
+    const inputCapabilities = getImageInputCapabilities(modelId);
+    if (inputSources.length > inputCapabilities.maxImages) {
+      return imageErrorResponse("invalid_parameters");
+    }
     parametersForPersistence = {
       model: modelOption.label,
       resolution: res,
       aspectRatio: ar,
-      mode: imageUrl ? "Image to image" : "Text to image",
+      mode: inputSources.length > 0 ? "Image to image" : "Text to image",
       ...(typeof runId === "string" && runId.trim().length > 0
         ? { runId: runId.trim().slice(0, 120) }
         : {}),
@@ -358,21 +373,20 @@ export async function POST(request: NextRequest) {
       return imageErrorResponse("invalid_parameters");
     }
 
-    const inputSource = imageUrl && String(imageUrl).trim() !== ""
-      ? String(imageUrl).trim()
-      : undefined;
     const requestId =
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const inputMedia = inputSource
-      ? [
-          await persistOrReuseImageInput({
-            source: inputSource,
-            userId: session.user.id,
-            requestId,
-          }),
-        ]
+    const inputMedia = inputSources.length > 0
+      ? await Promise.all(
+          inputSources.map((source, index) =>
+            persistOrReuseImageInput({
+              source,
+              userId: session.user.id,
+              requestId: `${requestId}-${index}`,
+            })
+          )
+        )
       : undefined;
     const inputUrls = inputMedia?.map((media) => media.url);
     inputUrlsForPersistence = inputUrls || [];

@@ -53,7 +53,7 @@ export function getMiniMaxVideoInput(params: {
   aspectRatio?: string;
   option: VideoModelOption;
 }) {
-  const [firstFrameUrl] = params.imageUrls || [];
+  const [firstFrameUrl, lastFrameUrl] = params.imageUrls || [];
   const input: Record<string, unknown> = {
     prompt: params.prompt,
     resolution: getKieVideoResolution(params.option),
@@ -62,6 +62,9 @@ export function getMiniMaxVideoInput(params: {
 
   if (firstFrameUrl) {
     input.first_frame_url = firstFrameUrl;
+    if (lastFrameUrl) {
+      input.last_frame_url = lastFrameUrl;
+    }
   } else if (params.aspectRatio) {
     input.aspect_ratio = params.aspectRatio;
   }

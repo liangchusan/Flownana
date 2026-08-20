@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, PanelRightClose, PanelRightOpen, Trash2, Video, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PanelRightClose, PanelRightOpen, Trash2, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
 import { CreationStream, type WorkspaceRun } from "@/components/blocks/creation-stream";
@@ -9,15 +9,26 @@ import { AssetsLibrary } from "@/components/blocks/assets-library";
 import { WorkspaceMobileHeader, WorkspaceSidebar, type WorkspaceView } from "@/components/blocks/workspace-sidebar";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, mergeCreations, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
+import {
+  ComposerAttachments,
+  ComposerToolbarLeading,
+  type ActiveComposerType,
+  type ComposerAssetOption,
+  type ComposerAttachment,
+} from "@/components/blocks/composer-input-controls";
+import {
+  getImageInputCapabilities,
+  getVideoInputCapabilities,
+  type GenerationInputCapabilities,
+} from "@/lib/generation-input-capabilities";
+import { COMPOSER_TYPE_STORAGE_KEY } from "@/lib/composer-preference";
 
 type ComposerType = CreationHistoryItem["type"];
-type ActiveComposerType = Exclude<ComposerType, "music">;
 
 interface DraftSeed {
   prompt: string;
-  attachmentUrl?: string;
-  attachmentType?: ComposerType;
-  parameters?: GenerationParameters;
+  attachments: ComposerAttachment[];
+  parametersByType: Partial<Record<ActiveComposerType, GenerationParameters>>;
   revision: number;
 }
 
@@ -38,7 +49,17 @@ export function MediaCreationWorkspace({
   const [view, setView] = useState<WorkspaceView>("create");
   const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
   const [creations, setCreations] = useState<CreationHistoryItem[]>(initialCreations);
-  const [draft, setDraft] = useState<DraftSeed>({ prompt: initialPrompt || "", revision: 0 });
+  const [draft, setDraft] = useState<DraftSeed>({
+    prompt: initialPrompt || "",
+    attachments: [],
+    parametersByType: {},
+    revision: 0,
+  });
+  const [inputCapabilities, setInputCapabilities] = useState<GenerationInputCapabilities>(
+    initialType === "image"
+      ? getImageInputCapabilities("gpt-image-2")
+      : getVideoInputCapabilities("MiniMax H3")
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [detailsRun, setDetailsRun] = useState<WorkspaceRun | null>(null);
@@ -51,6 +72,10 @@ export function MediaCreationWorkspace({
     target.scrollTop = target.scrollHeight;
   }, [creations, view]);
 
+  useEffect(() => {
+    window.localStorage.setItem(COMPOSER_TYPE_STORAGE_KEY, composerType);
+  }, [composerType]);
+
   const activeImageCount = creations.filter((creation) => creation.type === "image" && ["pending", "generating", "processing"].includes(creation.status)).length;
   const activeVideoCount = creations.filter((creation) => creation.type === "video" && ["pending", "generating", "processing"].includes(creation.status)).length;
 
@@ -58,7 +83,12 @@ export function MediaCreationWorkspace({
     setCreations((current) => current.map((creation) => creationIdentity(creation) === identity ? { ...creation, ...patch } : creation));
   };
 
-  const resetDraft = () => setDraft((current) => ({ prompt: "", revision: current.revision + 1 }));
+  const resetDraft = () => setDraft((current) => ({
+    ...current,
+    prompt: "",
+    attachments: [],
+    revision: current.revision + 1,
+  }));
 
   const handleNewCreate = () => {
     setView("create");
@@ -74,8 +104,16 @@ export function MediaCreationWorkspace({
 
   const setType = (nextType: ActiveComposerType) => {
     setComposerType(nextType);
-    if (draft.attachmentUrl && !isAttachmentCompatible(nextType, draft.attachmentType)) {
-      showToast({ title: "Attachment is not compatible", message: "Remove the marked attachment or switch to a compatible generator before creating.", variant: "warning" });
+    setInputCapabilities(
+      nextType === "image"
+        ? getImageInputCapabilities("gpt-image-2")
+        : getVideoInputCapabilities("MiniMax H3")
+    );
+    const nextUrl = new URL(window.location.href);
+    nextUrl.pathname = nextType === "image" ? "/ai-image" : "/ai-video";
+    window.history.replaceState(window.history.state, "", nextUrl);
+    if (draft.attachments.some((attachment) => attachment.kind !== "image")) {
+      showToast({ title: "Some inputs need attention", message: "Remove inputs marked as unsupported or switch to a compatible model before creating.", variant: "warning" });
     }
   };
 
@@ -88,17 +126,40 @@ export function MediaCreationWorkspace({
     setComposerType(creation.type);
     setDraft((current) => ({
       prompt: creation.prompt,
-      attachmentUrl: creation.inputUrls[0],
-      attachmentType: creation.inputUrls[0] ? "image" : undefined,
-      parameters: creation.parameters,
+      attachments: creation.inputUrls.map((url, index) => ({
+        id: `reprompt-${creationIdentity(creation)}-${index}`,
+        url,
+        kind: "image" as const,
+        name: `Input image ${index + 1}`,
+        source: "reference" as const,
+      })),
+      parametersByType: {
+        ...current.parametersByType,
+        [creation.type]: creation.parameters,
+      },
       revision: current.revision + 1,
     }));
   };
 
   const referenceAsset = (creation: CreationHistoryItem, url: string) => {
     setView("create");
-    setDraft((current) => ({ ...current, attachmentUrl: url, attachmentType: creation.type, revision: current.revision + 1 }));
-    if (!isAttachmentCompatible(composerType, creation.type)) {
+    const kind = creation.type === "music" ? "audio" : creation.type;
+    setDraft((current) => current.attachments.some((attachment) => attachment.url === url)
+      ? current
+      : {
+          ...current,
+          attachments: [
+            ...current.attachments,
+            {
+              id: `reference-${creationIdentity(creation)}-${current.attachments.length}`,
+              url,
+              kind,
+              name: `${kind === "audio" ? "Audio" : kind[0].toUpperCase() + kind.slice(1)} result`,
+              source: "reference",
+            },
+          ],
+        });
+    if (kind !== "image") {
       showToast({ title: "Attachment is not compatible", message: "This generator cannot use that media type yet. The attachment is marked and generation is blocked.", variant: "warning" });
     }
   };
@@ -109,7 +170,10 @@ export function MediaCreationWorkspace({
       type,
       status: "generating",
       urls: [],
-      inputUrls: draft.attachmentUrl && draft.attachmentType === "image" ? [draft.attachmentUrl] : [],
+      inputUrls: draft.attachments
+        .filter((attachment) => attachment.kind === "image")
+        .slice(0, inputCapabilities.maxImages)
+        .map((attachment) => attachment.url),
       prompt,
       createdAt: nowIso(),
       parameters: { ...parameters, runId: optimisticId, outputIndex: index, outputCount },
@@ -126,14 +190,52 @@ export function MediaCreationWorkspace({
     }));
   };
 
-  const attachmentIncompatible = !!draft.attachmentUrl && !isAttachmentCompatible(composerType, draft.attachmentType);
+  const imageAttachments = draft.attachments.filter((attachment) => attachment.kind === "image");
+  const attachmentIncompatible = draft.attachments.some((attachment, index) => {
+    if (attachment.kind === "video") return !inputCapabilities.acceptsVideo;
+    if (attachment.kind === "audio") return !inputCapabilities.acceptsAudio;
+    const imageIndex = draft.attachments
+      .slice(0, index + 1)
+      .filter((item) => item.kind === "image").length - 1;
+    return imageIndex >= inputCapabilities.maxImages;
+  });
+  const assetOptions = useMemo<ComposerAssetOption[]>(() => {
+    const seen = new Set<string>();
+    return creations.flatMap((creation) => {
+      if (creation.status !== "success") return [];
+      const kind = creation.type === "music" ? "audio" : creation.type;
+      return creation.urls.flatMap((url, index) => {
+        if (!url || seen.has(url)) return [];
+        seen.add(url);
+        return [{
+          id: `${creationIdentity(creation)}-${index}`,
+          url,
+          kind,
+          name: `${kind === "audio" ? "Audio" : kind[0].toUpperCase() + kind.slice(1)} result`,
+        }];
+      });
+    });
+  }, [creations]);
+  const toolbarLeading = (
+    <ComposerToolbarLeading
+      composerType={composerType}
+      capabilities={inputCapabilities}
+      attachments={draft.attachments}
+      assets={assetOptions}
+      onTypeChange={setType}
+      onAdd={(attachments) => setDraft((current) => ({
+        ...current,
+        attachments: [...current.attachments, ...attachments],
+      }))}
+    />
+  );
   const composerKey = `${composerType}-${draft.revision}`;
   const composer = (() => {
     if (composerType === "image") {
-      return <GenerateForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImage={draft.attachmentType === "image" ? draft.attachmentUrl : undefined} initialParameters={draft.parameters} activeGenerationCount={activeImageCount} isGenerating={activeImageCount >= 5} setIsGenerating={() => undefined} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
+      return <GenerateForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.image} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeImageCount} isGenerating={activeImageCount >= 5} setIsGenerating={() => undefined} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, image: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
     }
     if (composerType === "video") {
-      return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImage={draft.attachmentType === "image" ? draft.attachmentUrl : undefined} initialParameters={draft.parameters} activeGenerationCount={activeVideoCount} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
+      return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeVideoCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
     }
     return null;
   })();
@@ -160,14 +262,10 @@ export function MediaCreationWorkspace({
               )}
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} /></div>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6">
-                <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/95 p-3 shadow-float backdrop-blur-xl sm:p-4">
-                  <div className="mb-3 flex items-center gap-1" role="tablist" aria-label="Generation type">
-                    {([
-                      ["image", "Image", ImageIcon], ["video", "Video", Video],
-                    ] as const).map(([type, label, Icon]) => <button key={type} type="button" onClick={() => setType(type)} className={`flex h-9 items-center gap-1.5 rounded-ui px-3 text-xs font-medium transition-all duration-300 ${composerType === type ? "bg-surface-strong text-foreground" : "text-muted-foreground hover:bg-surface-soft hover:text-foreground"}`}><Icon className="h-4 w-4" />{label}</button>)}
-                  </div>
-                  {attachmentIncompatible && <div className="mb-3 flex items-center gap-3 rounded-ui-lg border border-destructive/20 bg-destructive/5 px-3 py-2"><Trash2 className="h-4 w-4 text-destructive" /><p className="min-w-0 flex-1 text-xs text-destructive">This {draft.attachmentType === "music" ? "audio" : draft.attachmentType} attachment is incompatible with the selected generator.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachmentUrl: undefined, attachmentType: undefined, revision: current.revision + 1 }))} className="text-xs font-medium text-destructive underline underline-offset-2">Remove incompatible</button></div>}
-                  <fieldset disabled={attachmentIncompatible} className={attachmentIncompatible ? "opacity-60" : ""}>{composer}</fieldset>
+                <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/98 p-2.5 shadow-soft sm:p-3">
+                  <ComposerAttachments attachments={draft.attachments} capabilities={inputCapabilities} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />
+                  {attachmentIncompatible && <div className="mt-2 flex items-center gap-2 rounded-ui bg-destructive/5 px-2 py-1.5"><Trash2 className="h-3.5 w-3.5 text-destructive" /><p className="min-w-0 flex-1 text-[11px] text-destructive">Remove inputs marked as unsupported before creating.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachments: filterCompatibleAttachments(current.attachments, inputCapabilities) }))} className="text-[11px] font-medium text-destructive underline underline-offset-2">Remove unsupported</button></div>}
+                  {composer}
                 </div>
               </div>
             </main>
@@ -179,10 +277,34 @@ export function MediaCreationWorkspace({
   );
 }
 
-function isAttachmentCompatible(type: ComposerType, attachmentType?: ComposerType) {
-  if (!attachmentType) return true;
-  if (type === "music") return false;
-  return attachmentType === "image";
+function replaceImageAttachments(
+  attachments: ComposerAttachment[],
+  urls: string[]
+) {
+  const existingImages = attachments.filter((attachment) => attachment.kind === "image");
+  const replacements = urls.map((url, index): ComposerAttachment =>
+    existingImages.find((attachment) => attachment.url === url) || {
+      id: `input-${index}-${url.slice(-24)}`,
+      url,
+      kind: "image",
+      name: `Input image ${index + 1}`,
+      source: "reference",
+    }
+  );
+  return [...replacements, ...attachments.filter((attachment) => attachment.kind !== "image")];
+}
+
+function filterCompatibleAttachments(
+  attachments: ComposerAttachment[],
+  capabilities: GenerationInputCapabilities
+) {
+  let imageCount = 0;
+  return attachments.filter((attachment) => {
+    if (attachment.kind === "video") return capabilities.acceptsVideo;
+    if (attachment.kind === "audio") return capabilities.acceptsAudio;
+    imageCount += 1;
+    return imageCount <= capabilities.maxImages;
+  });
 }
 
 function DetailsPanel({ run, onClose }: { run: WorkspaceRun; onClose: () => void }) {

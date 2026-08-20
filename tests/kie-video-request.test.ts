@@ -51,10 +51,13 @@ test("HappyHorse image-to-video uses image_urls input", () => {
   });
 });
 
-test("MiniMax H3 image-to-video uses first_frame_url input", () => {
+test("MiniMax H3 image-to-video supports first and last frame inputs", () => {
   const input = getMiniMaxVideoInput({
     prompt: "move naturally",
-    imageUrls: ["https://example.com/input.png"],
+    imageUrls: [
+      "https://example.com/first.png",
+      "https://example.com/last.png",
+    ],
     option: VIDEO_MODEL_OPTION_MAP.minimaxh3_720_15,
   });
 
@@ -62,7 +65,8 @@ test("MiniMax H3 image-to-video uses first_frame_url input", () => {
     prompt: "move naturally",
     resolution: "768P",
     duration: 15,
-    first_frame_url: "https://example.com/input.png",
+    first_frame_url: "https://example.com/first.png",
+    last_frame_url: "https://example.com/last.png",
   });
   assert.equal("image_urls" in input, false);
 });
