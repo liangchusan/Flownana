@@ -11,6 +11,7 @@ export interface GenerationParameters {
   resolution?: string;
   aspectRatio?: string;
   duration?: number;
+  processingDurationMs?: number;
   audio?: string;
   mode?: string;
   runId?: string;
@@ -34,6 +35,13 @@ export function normalizeGenerationParameters(
     typeof durationValue === "number" && Number.isFinite(durationValue)
       ? durationValue
       : undefined;
+  const processingDurationValue = candidate.processingDurationMs;
+  const processingDurationMs =
+    typeof processingDurationValue === "number" &&
+    Number.isFinite(processingDurationValue) &&
+    processingDurationValue >= 0
+      ? Math.round(processingDurationValue)
+      : undefined;
   const outputIndexValue = candidate.outputIndex;
   const outputIndex =
     typeof outputIndexValue === "number" && Number.isInteger(outputIndexValue)
@@ -49,6 +57,7 @@ export function normalizeGenerationParameters(
     resolution: readParameterString(candidate.resolution),
     aspectRatio: readParameterString(candidate.aspectRatio),
     duration,
+    processingDurationMs,
     audio: readParameterString(candidate.audio),
     mode: readParameterString(candidate.mode),
     ...(readParameterString(candidate.runId)
@@ -64,6 +73,16 @@ export function normalizeGenerationParameters(
   return Object.values(parameters).some((item) => item !== undefined)
     ? parameters
     : undefined;
+}
+
+export function formatProcessingDuration(durationMs: number) {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }
 
 export interface CreationHistoryItem {

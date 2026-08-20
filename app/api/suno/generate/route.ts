@@ -146,10 +146,12 @@ async function pollSunoResult(taskId: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const processingStartedAt = Date.now();
   let consumedCredits: CreditConsumptionSnapshot = [];
   let taskId: string | undefined;
   let userId: string | undefined;
   let promptForPersistence = "Untitled prompt";
+  let parametersForPersistence: Record<string, string | number> | undefined;
 
   try {
     const session = await getServerSession(authOptions);
@@ -180,6 +182,15 @@ export async function POST(request: NextRequest) {
       );
     }
     promptForPersistence = prompt;
+    parametersForPersistence = {
+      model: "Suno",
+      mode: makeInstrumental ? "Instrumental" : "Music",
+      ...(typeof runId === "string" && runId.trim()
+        ? { runId: runId.trim().slice(0, 120) }
+        : {}),
+      outputIndex: 0,
+      outputCount: 1,
+    };
 
     // Deduct credits before generation
     consumedCredits = await consumeCreditsFIFO(userId, MUSIC_CREDITS);
@@ -198,6 +209,10 @@ export async function POST(request: NextRequest) {
       taskId,
       kind: "music",
     });
+    parametersForPersistence = {
+      ...parametersForPersistence,
+      processingDurationMs: Date.now() - processingStartedAt,
+    };
 
     const generation = await prisma.generation.upsert({
       where: { taskId },
@@ -207,13 +222,7 @@ export async function POST(request: NextRequest) {
         urls: [generatedAudio.url],
         prompt,
         error: null,
-        parameters: {
-          model: "Suno",
-          mode: makeInstrumental ? "Instrumental" : "Music",
-          ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120) } : {}),
-          outputIndex: 0,
-          outputCount: 1,
-        } as Prisma.InputJsonValue,
+        parameters: parametersForPersistence as Prisma.InputJsonValue,
         creditsCost: MUSIC_CREDITS,
       },
       create: {
@@ -223,13 +232,7 @@ export async function POST(request: NextRequest) {
         urls: [generatedAudio.url],
         prompt,
         taskId,
-        parameters: {
-          model: "Suno",
-          mode: makeInstrumental ? "Instrumental" : "Music",
-          ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120) } : {}),
-          outputIndex: 0,
-          outputCount: 1,
-        } as Prisma.InputJsonValue,
+        parameters: parametersForPersistence as Prisma.InputJsonValue,
         creditsCost: MUSIC_CREDITS,
       },
     });
@@ -246,8 +249,15 @@ export async function POST(request: NextRequest) {
       audioUrl: generatedAudio.url,
       prompt,
       taskId,
+      parameters: parametersForPersistence,
     });
   } catch (error: any) {
+    if (parametersForPersistence) {
+      parametersForPersistence = {
+        ...parametersForPersistence,
+        processingDurationMs: Date.now() - processingStartedAt,
+      };
+    }
     if (taskId && userId) {
       try {
         await prisma.generation.upsert({
@@ -259,6 +269,9 @@ export async function POST(request: NextRequest) {
               typeof error?.message === "string"
                 ? error.message
                 : "Generation failed.",
+            ...(parametersForPersistence
+              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
+              : {}),
           },
           create: {
             userId,
@@ -271,6 +284,9 @@ export async function POST(request: NextRequest) {
               typeof error?.message === "string"
                 ? error.message
                 : "Generation failed.",
+            ...(parametersForPersistence
+              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
+              : {}),
           },
         });
       } catch (persistErr) {

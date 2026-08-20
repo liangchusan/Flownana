@@ -209,5 +209,5 @@ Before finishing:
 - creating a new raw button/input/card when an existing primitive fits
 - using Slate/Gray palettes, purple AI gradients, heavy black shadows, or glassmorphism as defaults
 - adding arbitrary JSX colors, inline `style={{}}`, or fixed desktop-only widths
-- turning a media-generation flow into a chat clone
+- copying a generic chat product wholesale; the approved Create stream may use a right-aligned prompt and response hierarchy, but it must remain Flownana-branded, media-first, and free of invented agent-process UI
 - declaring visual completion without inspecting the rendered result

@@ -117,7 +117,9 @@ export function MediaCreationWorkspace({
   const updateOptimisticOutput = ({ optimisticId, outputIndex = 0, url, taskId, prompt, parameters, inputUrls, status, error, errorCode }: { optimisticId: string; outputIndex?: number; url?: string; taskId?: string; prompt?: string; parameters?: GenerationParameters; inputUrls?: string[]; status: CreationHistoryItem["status"]; error?: string; errorCode?: string }) => {
     setCreations((current) => current.map((creation) => {
       if (creation.parameters?.runId !== optimisticId || (creation.parameters.outputIndex ?? 0) !== outputIndex) return creation;
-      return { ...creation, status, urls: url ? [url] : creation.urls, taskId: taskId || creation.taskId, prompt: prompt || creation.prompt, parameters: { ...creation.parameters, ...parameters, runId: optimisticId, outputIndex }, inputUrls: inputUrls || creation.inputUrls, error, errorCode };
+      const isSettled = status === "success" || status === "failed";
+      const processingDurationMs = parameters?.processingDurationMs ?? creation.parameters?.processingDurationMs ?? (isSettled ? Math.max(0, Date.now() - new Date(creation.createdAt).getTime()) : undefined);
+      return { ...creation, status, urls: url ? [url] : creation.urls, taskId: taskId || creation.taskId, prompt: prompt || creation.prompt, parameters: { ...creation.parameters, ...parameters, ...(processingDurationMs !== undefined ? { processingDurationMs } : {}), runId: optimisticId, outputIndex }, inputUrls: inputUrls || creation.inputUrls, error, errorCode };
     }));
   };
 

@@ -268,12 +268,33 @@ async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
   return parseKieVideoResult(json.data);
 }
 
+function withProcessingDuration(parameters: unknown, createdAt: Date) {
+  const current =
+    parameters && typeof parameters === "object" && !Array.isArray(parameters)
+      ? (parameters as Record<string, unknown>)
+      : {};
+  const savedDuration = current.processingDurationMs;
+  if (
+    typeof savedDuration === "number" &&
+    Number.isFinite(savedDuration) &&
+    savedDuration >= 0
+  ) {
+    return current;
+  }
+  return {
+    ...current,
+    processingDurationMs: Math.max(0, Date.now() - createdAt.getTime()),
+  };
+}
+
 async function failVideoGeneration(params: {
   generation: {
     id: string;
     prompt: string;
     taskId: string | null;
     creditConsumption: unknown;
+    createdAt: Date;
+    parameters: unknown;
   };
   error: unknown;
   source: "app" | "provider";
@@ -305,12 +326,17 @@ async function failVideoGeneration(params: {
       refundPending,
     }
   );
+  const settledParameters = withProcessingDuration(
+    params.generation.parameters,
+    params.generation.createdAt
+  );
 
   await prisma.generation.update({
     where: { id: params.generation.id },
     data: {
       status: "failed",
       error: display.message,
+      parameters: settledParameters as Prisma.InputJsonValue,
       ...(refundPending ? {} : { creditConsumption: Prisma.JsonNull }),
     },
   });
@@ -338,6 +364,7 @@ async function failVideoGeneration(params: {
       ...payload,
       prompt: params.generation.prompt,
       taskId: params.generation.taskId,
+      parameters: settledParameters,
     },
     { status: getGenerationErrorHttpStatus(display.code) }
   );
@@ -436,12 +463,17 @@ async function settleVideoTask(params: {
       source: "app",
     });
   }
+  const settledParameters = withProcessingDuration(
+    generation.parameters,
+    generation.createdAt
+  );
   await prisma.generation.update({
     where: { id: generation.id },
     data: {
       status: "success",
       urls: [generatedVideo.url],
       error: null,
+      parameters: settledParameters as Prisma.InputJsonValue,
       creditConsumption: Prisma.JsonNull,
     },
   });
@@ -455,7 +487,7 @@ async function settleVideoTask(params: {
     taskId: generation.taskId,
     creditsCost: generation.creditsCost,
     modelOptionId: generation.modelOptionId,
-    parameters: generation.parameters,
+    parameters: settledParameters,
     inputUrls: generation.inputUrls,
   });
 }
@@ -500,6 +532,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const processingStartedAt = Date.now();
   let consumedCredits: CreditConsumptionSnapshot = [];
   let taskId: string | undefined;
   let userId: string | undefined;
@@ -645,6 +678,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error generating video:", error);
+    if (parametersForPersistence) {
+      parametersForPersistence = {
+        ...parametersForPersistence,
+        processingDurationMs: Date.now() - processingStartedAt,
+      };
+    }
     let creditsRefunded = false;
     let refundPending = false;
     if (consumedCredits.length > 0) {

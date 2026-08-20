@@ -21,16 +21,19 @@ The durable user deliverable is the generated media asset. The Create stream is 
 ## Create stream
 
 - Mixed image, video, and audio records are displayed in chronological order, with the newest work at the bottom.
-- Every submitted Prompt is shown as a right-aligned prompt bubble.
+- Every submitted Prompt is shown as a right-aligned prompt bubble. Any original input attachment appears directly above the prompt, preserving its aspect ratio.
 - A corresponding Result Block appears immediately in a generating state.
 - One Prompt maps to one Result Block. A Result Block can contain one to four outputs.
 - Image supports one to four outputs in P0. Video and audio support one output.
-- Media uses contained rendering and supports `16:9`, `9:16`, `1:1`, `4:3`, and `3:4` without cropping.
+- The response is lightweight and borderless: English processing status, divider, type-specific inline parameters, generated media, then actions. The optional Details panel remains available for the full prompt, inputs, and parameter set.
+- Active records show a live `Processing` timer. New completed and failed records persist processing duration in `Generation.parameters` and show `Processed in` or `Failed after`; legacy records without reliable duration omit the time. Multi-output image runs use the slowest output duration.
+- Media uses contained rendering and supports `16:9`, `9:16`, `1:1`, `4:3`, and `3:4` without cropping. A single desktop result is capped near 512px wide and 480px tall; mobile results use the available width while keeping the original aspect ratio.
 - Desktop video previews play muted on hover, then pause and reset when the pointer leaves.
 - Clicking image, video, or audio opens a focused media viewer.
 
 ## Result actions
 
+- Download, Reference, and Delete are visible as lightweight actions adjacent to each successful output instead of being hidden in a large media overlay.
 - Reprompt replaces the current draft without confirmation and restores the original prompt, original input asset, model, parameters, and output count where saved. It never auto-submits.
 - Download keeps the existing authenticated download endpoint and `result_download_clicked` event.
 - Reference adds the output to the current composer draft.

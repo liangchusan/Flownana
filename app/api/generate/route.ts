@@ -282,6 +282,7 @@ async function pollImageResult(taskId: string, modelLabel: string) {
 }
 
 export async function POST(request: NextRequest) {
+  const processingStartedAt = Date.now();
   let consumedCredits: CreditConsumptionSnapshot = [];
   let taskId: string | undefined;
   let userId: string | undefined;
@@ -396,6 +397,10 @@ export async function POST(request: NextRequest) {
       kind: "image",
     });
     const generatedImageUrl = generatedImage.url;
+    parametersForPersistence = {
+      ...parametersForPersistence,
+      processingDurationMs: Date.now() - processingStartedAt,
+    };
 
     const generation = await prisma.generation.upsert({
       where: { taskId },
@@ -452,6 +457,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error generating image:", error);
+    if (parametersForPersistence) {
+      parametersForPersistence = {
+        ...parametersForPersistence,
+        processingDurationMs: Date.now() - processingStartedAt,
+      };
+    }
     let creditsRefunded = false;
     let refundPending = false;
     if (consumedCredits.length > 0) {

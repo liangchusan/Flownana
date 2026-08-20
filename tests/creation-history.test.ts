@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  formatProcessingDuration,
   mergeCreations,
   getRegenerationInputImage,
   normalizeGenerationParameters,
@@ -105,6 +106,7 @@ test("normalizeGenerationParameters keeps only supported display fields", () => 
       resolution: "2K",
       aspectRatio: "3:4",
       duration: undefined,
+      processingDurationMs: undefined,
       audio: undefined,
       mode: undefined,
     }
@@ -125,6 +127,7 @@ test("normalizeGenerationParameters preserves workspace run metadata", () => {
       resolution: undefined,
       aspectRatio: undefined,
       duration: undefined,
+      processingDurationMs: undefined,
       audio: undefined,
       mode: undefined,
       runId: "run-123",
@@ -133,4 +136,22 @@ test("normalizeGenerationParameters preserves workspace run metadata", () => {
       hiddenFromRecent: true,
     }
   );
+});
+
+test("normalizeGenerationParameters keeps a valid processing duration", () => {
+  assert.equal(
+    normalizeGenerationParameters({ processingDurationMs: 84_321.4 })
+      ?.processingDurationMs,
+    84_321
+  );
+  assert.equal(
+    normalizeGenerationParameters({ processingDurationMs: -1 }),
+    undefined
+  );
+});
+
+test("formatProcessingDuration uses compact English time units", () => {
+  assert.equal(formatProcessingDuration(999), "0s");
+  assert.equal(formatProcessingDuration(84_321), "1m 24s");
+  assert.equal(formatProcessingDuration(3_664_000), "1h 1m 4s");
 });
