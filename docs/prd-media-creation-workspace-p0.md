@@ -33,7 +33,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 
 ## Result actions
 
-- Download, Reference, and Delete are visible as lightweight actions adjacent to each successful output instead of being hidden in a large media overlay.
+- Download, Reference, and Delete are lightweight controls in each successful output's top-right corner. They reveal on desktop hover or keyboard focus and remain visible on touch layouts. There is no separate expand control; clicking image or video still opens the focused viewer.
 - Reprompt replaces the current draft without confirmation and restores the original prompt, original input asset, model, parameters, and output count where saved. It never auto-submits.
 - Download keeps the existing authenticated download endpoint and `result_download_clicked` event.
 - Reference adds the output to the current composer draft.

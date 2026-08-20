@@ -7,7 +7,6 @@ import {
   Ellipsis,
   Image as ImageIcon,
   Loader2,
-  Maximize2,
   Music,
   RefreshCw,
   Settings2,
@@ -120,13 +119,11 @@ function VideoResult({ creationId, url, prompt, onOpen }: { creationId: string; 
 function ResultActions({
   creation,
   url,
-  onOpen,
   onReference,
   onDelete,
 }: {
   creation: CreationHistoryItem;
   url: string;
-  onOpen: () => void;
   onReference: () => void;
   onDelete: () => void;
 }) {
@@ -135,15 +132,14 @@ function ResultActions({
     window.location.href = `/api/creations/download?id=${encodeURIComponent(creation.taskId || creation.id)}&url=${encodeURIComponent(url)}`;
   };
   return (
-    <div className="mt-2 flex items-center gap-1">
+    <div className="absolute right-2 top-2 z-20 flex items-center gap-1 opacity-100 transition-all duration-300 sm:translate-y-1 sm:opacity-0 sm:group-hover/result:translate-y-0 sm:group-hover/result:opacity-100 sm:group-focus-within/result:translate-y-0 sm:group-focus-within/result:opacity-100">
       {[
-        { label: "Open", icon: Maximize2, action: onOpen },
         { label: "Download", icon: Download, action: download },
         { label: "Reference", icon: AtSign, action: onReference },
         { label: "Delete", icon: Trash2, action: onDelete },
       ].map((item) => {
         const Icon = item.icon;
-        return <button key={item.label} type="button" onClick={(event) => { event.stopPropagation(); item.action(); }} className="flex h-9 w-9 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label={item.label} title={item.label}><Icon className="h-4 w-4" /></button>;
+        return <button key={item.label} type="button" onClick={(event) => { event.stopPropagation(); item.action(); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-stone-950/80 text-white shadow-soft transition-all duration-300 hover:bg-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={item.label} title={item.label}><Icon className="h-4 w-4" /></button>;
       })}
     </div>
   );
@@ -319,9 +315,9 @@ export function CreationStream({
                   }
                   if (!url) return null;
                   return (
-                    <div key={key} className="relative min-w-0">
+                    <div key={key} className={`group/result relative min-w-0 ${creation.type === "music" ? "w-full max-w-lg" : "w-fit max-w-full"}`}>
                       {creation.type === "image" ? <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Image" className="max-w-lg rounded-ui-lg">{({ src, onError, onReady }) => <button type="button" onClick={() => setViewer({ creation, url })} className="inline-flex max-w-full overflow-hidden rounded-ui-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><img src={src} alt={creation.prompt} onError={onError} onLoad={onReady} className="h-auto max-h-[30rem] w-auto max-w-full object-contain" /></button>}</ResilientMedia> : creation.type === "video" ? <VideoResult creationId={creation.taskId || creation.id} url={url} prompt={creation.prompt} onOpen={() => setViewer({ creation, url })} /> : <div className="relative w-full max-w-lg"><ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Audio" className="min-h-0 rounded-ui-lg py-4">{({ src, onError, onReady }) => <audio src={src} controls onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div>}
-                      <ResultActions creation={creation} url={url} onOpen={() => setViewer({ creation, url })} onReference={() => onReference(creation, url)} onDelete={() => setPendingDelete({ creation, url })} />
+                      <ResultActions creation={creation} url={url} onReference={() => onReference(creation, url)} onDelete={() => setPendingDelete({ creation, url })} />
                     </div>
                   );
                 })}
