@@ -99,3 +99,22 @@ body {
   animation: banner-flow 12s ease-in-out infinite;
 }
 
+@keyframes creation-loading-float {
+  0%, 100% {
+    transform: translate3d(-0.5%, 1.5%, 0) scale(1.08);
+  }
+  50% {
+    transform: translate3d(0.5%, -1.5%, 0) scale(1.12);
+  }
+}
+
+.creation-loading-logo {
+  animation: creation-loading-float 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .creation-loading-logo {
+    animation: none;
+    transform: scale(1.08);
+  }
+}

@@ -127,7 +127,7 @@ export function MediaCreationWorkspace({
   const composerKey = `${composerType}-${draft.revision}`;
   const composer = (() => {
     if (composerType === "image") {
-      return <GenerateForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImage={draft.attachmentType === "image" ? draft.attachmentUrl : undefined} initialParameters={draft.parameters} activeGenerationCount={activeImageCount} isGenerating={activeImageCount >= 5} setIsGenerating={() => undefined} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, prompt, error, errorCode, status: "failed" })} />;
+      return <GenerateForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImage={draft.attachmentType === "image" ? draft.attachmentUrl : undefined} initialParameters={draft.parameters} activeGenerationCount={activeImageCount} isGenerating={activeImageCount >= 5} setIsGenerating={() => undefined} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
     }
     if (composerType === "video") {
       return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImage={draft.attachmentType === "image" ? draft.attachmentUrl : undefined} initialParameters={draft.parameters} activeGenerationCount={activeVideoCount} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
@@ -143,21 +143,18 @@ export function MediaCreationWorkspace({
         {view === "assets" ? <div className="min-h-0 flex-1 overflow-y-auto"><AssetsLibrary creations={creations} onReference={referenceAsset} onChange={updateCreation} /></div> : (
           <div className="flex min-h-0 flex-1">
             <main className="relative flex min-w-0 flex-1 flex-col">
-              <header className="hidden h-16 shrink-0 items-center justify-between px-6 lg:flex">
-                <div><h1 className="text-sm font-medium text-foreground">Create</h1><p className="text-xs text-muted-foreground">Recent generations across image, video, and audio</p></div>
-                {!detailsOpen && (
+              {!detailsOpen && (
                   <button
                     type="button"
                     onClick={() => detailsRun && setDetailsOpen(true)}
                     disabled={!detailsRun}
-                    className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
+                    className="absolute right-4 top-3 z-20 hidden h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent lg:flex"
                     aria-label="Open details sidebar"
                     title={detailsRun ? "Open details sidebar" : "Select Details on a result first"}
                   >
                     <PanelRightOpen className="h-5 w-5" />
                   </button>
-                )}
-              </header>
+              )}
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} /></div>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6">
                 <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/95 p-3 shadow-float backdrop-blur-xl sm:p-4">

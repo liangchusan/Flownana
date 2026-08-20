@@ -85,6 +85,53 @@ export function formatProcessingDuration(durationMs: number) {
   return `${seconds}s`;
 }
 
+const CONVERSATION_TIME_GAP_MS = 60 * 60 * 1000;
+
+function isSameLocalDay(left: Date, right: Date) {
+  return left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+}
+
+export function shouldShowConversationTimestamp(
+  currentCreatedAt: string,
+  previousCreatedAt?: string
+) {
+  const current = new Date(currentCreatedAt);
+  if (!Number.isFinite(current.getTime())) return false;
+  if (!previousCreatedAt) return true;
+  const previous = new Date(previousCreatedAt);
+  if (!Number.isFinite(previous.getTime())) return true;
+  return !isSameLocalDay(current, previous) ||
+    current.getTime() - previous.getTime() >= CONVERSATION_TIME_GAP_MS;
+}
+
+export function formatConversationTimestamp(
+  createdAt: string,
+  now = new Date()
+) {
+  const date = new Date(createdAt);
+  if (!Number.isFinite(date.getTime())) return "";
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+  if (isSameLocalDay(date, now)) return `Today ${time}`;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameLocalDay(date, yesterday)) return `Yesterday ${time}`;
+
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(date.getFullYear() !== now.getFullYear()
+      ? { year: "numeric" as const }
+      : {}),
+  }).format(date);
+  return `${dateLabel}, ${time}`;
+}
+
 export interface CreationHistoryItem {
   id: string;
   type: "image" | "video" | "music";
@@ -103,6 +150,15 @@ export interface CreationHistoryItem {
 
 export function creationIdentity(creation: CreationHistoryItem): string {
   return creation.taskId || creation.id;
+}
+
+export function getCreationRunRemovalTarget(creation: CreationHistoryItem) {
+  return {
+    id: creationIdentity(creation),
+    ...(creation.parameters?.runId
+      ? { runId: creation.parameters.runId }
+      : {}),
+  };
 }
 
 export function getRegenerationInputImage(

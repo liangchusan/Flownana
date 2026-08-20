@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { getCreationHistory, type CreationType } from "@/lib/creations";
@@ -69,11 +70,60 @@ export async function PATCH(request: Request) {
 
     const body = (await request.json()) as {
       id?: string;
+      runId?: string;
       action?: "delete-media" | "hide-from-recent";
       url?: string;
     };
-    if (!body.id || !body.action) {
-      return NextResponse.json({ error: "Missing id or action" }, { status: 400 });
+    if (!body.action) {
+      return NextResponse.json({ error: "Missing action" }, { status: 400 });
+    }
+
+    if (body.action === "hide-from-recent") {
+      const runId = body.runId?.trim();
+      const identifiers = body.id?.trim();
+      if (!identifiers && !runId) {
+        return NextResponse.json({ error: "Missing record target" }, { status: 400 });
+      }
+      const targets: Prisma.GenerationWhereInput[] = [];
+      if (identifiers) {
+        targets.push({ id: identifiers }, { taskId: identifiers });
+      }
+      if (runId) {
+        targets.push({ parameters: { path: ["runId"], equals: runId } });
+      }
+      const generations = await prisma.generation.findMany({
+        where: { userId: session.user.id, OR: targets },
+        select: { id: true, parameters: true },
+      });
+      if (generations.length === 0) {
+        // A task can fail before the provider creates a persisted record. In that
+        // case removing its optimistic Create entry is still a successful action.
+        return NextResponse.json({ success: true, updated: 0 });
+      }
+      await prisma.$transaction(
+        generations.map((generation) => {
+          const parameters =
+            generation.parameters &&
+            typeof generation.parameters === "object" &&
+            !Array.isArray(generation.parameters)
+              ? generation.parameters
+              : {};
+          return prisma.generation.update({
+            where: { id: generation.id },
+            data: {
+              parameters: {
+                ...parameters,
+                hiddenFromRecent: true,
+              },
+            },
+          });
+        })
+      );
+      return NextResponse.json({ success: true, updated: generations.length });
+    }
+
+    if (!body.id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
     const generation = await prisma.generation.findFirst({
@@ -93,25 +143,6 @@ export async function PATCH(request: Request) {
     });
     if (!generation) {
       return NextResponse.json({ error: "Creation not found" }, { status: 404 });
-    }
-
-    if (body.action === "hide-from-recent") {
-      const parameters =
-        generation.parameters &&
-        typeof generation.parameters === "object" &&
-        !Array.isArray(generation.parameters)
-          ? generation.parameters
-          : {};
-      await prisma.generation.update({
-        where: { id: generation.id },
-        data: {
-          parameters: {
-            ...parameters,
-            hiddenFromRecent: true,
-          },
-        },
-      });
-      return NextResponse.json({ success: true });
     }
 
     const targetUrl = body.url || generation.urls[0];

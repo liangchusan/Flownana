@@ -50,6 +50,7 @@ interface GenerateFormProps {
   }) => void;
   onGenerationFailure?: (data: {
     optimisticId: string;
+    taskId?: string;
     prompt: string;
     error: string;
     errorCode?: string;
@@ -326,6 +327,7 @@ export function GenerateForm({
         });
         onGenerationFailure?.({
           optimisticId,
+          taskId: error.response?.data?.taskId,
           prompt: requestPrompt,
           error: errorDisplay.message,
           errorCode: errorDisplay.code,

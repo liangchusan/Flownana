@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   formatProcessingDuration,
+  formatConversationTimestamp,
+  getCreationRunRemovalTarget,
   mergeCreations,
   getRegenerationInputImage,
   normalizeGenerationParameters,
+  shouldShowConversationTimestamp,
   type CreationHistoryItem,
 } from "../lib/creation-history.ts";
 
@@ -154,4 +157,67 @@ test("formatProcessingDuration uses compact English time units", () => {
   assert.equal(formatProcessingDuration(999), "0s");
   assert.equal(formatProcessingDuration(84_321), "1m 24s");
   assert.equal(formatProcessingDuration(3_664_000), "1h 1m 4s");
+});
+
+test("remove-from-recent targets persisted tasks and their shared run", () => {
+  assert.deepEqual(
+    getCreationRunRemovalTarget(item({
+      id: "db-1",
+      taskId: "task-1",
+      parameters: { runId: "run-1" },
+    })),
+    { id: "task-1", runId: "run-1" }
+  );
+});
+
+test("remove-from-recent can target a local failed run before task id recovery", () => {
+  assert.deepEqual(
+    getCreationRunRemovalTarget(item({
+      id: "run-2-0",
+      status: "failed",
+      parameters: { runId: "run-2" },
+    })),
+    { id: "run-2-0", runId: "run-2" }
+  );
+});
+
+test("conversation timestamps start a stream and repeat after an hour or a day change", () => {
+  const first = new Date(2026, 7, 20, 8, 27);
+  const beforeHour = new Date(2026, 7, 20, 9, 26, 59);
+  const afterHour = new Date(2026, 7, 20, 9, 27);
+  const beforeMidnight = new Date(2026, 7, 20, 23, 55);
+  const afterMidnight = new Date(2026, 7, 21, 0, 5);
+
+  assert.equal(shouldShowConversationTimestamp(first.toISOString()), true);
+  assert.equal(
+    shouldShowConversationTimestamp(
+      beforeHour.toISOString(),
+      first.toISOString()
+    ),
+    false
+  );
+  assert.equal(
+    shouldShowConversationTimestamp(
+      afterHour.toISOString(),
+      first.toISOString()
+    ),
+    true
+  );
+  assert.equal(
+    shouldShowConversationTimestamp(
+      afterMidnight.toISOString(),
+      beforeMidnight.toISOString()
+    ),
+    true
+  );
+});
+
+test("conversation timestamps use Today, Yesterday, and calendar dates", () => {
+  const now = new Date(2026, 7, 20, 12, 0);
+  const today = new Date(2026, 7, 20, 8, 27).toISOString();
+  const yesterday = new Date(2026, 7, 19, 9, 49).toISOString();
+  const older = new Date(2026, 7, 18, 10, 5).toISOString();
+  assert.match(formatConversationTimestamp(today, now), /^Today /);
+  assert.match(formatConversationTimestamp(yesterday, now), /^Yesterday /);
+  assert.match(formatConversationTimestamp(older, now), /^Aug 18, /);
 });

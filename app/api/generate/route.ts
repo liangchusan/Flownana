@@ -560,6 +560,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ...payload,
+        ...(taskId ? { taskId } : {}),
         ...(error instanceof InsufficientCreditsError
           ? { required: error.required, available: error.available }
           : {}),

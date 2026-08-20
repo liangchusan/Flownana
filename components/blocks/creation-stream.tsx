@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import {
   AtSign,
   Download,
   Ellipsis,
   Image as ImageIcon,
-  Loader2,
   Music,
   RefreshCw,
   Settings2,
@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
-import { creationIdentity, formatProcessingDuration, type CreationHistoryItem } from "@/lib/creation-history";
+import { creationIdentity, formatConversationTimestamp, formatProcessingDuration, getCreationRunRemovalTarget, shouldShowConversationTimestamp, type CreationHistoryItem } from "@/lib/creation-history";
 import { getCreationParameters } from "@/lib/creation-details";
 import { trackEvent } from "@/lib/analytics";
 
@@ -166,12 +166,48 @@ function RunStatus({ run }: { run: WorkspaceRun }) {
   const duration = isProcessing ? liveDuration : savedDuration;
   const label = isProcessing ? "Processing" : hasFailed ? "Failed" : "Processed";
   const connector = isProcessing ? "" : hasFailed ? " after" : " in";
+  const statusClassName = isProcessing
+    ? "text-sm font-medium text-muted-foreground"
+    : hasFailed
+      ? "text-xs font-normal text-destructive/70"
+      : "text-xs font-normal text-stone-400";
 
   return (
     <div className="border-b border-border pb-3">
-      <p className="text-sm font-medium text-muted-foreground">
+      <p className={statusClassName}>
         {label}{duration !== undefined ? `${connector} ${formatProcessingDuration(duration)}` : ""}
       </p>
+    </div>
+  );
+}
+
+function PendingResult({ creation }: { creation: CreationHistoryItem }) {
+  if (creation.type === "music") {
+    return (
+      <div className="relative flex min-h-32 w-full max-w-lg items-center justify-center overflow-hidden rounded-ui-lg bg-surface-soft">
+        <Image src="/logo.png" alt="" fill sizes="512px" className="creation-loading-logo object-cover opacity-45" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background/20 via-transparent to-background/30" />
+        <span className="sr-only">Creating audio</span>
+      </div>
+    );
+  }
+
+  const aspectRatio = creation.parameters?.aspectRatio;
+  const layoutClassName = aspectRatio === "9:16"
+    ? "aspect-[9/16] h-[min(30rem,70vh)] max-w-full"
+    : aspectRatio === "3:4"
+      ? "aspect-[3/4] h-[min(30rem,70vh)] max-w-full"
+      : aspectRatio === "16:9" || (creation.type === "video" && (!aspectRatio || aspectRatio === "Auto" || aspectRatio === "auto"))
+        ? "aspect-video w-full max-w-lg"
+        : aspectRatio === "4:3"
+          ? "aspect-[4/3] w-full max-w-lg"
+          : "aspect-square w-full max-w-lg";
+
+  return (
+    <div className={`relative flex items-center justify-center overflow-hidden rounded-ui-lg bg-surface-soft ${layoutClassName}`}>
+      <Image src="/logo.png" alt="" fill sizes="(max-width: 640px) 100vw, 512px" className="creation-loading-logo object-cover opacity-45" aria-hidden="true" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background/20 via-transparent to-background/30" />
+      <span className="sr-only">Creating {creation.type}</span>
     </div>
   );
 }
@@ -216,6 +252,24 @@ export function CreationStream({
   const [pendingDelete, setPendingDelete] = useState<{ creation: CreationHistoryItem; url: string } | null>(null);
   const [pendingRemove, setPendingRemove] = useState<WorkspaceRun | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const removeActionRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!openMenu) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (removeActionRef.current?.contains(event.target as Node)) return;
+      setOpenMenu(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openMenu]);
 
   const deleteMedia = async () => {
     if (!pendingDelete) return;
@@ -236,16 +290,13 @@ export function CreationStream({
 
   const removeRun = async () => {
     if (!pendingRemove) return;
-    const responses = await Promise.all(
-      pendingRemove.creations.map((creation) =>
-        fetch("/api/creations", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: creation.taskId || creation.id, action: "hide-from-recent" }),
-        })
-      )
-    );
-    if (responses.some((response) => !response.ok)) {
+    const target = getCreationRunRemovalTarget(pendingRemove.creations[0]);
+    const response = await fetch("/api/creations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...target, action: "hide-from-recent" }),
+    });
+    if (!response.ok) {
       showToast({ title: "Could not remove record", message: "Please try again.", variant: "error" });
       return;
     }
@@ -265,7 +316,7 @@ export function CreationStream({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-12 px-4 pb-96 pt-8 sm:px-6 sm:pb-80 lg:px-8 lg:pb-72">
-      {runs.map((run) => {
+      {runs.map((run, runIndex) => {
         const requestedCount = Math.max(...run.creations.map((item) => item.parameters?.outputCount || 1));
         const cells = [...run.creations];
         const metadata = getRunMetadata(run);
@@ -273,8 +324,18 @@ export function CreationStream({
         while (cells.length < requestedCount) {
           cells.push({ ...run.creations[0], id: `${run.id}-placeholder-${cells.length}`, urls: [], status: "generating", parameters: { ...run.creations[0].parameters, outputIndex: cells.length } });
         }
+        const showTimestamp = shouldShowConversationTimestamp(
+          run.createdAt,
+          runs[runIndex - 1]?.createdAt
+        );
         return (
-          <article key={run.id} className="space-y-6">
+          <div key={run.id} className="space-y-8">
+          {showTimestamp && (
+            <p className="text-center text-xs font-normal text-stone-400">
+              {formatConversationTimestamp(run.createdAt)}
+            </p>
+          )}
+          <article className="space-y-6">
             <div className="flex justify-end">
               <div className="flex max-w-[88%] flex-col items-end gap-2 sm:max-w-2xl">
                 {firstCreation.inputUrls.length > 0 && (
@@ -308,7 +369,7 @@ export function CreationStream({
                     return <div key={key} className="flex min-h-16 items-center rounded-ui-lg bg-surface-soft px-4 text-xs text-muted-foreground"><Trash2 className="mr-2 h-4 w-4" />Media deleted</div>;
                   }
                   if (ACTIVE_STATUSES.has(creation.status)) {
-                    return <div key={key} className="flex min-h-16 items-center gap-2 text-xs font-medium text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /><span>Creating result {index + 1}</span></div>;
+                    return <PendingResult key={key} creation={creation} />;
                   }
                   if (creation.status === "failed") {
                     return <div key={key} className="max-w-lg rounded-ui-lg bg-destructive/5 px-4 py-3"><p className="text-sm font-medium text-destructive">Generation failed</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{creation.error || "Please reprompt and try again."}</p></div>;
@@ -326,13 +387,14 @@ export function CreationStream({
               <div className="flex flex-wrap items-center gap-1">
                 <button type="button" onClick={() => onReprompt(run.creations[0])} className="flex h-9 items-center gap-1.5 rounded-ui px-2.5 text-xs font-medium text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground"><RefreshCw className="h-4 w-4" />Reprompt</button>
                 <button type="button" onClick={() => onDetails(run)} className="flex h-9 items-center gap-1.5 rounded-ui px-2.5 text-xs font-medium text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground"><Settings2 className="h-4 w-4" />Details</button>
-                <div className="relative ml-auto">
-                  <button type="button" onClick={() => setOpenMenu(openMenu === run.id ? null : run.id)} className="flex h-9 w-9 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="More actions"><Ellipsis className="h-4 w-4" /></button>
-                  {openMenu === run.id && <div className="absolute bottom-11 right-0 z-20 w-48 rounded-ui-lg border border-border bg-background p-1 shadow-float"><button type="button" onClick={() => { setOpenMenu(null); setPendingRemove(run); }} className="flex w-full items-center gap-2 rounded-ui px-3 py-2 text-left text-xs text-destructive transition-all duration-300 hover:bg-destructive/5"><Trash2 className="h-4 w-4" />Remove from recent</button></div>}
+                <div className="relative">
+                  <button type="button" onClick={() => setOpenMenu(openMenu === run.id ? null : run.id)} className="flex h-9 w-9 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="More actions" aria-haspopup="menu" aria-expanded={openMenu === run.id}><Ellipsis className="h-4 w-4" /></button>
+                  {openMenu === run.id && <div role="menu" className="absolute bottom-11 right-0 z-20 w-48 rounded-ui-lg border border-border bg-background p-1 shadow-float"><button ref={removeActionRef} role="menuitem" type="button" onClick={() => { setOpenMenu(null); setPendingRemove(run); }} className="flex w-full items-center gap-2 rounded-ui px-3 py-2 text-left text-xs text-destructive transition-all duration-300 hover:bg-destructive/5"><Trash2 className="h-4 w-4" />Remove from recent</button></div>}
                 </div>
               </div>
             </section>
           </article>
+          </div>
         );
       })}
 
