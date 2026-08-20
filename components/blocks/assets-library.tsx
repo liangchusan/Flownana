@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, type CreationHistoryItem } from "@/lib/creation-history";
+import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { trackEvent } from "@/lib/analytics";
 
 type AssetFilter = "all" | CreationHistoryItem["type"];
@@ -50,7 +51,15 @@ export function AssetsLibrary({
 
   const download = (asset: AssetItem) => {
     trackEvent("result_download_clicked", { type: asset.creation.type, source: "assets" });
-    window.location.href = `/api/creations/download?id=${encodeURIComponent(asset.creation.taskId || asset.creation.id)}&url=${encodeURIComponent(asset.url)}`;
+    const link = document.createElement("a");
+    link.href = buildCreationDownloadPath(
+      asset.creation.taskId || asset.creation.id,
+      asset.url
+    );
+    link.download = "";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const deleteAsset = async () => {

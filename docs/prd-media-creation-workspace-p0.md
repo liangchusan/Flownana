@@ -25,11 +25,11 @@ The durable user deliverable is the generated media asset. The Create stream is 
 - A corresponding Result Block appears immediately in a generating state.
 - One Prompt maps to one Result Block. A Result Block can contain one to four outputs.
 - Image supports one to four outputs in P0. Video and audio support one output.
-- The response is lightweight and borderless: English processing status, divider, type-specific inline parameters, generated media, then actions. While generation is active, the stream immediately reserves a proportion-matched result frame animated with the existing Flownana banana-at-sea logo; no visible result-number label is shown. Completed timing is visually secondary. The optional Details panel remains available for the full prompt, inputs, and parameter set.
+- The response is lightweight and borderless: English processing status, divider, type-specific inline parameters, generated media, then actions. While generation is active, the stream immediately reserves a proportion-matched result frame with a small Flownana banana drifting across a deeper-blue animated sea; no visible result-number label is shown. Completed timing is visually secondary. The optional Details panel remains available for the full prompt, inputs, and parameter set.
 - A centered conversation timestamp appears before the first run, when the local calendar day changes, or when at least one hour separates adjacent runs. Labels use `Today`, `Yesterday`, or a compact English calendar date plus local time.
 - Active records show a live `Processing` timer. New completed and failed records persist processing duration in `Generation.parameters` and show `Processed in` or `Failed after`; legacy records without reliable duration omit the time. Multi-output image runs use the slowest output duration.
-- Media uses contained rendering and supports `16:9`, `9:16`, `1:1`, `4:3`, and `3:4` without cropping. A single desktop result is capped near 512px wide and 480px tall; mobile results use the available width while keeping the original aspect ratio.
-- Desktop video previews play muted on hover, then pause and reset when the pointer leaves.
+- Media uses contained rendering and supports `16:9`, `9:16`, `1:1`, `4:3`, and `3:4` without cropping. A single desktop result is capped near 512px wide and 480px tall. Four 9:16 image outputs use one four-column desktop row and two columns on mobile; other multi-output layouts remain responsive.
+- Video previews start muted and provide play/pause, progress, elapsed/duration, and sound controls. Desktop previews also play on hover, then pause and reset when the pointer leaves. A record explicitly saved with Sound Off keeps its sound control disabled; unknown legacy audio capability remains user-toggleable.
 - Clicking image, video, or audio opens a focused media viewer.
 
 ## Result actions
@@ -38,7 +38,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 - Reprompt replaces the current draft without confirmation and restores the original prompt, original input asset, model, parameters, and output count where saved. It never auto-submits.
 - Download keeps the existing authenticated download endpoint and `result_download_clicked` event.
 - Reference adds the output to the current composer draft.
-- Delete removes the selected media from Create and Assets while retaining a compact deleted placeholder in the Create record. Unreferenced owned Blob storage is cleaned up; media still referenced by another generation input is retained until it is no longer in use.
+- Delete removes the selected media from Create and Assets while retaining a centered, compact deleted placeholder in the Create record. Unreferenced owned Blob storage is cleaned up; media still referenced by another generation input is retained until it is no longer in use.
 - Reprompt, Details, and More form one adjacent action group below the result. The More menu closes on any click outside Remove from recent and on Escape. More → Remove from recent hides the Prompt and Result record from Create without deleting successful media from Assets, including provider-failed and local-only failed runs.
 
 ## Composer

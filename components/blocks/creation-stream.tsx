@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import {
   AtSign,
   Download,
   Ellipsis,
   Image as ImageIcon,
   Music,
+  Pause,
+  Play,
   RefreshCw,
   Settings2,
   Trash2,
-  Video,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, formatConversationTimestamp, formatProcessingDuration, getCreationRunRemovalTarget, shouldShowConversationTimestamp, type CreationHistoryItem } from "@/lib/creation-history";
 import { getCreationParameters } from "@/lib/creation-details";
+import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { trackEvent } from "@/lib/analytics";
 
 const ACTIVE_STATUSES = new Set(["pending", "generating", "processing"]);
@@ -102,15 +105,131 @@ function MediaViewer({
   );
 }
 
-function VideoResult({ creationId, url, prompt, onOpen }: { creationId: string; url: string; prompt: string; onOpen: () => void }) {
+function formatMediaTime(value: number) {
+  if (!Number.isFinite(value) || value < 0) return "0:00";
+  const totalSeconds = Math.floor(value);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function VideoResult({
+  creationId,
+  url,
+  prompt,
+  audioDisabled,
+  onOpen,
+}: {
+  creationId: string;
+  url: string;
+  prompt: string;
+  audioDisabled: boolean;
+  onOpen: () => void;
+}) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const updateDuration = (video: HTMLVideoElement) => {
+    setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+  };
+
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    const syncDuration = () => {
+      setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+    };
+    syncDuration();
+    video.addEventListener("loadedmetadata", syncDuration);
+    video.addEventListener("durationchange", syncDuration);
+    video.addEventListener("canplay", syncDuration);
+    return () => {
+      video.removeEventListener("loadedmetadata", syncDuration);
+      video.removeEventListener("durationchange", syncDuration);
+      video.removeEventListener("canplay", syncDuration);
+    };
+  }, [url]);
+
+  const play = () => {
+    ref.current?.play().catch(() => undefined);
+  };
+
+  const reset = () => {
+    if (!ref.current) return;
+    ref.current.pause();
+    ref.current.currentTime = 0;
+    setCurrentTime(0);
+  };
+
+  const togglePlayback = () => {
+    const video = ref.current;
+    if (!video) return;
+    if (video.paused) {
+      video.play().catch(() => undefined);
+    } else {
+      video.pause();
+    }
+  };
+
+  const toggleMuted = () => {
+    if (audioDisabled) return;
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    if (ref.current) ref.current.muted = nextMuted;
+  };
+
   return (
     <ResilientMedia creationId={creationId} url={url} label="Video" className="max-w-lg rounded-ui-lg">
       {({ src, onError, onReady }) => (
-        <button type="button" onClick={onOpen} onMouseEnter={() => ref.current?.play().catch(() => undefined)} onMouseLeave={() => { if (!ref.current) return; ref.current.pause(); ref.current.currentTime = 0; }} className="relative inline-flex max-w-full overflow-hidden rounded-ui-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <video ref={ref} src={src} muted playsInline preload="metadata" onError={onError} onLoadedData={onReady} aria-label={prompt} className="h-auto max-h-[30rem] w-auto max-w-full object-contain" />
-          <span className="absolute bottom-2 right-2 rounded-full bg-black/60 p-2 text-white"><Video className="h-4 w-4" /></span>
-        </button>
+        <div onMouseEnter={play} onMouseLeave={reset} className="group/video relative inline-flex max-w-full overflow-hidden rounded-ui-lg bg-surface-dark focus-within:ring-2 focus-within:ring-primary">
+          <video
+            ref={ref}
+            src={src}
+            muted={muted || audioDisabled}
+            playsInline
+            preload="metadata"
+            onError={onError}
+            onLoadedData={(event) => {
+              onReady();
+              updateDuration(event.currentTarget);
+            }}
+            onLoadedMetadata={(event) => updateDuration(event.currentTarget)}
+            onDurationChange={(event) => updateDuration(event.currentTarget)}
+            onCanPlay={(event) => updateDuration(event.currentTarget)}
+            onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            aria-label={prompt}
+            className="pointer-events-none h-auto max-h-[30rem] w-auto max-w-full object-contain"
+          />
+          <button type="button" onClick={onOpen} className="absolute inset-0 z-10 focus-visible:outline-none" aria-label={`Open video preview: ${prompt}`} />
+          <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-2 bg-gradient-to-t from-stone-950/90 via-stone-950/65 to-transparent px-2 pb-2 pt-8 text-white opacity-100 transition-all duration-300 sm:translate-y-1 sm:opacity-0 sm:group-hover/video:translate-y-0 sm:group-hover/video:opacity-100 sm:group-focus-within/video:translate-y-0 sm:group-focus-within/video:opacity-100">
+            <button type="button" onClick={togglePlayback} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 transition-all duration-300 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={playing ? "Pause video" : "Play video"}>
+              {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </button>
+            <span className="shrink-0 text-[11px] font-medium tabular-nums">{formatMediaTime(currentTime)} / {formatMediaTime(duration)}</span>
+            <input
+              type="range"
+              min="0"
+              max={Math.max(duration, 0.01)}
+              step="0.01"
+              value={Math.min(currentTime, Math.max(duration, 0.01))}
+              onChange={(event) => {
+                const nextTime = Number(event.currentTarget.value);
+                setCurrentTime(nextTime);
+                if (ref.current) ref.current.currentTime = nextTime;
+              }}
+              className="creation-video-progress min-w-16 flex-1"
+              aria-label="Video progress"
+            />
+            <button type="button" onClick={toggleMuted} disabled={audioDisabled} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 transition-all duration-300 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-white/10" aria-label={audioDisabled ? "This video has no audio" : muted ? "Turn sound on" : "Mute video"} title={audioDisabled ? "No audio" : muted ? "Turn sound on" : "Mute video"}>
+              {muted || audioDisabled ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
       )}
     </ResilientMedia>
   );
@@ -129,7 +248,12 @@ function ResultActions({
 }) {
   const download = () => {
     trackEvent("result_download_clicked", { type: creation.type, source: "create_stream" });
-    window.location.href = `/api/creations/download?id=${encodeURIComponent(creation.taskId || creation.id)}&url=${encodeURIComponent(url)}`;
+    const link = document.createElement("a");
+    link.href = buildCreationDownloadPath(creation.taskId || creation.id, url);
+    link.download = "";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
   return (
     <div className="absolute right-2 top-2 z-20 flex items-center gap-1 opacity-100 transition-all duration-300 sm:translate-y-1 sm:opacity-0 sm:group-hover/result:translate-y-0 sm:group-hover/result:opacity-100 sm:group-focus-within/result:translate-y-0 sm:group-focus-within/result:opacity-100">
@@ -181,12 +305,17 @@ function RunStatus({ run }: { run: WorkspaceRun }) {
   );
 }
 
-function PendingResult({ creation }: { creation: CreationHistoryItem }) {
+function PendingResult({
+  creation,
+  compactPortrait = false,
+}: {
+  creation: CreationHistoryItem;
+  compactPortrait?: boolean;
+}) {
   if (creation.type === "music") {
     return (
-      <div className="relative flex min-h-32 w-full max-w-lg items-center justify-center overflow-hidden rounded-ui-lg bg-surface-soft">
-        <Image src="/logo.png" alt="" fill sizes="512px" className="creation-loading-logo object-cover opacity-45" aria-hidden="true" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background/20 via-transparent to-background/30" />
+      <div className="creation-loading-sea relative flex min-h-32 w-full max-w-lg items-center justify-center overflow-hidden rounded-ui-lg">
+        <span className="creation-loading-vessel text-5xl sm:text-6xl" aria-hidden="true">🍌</span>
         <span className="sr-only">Creating audio</span>
       </div>
     );
@@ -194,7 +323,9 @@ function PendingResult({ creation }: { creation: CreationHistoryItem }) {
 
   const aspectRatio = creation.parameters?.aspectRatio;
   const layoutClassName = aspectRatio === "9:16"
-    ? "aspect-[9/16] h-[min(30rem,70vh)] max-w-full"
+    ? compactPortrait
+      ? "aspect-[9/16] w-full"
+      : "aspect-[9/16] h-[min(30rem,70vh)] max-w-full"
     : aspectRatio === "3:4"
       ? "aspect-[3/4] h-[min(30rem,70vh)] max-w-full"
       : aspectRatio === "16:9" || (creation.type === "video" && (!aspectRatio || aspectRatio === "Auto" || aspectRatio === "auto"))
@@ -204,9 +335,8 @@ function PendingResult({ creation }: { creation: CreationHistoryItem }) {
           : "aspect-square w-full max-w-lg";
 
   return (
-    <div className={`relative flex items-center justify-center overflow-hidden rounded-ui-lg bg-surface-soft ${layoutClassName}`}>
-      <Image src="/logo.png" alt="" fill sizes="(max-width: 640px) 100vw, 512px" className="creation-loading-logo object-cover opacity-45" aria-hidden="true" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background/20 via-transparent to-background/30" />
+    <div className={`creation-loading-sea relative flex items-center justify-center overflow-hidden rounded-ui-lg ${layoutClassName}`}>
+      <span className="creation-loading-vessel text-5xl sm:text-6xl" aria-hidden="true">🍌</span>
       <span className="sr-only">Creating {creation.type}</span>
     </div>
   );
@@ -324,6 +454,15 @@ export function CreationStream({
         while (cells.length < requestedCount) {
           cells.push({ ...run.creations[0], id: `${run.id}-placeholder-${cells.length}`, urls: [], status: "generating", parameters: { ...run.creations[0].parameters, outputIndex: cells.length } });
         }
+        const isFourPortraits =
+          run.type === "image" &&
+          cells.length === 4 &&
+          firstCreation.parameters?.aspectRatio === "9:16";
+        const resultLayoutClassName = cells.length === 1
+          ? "w-full max-w-lg"
+          : isFourPortraits
+            ? "grid w-full max-w-5xl grid-cols-2 gap-3 sm:grid-cols-4"
+            : "grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2";
         const showTimestamp = shouldShowConversationTimestamp(
           run.createdAt,
           runs[runIndex - 1]?.createdAt
@@ -361,23 +500,23 @@ export function CreationStream({
                 </div>
               )}
 
-              <div className={cells.length === 1 ? "w-full max-w-lg" : "grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2"}>
+              <div className={resultLayoutClassName}>
                 {cells.map((creation, index) => {
                   const url = creation.urls[0];
                   const key = `${creationIdentity(creation)}-${index}`;
                   if (creation.status === "deleted") {
-                    return <div key={key} className="flex min-h-16 items-center rounded-ui-lg bg-surface-soft px-4 text-xs text-muted-foreground"><Trash2 className="mr-2 h-4 w-4" />Media deleted</div>;
+                    return <div key={key} className="flex h-full min-h-36 items-center justify-center rounded-ui-lg border border-dashed border-border bg-surface-soft px-4 text-center text-muted-foreground"><div className="flex flex-col items-center gap-2"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-background"><Trash2 className="h-4 w-4" /></span><span className="text-xs font-medium">Media deleted</span></div></div>;
                   }
                   if (ACTIVE_STATUSES.has(creation.status)) {
-                    return <PendingResult key={key} creation={creation} />;
+                    return <PendingResult key={key} creation={creation} compactPortrait={isFourPortraits} />;
                   }
                   if (creation.status === "failed") {
                     return <div key={key} className="max-w-lg rounded-ui-lg bg-destructive/5 px-4 py-3"><p className="text-sm font-medium text-destructive">Generation failed</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{creation.error || "Please reprompt and try again."}</p></div>;
                   }
                   if (!url) return null;
                   return (
-                    <div key={key} className={`group/result relative min-w-0 ${creation.type === "music" ? "w-full max-w-lg" : "w-fit max-w-full"}`}>
-                      {creation.type === "image" ? <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Image" className="max-w-lg rounded-ui-lg">{({ src, onError, onReady }) => <button type="button" onClick={() => setViewer({ creation, url })} className="inline-flex max-w-full overflow-hidden rounded-ui-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><img src={src} alt={creation.prompt} onError={onError} onLoad={onReady} className="h-auto max-h-[30rem] w-auto max-w-full object-contain" /></button>}</ResilientMedia> : creation.type === "video" ? <VideoResult creationId={creation.taskId || creation.id} url={url} prompt={creation.prompt} onOpen={() => setViewer({ creation, url })} /> : <div className="relative w-full max-w-lg"><ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Audio" className="min-h-0 rounded-ui-lg py-4">{({ src, onError, onReady }) => <audio src={src} controls onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div>}
+                    <div key={key} className={`group/result relative min-w-0 ${creation.type === "music" || isFourPortraits ? "w-full" : "w-fit max-w-full"} ${creation.type === "music" ? "max-w-lg" : ""}`}>
+                      {creation.type === "image" ? <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Image" className="max-w-lg rounded-ui-lg">{({ src, onError, onReady }) => <button type="button" onClick={() => setViewer({ creation, url })} className={`inline-flex max-w-full overflow-hidden rounded-ui-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isFourPortraits ? "w-full" : ""}`}><img src={src} alt={creation.prompt} onError={onError} onLoad={onReady} className={`h-auto max-h-[30rem] max-w-full object-contain ${isFourPortraits ? "w-full" : "w-auto"}`} /></button>}</ResilientMedia> : creation.type === "video" ? <VideoResult creationId={creation.taskId || creation.id} url={url} prompt={creation.prompt} audioDisabled={getCreationParameters(creation)?.audio?.toLowerCase() === "off"} onOpen={() => setViewer({ creation, url })} /> : <div className="relative w-full max-w-lg"><ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Audio" className="min-h-0 rounded-ui-lg py-4">{({ src, onError, onReady }) => <audio src={src} controls onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div>}
                       <ResultActions creation={creation} url={url} onReference={() => onReference(creation, url)} onDelete={() => setPendingDelete({ creation, url })} />
                     </div>
                   );

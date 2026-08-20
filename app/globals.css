@@ -32,6 +32,10 @@
   --surface-strong: 232 224 210;
   --surface-dark: 24 23 21;
   --surface-dark-elevated: 37 35 32;
+  --creation-sea-sky: 230 245 250;
+  --creation-sea-horizon: 185 228 243;
+  --creation-sea-surface: 82 189 225;
+  --creation-sea-depth: 19 139 195;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
@@ -99,22 +103,95 @@ body {
   animation: banner-flow 12s ease-in-out infinite;
 }
 
-@keyframes creation-loading-float {
+@keyframes creation-vessel-drift {
   0%, 100% {
-    transform: translate3d(-0.5%, 1.5%, 0) scale(1.08);
+    transform: translate3d(-14%, 5%, 0) rotate(-2deg) scale(0.94);
   }
   50% {
-    transform: translate3d(0.5%, -1.5%, 0) scale(1.12);
+    transform: translate3d(14%, -6%, 0) rotate(2deg) scale(1);
   }
 }
 
-.creation-loading-logo {
-  animation: creation-loading-float 4.5s ease-in-out infinite;
+@keyframes creation-wave-drift {
+  0%, 100% {
+    transform: translate3d(-4%, 0, 0);
+  }
+  50% {
+    transform: translate3d(4%, -6%, 0);
+  }
+}
+
+.creation-loading-sea {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 68% 18%, rgb(255 255 255 / 72%), transparent 24%),
+    linear-gradient(
+      180deg,
+      rgb(var(--creation-sea-sky)) 0%,
+      rgb(var(--creation-sea-horizon)) 36%,
+      rgb(var(--creation-sea-surface)) 37%,
+      rgb(var(--creation-sea-depth)) 100%
+    );
+}
+
+.creation-loading-sea::before,
+.creation-loading-sea::after {
+  position: absolute;
+  left: -25%;
+  width: 150%;
+  content: "";
+  border-radius: 50%;
+  animation: creation-wave-drift 5.5s ease-in-out infinite;
+}
+
+.creation-loading-sea::before {
+  bottom: 27%;
+  height: 22%;
+  background: rgb(255 255 255 / 22%);
+}
+
+.creation-loading-sea::after {
+  bottom: -4%;
+  height: 32%;
+  background: rgb(13 112 171 / 26%);
+  animation-delay: -2.75s;
+}
+
+.creation-loading-vessel {
+  z-index: 1;
+  filter: saturate(1.08) drop-shadow(0 10px 18px rgb(10 75 110 / 12%));
+  animation: creation-vessel-drift 5.5s ease-in-out infinite;
+}
+
+.creation-video-progress {
+  height: 0.25rem;
+  cursor: pointer;
+  appearance: none;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 48%);
+}
+
+.creation-video-progress::-webkit-slider-thumb {
+  width: 0.7rem;
+  height: 0.7rem;
+  appearance: none;
+  border: 0;
+  border-radius: 9999px;
+  background: rgb(255 255 255);
+}
+
+.creation-video-progress::-moz-range-thumb {
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 0;
+  border-radius: 9999px;
+  background: rgb(255 255 255);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .creation-loading-logo {
+  .creation-loading-vessel,
+  .creation-loading-sea::before,
+  .creation-loading-sea::after {
     animation: none;
-    transform: scale(1.08);
   }
 }

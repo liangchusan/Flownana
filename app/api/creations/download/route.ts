@@ -39,7 +39,8 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const creationId = searchParams.get("creationId")?.trim();
+    const creationId =
+      searchParams.get("creationId")?.trim() || searchParams.get("id")?.trim();
     const url = searchParams.get("url")?.trim();
     if (!creationId || !url) {
       return NextResponse.json(

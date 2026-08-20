@@ -35,6 +35,7 @@ import {
   type GenerationErrorCode,
 } from "@/lib/generation-errors";
 import { trackEvent } from "@/lib/analytics";
+import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import type { PanelGeneration } from "./result-panel";
 
@@ -683,12 +684,8 @@ export function MyCreationsTab({
 
   const handleDownload = (creation: Creation, url: string) => {
     trackEvent("result_download_clicked", { type: creation.type });
-    const params = new URLSearchParams({
-      creationId: creation.id,
-      url,
-    });
     const link = document.createElement("a");
-    link.href = `/api/creations/download?${params.toString()}`;
+    link.href = buildCreationDownloadPath(creation.id, url);
     link.download = "";
     document.body.appendChild(link);
     link.click();
