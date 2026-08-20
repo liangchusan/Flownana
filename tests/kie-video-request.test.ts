@@ -89,25 +89,6 @@ test("active KIE video models use their documented request contracts", () => {
   assert.deepEqual(
     getKieMarketVideoTaskBody({
       prompt: "move naturally",
-      aspectRatio: "9:16",
-      option: VIDEO_MODEL_OPTION_MAP.seedance20fast_480_4,
-    }),
-    {
-      model: "bytedance/seedance-2-fast",
-      input: {
-        prompt: "move naturally",
-        resolution: "480p",
-        duration: 4,
-        generate_audio: false,
-        web_search: false,
-        aspect_ratio: "9:16",
-      },
-    }
-  );
-
-  assert.deepEqual(
-    getKieMarketVideoTaskBody({
-      prompt: "move naturally",
       imageUrls: ["https://example.com/input.png"],
       aspectRatio: "9:16",
       option: VIDEO_MODEL_OPTION_MAP.minimaxh3_720_15,

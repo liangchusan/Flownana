@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Music, PanelRightClose, PanelRightOpen, Trash2, Video, X } from "lucide-react";
+import { Image as ImageIcon, PanelRightClose, PanelRightOpen, Trash2, Video, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
-import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
 import { CreationStream, type WorkspaceRun } from "@/components/blocks/creation-stream";
 import { AssetsLibrary } from "@/components/blocks/assets-library";
 import { WorkspaceMobileHeader, WorkspaceSidebar, type WorkspaceView } from "@/components/blocks/workspace-sidebar";
@@ -12,6 +11,7 @@ import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, mergeCreations, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
 
 type ComposerType = CreationHistoryItem["type"];
+type ActiveComposerType = Exclude<ComposerType, "music">;
 
 interface DraftSeed {
   prompt: string;
@@ -30,13 +30,13 @@ export function MediaCreationWorkspace({
   initialCreations = [],
   initialPrompt,
 }: {
-  initialType: ComposerType;
+  initialType: ActiveComposerType;
   initialCreations?: CreationHistoryItem[];
   initialPrompt?: string;
 }) {
   const { showToast } = useToast();
   const [view, setView] = useState<WorkspaceView>("create");
-  const [composerType, setComposerType] = useState<ComposerType>(initialType);
+  const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
   const [creations, setCreations] = useState<CreationHistoryItem[]>(initialCreations);
   const [draft, setDraft] = useState<DraftSeed>({ prompt: initialPrompt || "", revision: 0 });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -53,7 +53,6 @@ export function MediaCreationWorkspace({
 
   const activeImageCount = creations.filter((creation) => creation.type === "image" && ["pending", "generating", "processing"].includes(creation.status)).length;
   const activeVideoCount = creations.filter((creation) => creation.type === "video" && ["pending", "generating", "processing"].includes(creation.status)).length;
-  const activeMusicCount = creations.filter((creation) => creation.type === "music" && ["pending", "generating", "processing"].includes(creation.status)).length;
 
   const updateCreation = (identity: string, patch: Partial<CreationHistoryItem>) => {
     setCreations((current) => current.map((creation) => creationIdentity(creation) === identity ? { ...creation, ...patch } : creation));
@@ -73,7 +72,7 @@ export function MediaCreationWorkspace({
     setDetailsOpen(true);
   };
 
-  const setType = (nextType: ComposerType) => {
+  const setType = (nextType: ActiveComposerType) => {
     setComposerType(nextType);
     if (draft.attachmentUrl && !isAttachmentCompatible(nextType, draft.attachmentType)) {
       showToast({ title: "Attachment is not compatible", message: "Remove the marked attachment or switch to a compatible generator before creating.", variant: "warning" });
@@ -81,6 +80,10 @@ export function MediaCreationWorkspace({
   };
 
   const restoreCreation = (creation: CreationHistoryItem) => {
+    if (creation.type === "music") {
+      showToast({ title: "Audio generation is unavailable", message: "Suno has been retired. Existing audio remains available in Create and Assets.", variant: "warning" });
+      return;
+    }
     setView("create");
     setComposerType(creation.type);
     setDraft((current) => ({
@@ -132,7 +135,7 @@ export function MediaCreationWorkspace({
     if (composerType === "video") {
       return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImage={draft.attachmentType === "image" ? draft.attachmentUrl : undefined} initialParameters={draft.parameters} activeGenerationCount={activeVideoCount} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
     }
-    return <VoiceCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} isGenerating={activeMusicCount > 0} setIsGenerating={() => undefined} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "music" })} onGenerate={(url, taskId, prompt, optimisticId) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error }) => updateOptimisticOutput({ optimisticId, prompt, error, status: "failed" })} />;
+    return null;
   })();
 
   return (
@@ -160,7 +163,7 @@ export function MediaCreationWorkspace({
                 <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background/95 p-3 shadow-float backdrop-blur-xl sm:p-4">
                   <div className="mb-3 flex items-center gap-1" role="tablist" aria-label="Generation type">
                     {([
-                      ["image", "Image", ImageIcon], ["video", "Video", Video], ["music", "Audio", Music],
+                      ["image", "Image", ImageIcon], ["video", "Video", Video],
                     ] as const).map(([type, label, Icon]) => <button key={type} type="button" onClick={() => setType(type)} className={`flex h-9 items-center gap-1.5 rounded-ui px-3 text-xs font-medium transition-all duration-300 ${composerType === type ? "bg-surface-strong text-foreground" : "text-muted-foreground hover:bg-surface-soft hover:text-foreground"}`}><Icon className="h-4 w-4" />{label}</button>)}
                   </div>
                   {attachmentIncompatible && <div className="mb-3 flex items-center gap-3 rounded-ui-lg border border-destructive/20 bg-destructive/5 px-3 py-2"><Trash2 className="h-4 w-4 text-destructive" /><p className="min-w-0 flex-1 text-xs text-destructive">This {draft.attachmentType === "music" ? "audio" : draft.attachmentType} attachment is incompatible with the selected generator.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachmentUrl: undefined, attachmentType: undefined, revision: current.revision + 1 }))} className="text-xs font-medium text-destructive underline underline-offset-2">Remove incompatible</button></div>}

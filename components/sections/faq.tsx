@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 const faqs = [
   {
     question: "What is Flownana AI?",
-    answer: "Flownana is a comprehensive AI platform that provides advanced video, image, and voice generation capabilities. Powered by cutting-edge models like Seedance 2 Fast, GPT Image 2, and Suno, it enables creators to generate professional content with simple text prompts.",
+    answer: "Flownana is an AI platform for advanced image and video generation. It brings multiple creative models into one workspace so creators can generate professional content from simple text prompts or image references.",
   },
   {
     question: "What image formats and resolutions are supported?",
@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     question: "Can I use generated content for commercial purposes?",
-    answer: "Yes, all images, videos, and audio generated or edited through our platform can be used for commercial purposes, including marketing, advertising, product design, and any other business applications. You retain full rights to the content you create.",
+    answer: "Yes, images and videos generated or edited through our platform can be used for commercial purposes, including marketing, advertising, product design, and other business applications. You retain full rights to the content you create.",
   },
   {
     question: "How do I cancel my subscription?",

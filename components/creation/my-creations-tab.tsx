@@ -676,7 +676,7 @@ export function MyCreationsTab({
         ? "/ai-image"
         : creation.type === "video"
           ? "/ai-video"
-          : "/ai-music";
+          : "/ai-image";
 
     const query = params.toString();
     router.push(query ? `${basePath}?${query}` : basePath);

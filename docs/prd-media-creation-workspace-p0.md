@@ -1,7 +1,7 @@
 # Media Creation Workspace P0
 
 Status: Approved and implemented baseline  
-Scope: `/ai-image`, `/ai-video`, `/ai-music`
+Scope: `/ai-image`, `/ai-video`; historical audio remains visible, while `/ai-music` redirects to `/ai-image`
 
 ## Product direction
 
@@ -11,7 +11,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 
 ## Information architecture
 
-- One shared workspace across image, video, and audio routes.
+- One shared workspace across the active image and video routes, with historical audio records retained in Create and Assets.
 - Collapsible desktop sidebar and mobile drawer.
 - Primary destinations: Create and Assets.
 - New Create clears only the composer draft; it does not clear recent history.
@@ -24,7 +24,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 - Every submitted Prompt is shown as a right-aligned prompt bubble. Any original input attachment appears directly above the prompt, preserving its aspect ratio.
 - A corresponding Result Block appears immediately in a generating state.
 - One Prompt maps to one Result Block. A Result Block can contain one to four outputs.
-- Image supports one to four outputs in P0. Video and audio support one output.
+- Image supports one to four outputs in P0. Video supports one output. Historical audio records remain single-output.
 - The response is lightweight and borderless: English processing status, divider, type-specific inline parameters, generated media, then actions. While generation is active, the stream immediately reserves a proportion-matched result frame with a small Flownana banana drifting across a deeper-blue animated sea; no visible result-number label is shown. Completed timing is visually secondary. The optional Details panel remains available for the full prompt, inputs, and parameter set.
 - A centered conversation timestamp appears before the first run, when the local calendar day changes, or when at least one hour separates adjacent runs. Labels use `Today`, `Yesterday`, or a compact English calendar date plus local time.
 - Active records show a live `Processing` timer. New completed and failed records persist processing duration in `Generation.parameters` and show `Processed in` or `Failed after`; legacy records without reliable duration omit the time. Multi-output image runs use the slowest output duration.
@@ -43,7 +43,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 
 ## Composer
 
-- The composer stays at the bottom of Create and contains Image, Video, and Audio generation type controls.
+- The composer stays at the bottom of Create and contains Image and Video generation type controls.
 - Model and settings use progressive disclosure.
 - The Generate action displays the total estimated credit cost.
 - After a valid submission starts, prompt and attachments clear; the current media type and generator settings remain.
@@ -57,13 +57,11 @@ The durable user deliverable is the generated media asset. The Create stream is 
 | GPT Image 2 | Image | 1 | Input optional |
 | Nano Banana 2 | Image | 1 | Input optional |
 | Qwen Image 3.0 Pro | Image | 1 | Input optional |
-| Seedance 2 Fast | Image | 1 | Input optional |
 | MiniMax H3 | Image | 1 | Input optional |
 | Grok Imagine Video 1.5 | Image | 1 | Input required |
 | HappyHorse 1.1 | Image | 1 | Input optional |
-| Suno audio | None | 0 | Prompt and audio settings only |
 
-Video and audio files are not valid composer inputs for the currently active models. Referencing one keeps it visible as incompatible, shows one warning Toast, blocks generation, and offers Remove incompatible. Compatible attachments are never deleted automatically during a generator switch.
+Video and audio files are not valid composer inputs for the currently active models. Referencing one keeps it visible as incompatible, shows one warning Toast, blocks generation, and offers Remove incompatible. Compatible attachments are never deleted automatically during a generator switch. Suno generation is retired; historical audio remains viewable, downloadable, and deletable, and audio Reprompt explains that generation is unavailable.
 
 ## Assets
 

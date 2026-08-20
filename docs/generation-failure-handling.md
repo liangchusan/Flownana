@@ -51,7 +51,6 @@
 
 | 模型 | 已确认的请求规则 | 本次修复 |
 | --- | --- | --- |
-| Seedance 2 Fast | 文生视频发送 `aspect_ratio`；图生视频使用 `first_frame_url`，由输入图片决定比例 | 图生视频不再附带冲突的比例字段；完整请求体纳入合同测试 |
 | MiniMax H3 | 720P UI 对应 KIE `768P`；图生视频使用 `first_frame_url` | 修复把 720P 直接发送给供应商导致的 `resolution is not within...` |
 | Grok Imagine Video 1.5 | 使用 `image_urls`、`480p/720p`、1-15 秒和 `nsfw_checker` | 去掉当前接口未列出的旧 `mode` 字段；单图输入不再发送无效比例 |
 | HappyHorse 1.1 | 图生视频使用 `image_urls` 数组，分辨率为 `720p/1080p` | 修复单数图片字段造成的必填/图片格式错误 |

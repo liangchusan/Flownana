@@ -45,7 +45,7 @@
 - 检查 API 文档确认端点是否正确：
   - 图片：`https://api.kie.ai/api/v1/jobs/createTask`
   - 视频：`https://api.kie.ai/api/v1/veo/generate`
-  - 音频：`https://api.kie.ai/api/v1/suno/generate`
+  - 音频生成已下线；`POST /api/suno/generate` 应返回 HTTP 410 和 `model_retired`
 
 ### 5. 请求格式错误
 
@@ -108,4 +108,3 @@
 2. 环境变量检查结果（`/api/test-env`）
 3. 网络连接状态
 4. API 密钥状态
-

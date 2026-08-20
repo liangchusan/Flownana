@@ -9,7 +9,6 @@ import {
 } from "../lib/generation-pricing.ts";
 
 test("new video model platform credits follow KIE API credits times 0.3", () => {
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance20fast_720_4.credits, 40);
   assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.credits, 22);
   assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_4.credits, 35);
   assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_15.credits, 131);
@@ -18,10 +17,6 @@ test("new video model platform credits follow KIE API credits times 0.3", () => 
 });
 
 test("new video model options use their KIE provider models", () => {
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.seedance20fast_480_4.providerModel,
-    "bytedance/seedance-2-fast"
-  );
   assert.equal(
     VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.providerModel,
     "minimax-h3/text-to-video"
@@ -50,6 +45,7 @@ test("retired video models are no longer exposed as generation options", () => {
   assert.equal(providerModels.has("kling/v3-turbo-text-to-video"), false);
   assert.equal(providerModels.has("bytedance/seedance-2"), false);
   assert.equal(providerModels.has("bytedance/seedance-2-mini"), false);
+  assert.equal(providerModels.has("bytedance/seedance-2-fast"), false);
   assert.equal(providerModels.has("happyhorse/text-to-video"), false);
 });
 
@@ -68,11 +64,6 @@ test("video parameter display rules keep only canonical aspect ratios", () => {
 });
 
 test("video parameter display rules keep only canonical resolutions", () => {
-  const seedanceFastOptions = VIDEO_MODEL_OPTIONS.filter(
-    (option) => option.providerModel === "bytedance/seedance-2-fast"
-  );
-  assert.deepEqual(getDisplayResolutions(seedanceFastOptions), ["480P", "720P"]);
-
   const grokOptions = VIDEO_MODEL_OPTIONS.filter(
     (option) => option.providerModel === "grok-imagine-video-1-5-preview"
   );
@@ -85,13 +76,9 @@ test("video parameter display rules keep only canonical resolutions", () => {
 });
 
 test("video parameter display rules expose sound only when model supports it", () => {
-  const seedanceOptions = VIDEO_MODEL_OPTIONS.filter(
-    (option) => option.providerModel === "bytedance/seedance-2-fast"
-  );
-  assert.deepEqual(getDisplaySoundOptions(seedanceOptions), ["Auto", "On", "Off"]);
-
   const happyHorseOptions = VIDEO_MODEL_OPTIONS.filter((option) =>
     option.providerModel.startsWith("happyhorse-1-1/")
   );
   assert.deepEqual(getDisplaySoundOptions(happyHorseOptions), []);
+  assert.deepEqual(getDisplaySoundOptions(VIDEO_MODEL_OPTIONS), []);
 });

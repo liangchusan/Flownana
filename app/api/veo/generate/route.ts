@@ -77,11 +77,6 @@ const FAMILY_ENDPOINTS: Record<
     detail: "/api/v1/jobs/recordInfo",
     style: "market",
   },
-  seedance: {
-    create: "/api/v1/jobs/createTask",
-    detail: "/api/v1/jobs/recordInfo",
-    style: "market",
-  },
   happyhorse: {
     create: "/api/v1/jobs/createTask",
     detail: "/api/v1/jobs/recordInfo",

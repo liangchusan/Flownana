@@ -45,12 +45,6 @@ export function Header({ showBackground = false }: HeaderProps) {
             AI Image
           </Link>
           <Link 
-            href="/ai-music" 
-            className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
-          >
-            AI Music
-          </Link>
-          <Link 
             href="/pricing" 
             className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
           >

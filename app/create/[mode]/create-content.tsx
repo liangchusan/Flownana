@@ -6,8 +6,6 @@ import { VideoCreationForm } from "@/components/creation/video-creation-form";
 import { VideoPreview } from "@/components/creation/video-preview";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { ImagePreview } from "@/components/generate/image-preview";
-import { VoiceCreationForm } from "@/components/creation/voice-creation-form";
-import { VoicePreview } from "@/components/creation/voice-preview";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -15,7 +13,7 @@ import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
-type CreationMode = "video" | "image" | "voice";
+type CreationMode = "video" | "image";
 
 export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
   const { data: session, status } = useSession();
@@ -30,24 +28,18 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
-  // Voice state
-  const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
-  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
-
   const getTitle = () => {
     switch (mode) {
       case "video":
         return "AI Video";
       case "image":
         return "AI Image";
-      case "voice":
-        return "AI Music";
       default:
         return "Create with AI";
     }
   };
 
-  if (!mode || !["video", "image", "voice"].includes(mode)) {
+  if (!mode || !["video", "image"].includes(mode)) {
     return null;
   }
 
@@ -107,13 +99,6 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
                 setIsGenerating={setIsGeneratingImage}
               />
             )}
-            {mode === "voice" && (
-              <VoiceCreationForm
-                onGenerate={setGeneratedAudio}
-                isGenerating={isGeneratingVoice}
-                setIsGenerating={setIsGeneratingVoice}
-              />
-            )}
           </div>
 
           {/* Right: Preview - Full Screen */}
@@ -128,12 +113,6 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
               <ImagePreview
                 imageUrl={generatedImage}
                 isGenerating={isGeneratingImage}
-              />
-            )}
-            {mode === "voice" && (
-              <VoicePreview
-                audioUrl={generatedAudio}
-                isGenerating={isGeneratingVoice}
               />
             )}
           </div>

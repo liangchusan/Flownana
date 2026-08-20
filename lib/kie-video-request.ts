@@ -129,18 +129,6 @@ export function getKieMarketVideoTaskBody(params: {
       aspectRatio,
       option: params.option,
     });
-  } else if (params.option.family === "seedance") {
-    const [firstFrameUrl, lastFrameUrl] = imageUrls;
-    input = {
-      prompt: params.prompt,
-      ...(firstFrameUrl ? { first_frame_url: firstFrameUrl } : {}),
-      ...(lastFrameUrl ? { last_frame_url: lastFrameUrl } : {}),
-      resolution: getKieVideoResolution(params.option),
-      duration: params.option.duration,
-      generate_audio: !!params.option.hasAudio,
-      web_search: false,
-      ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
-    };
   } else {
     throw new Error(`Unsupported KIE market video family: ${params.option.family}`);
   }

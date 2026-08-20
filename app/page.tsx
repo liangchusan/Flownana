@@ -13,7 +13,6 @@ import {
   Sparkles, 
   Video, 
   Image as ImageIcon, 
-  Music, 
   Play,
   ChevronLeft,
   ChevronRight,
@@ -50,41 +49,6 @@ const heroVideos = [
     duration: "12s"
   }
 ];
-
-/** 固定高度档 + 动画错开，避免内联 style，且保证 JIT 能扫描到类名 */
-const MUSIC_EQUALIZER_HEIGHTS = [
-  "h-[38%]",
-  "h-[62%]",
-  "h-[45%]",
-  "h-[71%]",
-  "h-[33%]",
-  "h-[55%]",
-  "h-[48%]",
-  "h-[66%]",
-  "h-[41%]",
-  "h-[59%]",
-  "h-[36%]",
-  "h-[64%]",
-  "h-[52%]",
-  "h-[44%]",
-  "h-[68%]",
-  "h-[39%]",
-  "h-[57%]",
-  "h-[46%]",
-  "h-[61%]",
-  "h-[35%]",
-] as const;
-
-const MUSIC_EQUALIZER_DELAYS = [
-  "delay-0",
-  "delay-75",
-  "delay-100",
-  "delay-150",
-  "delay-200",
-  "delay-300",
-  "delay-500",
-  "delay-700",
-] as const;
 
 export default function Home() {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -218,7 +182,7 @@ export default function Home() {
                 Create Anything with AI
               </h1>
               <p className="mx-auto mb-8 max-w-2xl text-xl leading-relaxed text-stone-200 md:text-2xl">
-                Transform your ideas into stunning videos, images, and music in seconds.
+                Transform your ideas into stunning videos and images in seconds.
                 <span className="text-white font-semibold"> No design skills required.</span>
               </p>
 
@@ -267,19 +231,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 三大功能展示 */}
+      {/* 核心功能展示 */}
       <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
-              Three Ways to Create
+              Two Ways to Create
             </h2>
             <p className="mx-auto max-w-3xl text-lg text-stone-600 md:text-xl">
-              Choose your creative path. From videos to images to music, we&apos;ve got you covered.
+              Choose your creative path for image and video generation.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid gap-8 md:grid-cols-2">
             {/* AI Video */}
             <Link href="/ai-video" className="group">
               <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-stone-600 to-stone-800 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
@@ -346,39 +310,6 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* AI Music */}
-            <Link href="/ai-music" className="group">
-              <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-stone-700 to-zinc-700 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
-                <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
-                  <div>
-                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-3 w-12 h-12 flex items-center justify-center mb-5 transition-transform group-hover:scale-105">
-                      <Music className="h-6 w-6" />
-                    </div>
-                    <h3 className="text-2xl md:text-3xl font-bold mb-2">AI Music</h3>
-                    <p className="text-green-100/90 text-base md:text-lg">
-                      Create original music and sounds. Powered by Suno
-                    </p>
-                  </div>
-                  <div className="flex items-center text-white/95 font-medium">
-                    Try Suno
-                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
-                  </div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                  <div className="flex items-end gap-1 h-32">
-                    {MUSIC_EQUALIZER_HEIGHTS.map((heightClass, i) => (
-                      <div
-                        key={i}
-                        className={`w-2 bg-white rounded-full animate-pulse ${heightClass} ${
-                          MUSIC_EQUALIZER_DELAYS[i % MUSIC_EQUALIZER_DELAYS.length]
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Link>
           </div>
         </div>
       </section>

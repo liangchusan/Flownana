@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Video, Image as ImageIcon, Music, Home, UserCircle } from "lucide-react";
+import { Video, Image as ImageIcon, Home, UserCircle } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Logo } from "@/components/ui/logo";
 import { CreditsWidget } from "@/components/creation/credits-widget";
@@ -18,13 +18,11 @@ function SidebarContent() {
   // Extract mode from pathname
   const currentMode = pathname === "/ai-video" ? "video" 
     : pathname === "/ai-image" ? "image"
-    : pathname === "/ai-music" ? "voice"
     : null;
 
   const navItems = [
     { id: "image", label: "AI Image", icon: ImageIcon, href: "/ai-image" },
     { id: "video", label: "AI Video", icon: Video, href: "/ai-video" },
-    { id: "voice", label: "AI Music", icon: Music, href: "/ai-music" },
   ];
 
   // Check if we're on the home page

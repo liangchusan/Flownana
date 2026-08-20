@@ -22,6 +22,7 @@ import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in"
 import { mergeCreations, type CreationHistoryItem, type CreationStatus } from "@/lib/creation-history";
 
 type CreationType = "image" | "video" | "music";
+type ActiveCreationType = Exclude<CreationType, "music">;
 
 type Creation = CreationHistoryItem;
 
@@ -42,14 +43,14 @@ const HOME_DEMO_VIDEO_URL = "/videos/flownana-home-demo.mp4";
 
 const heroBanners: HeroBanner[] = [
   {
-    id: "seedance-2-fast",
+    id: "minimax-h3",
     type: "video",
     mediaUrl: HOME_DEMO_VIDEO_URL,
     posterUrl:
       "https://images.unsplash.com/photo-1517821099601-8ccf4a767a87?w=1200&auto=format&fit=crop&q=80",
-    title: "Cinematic AI Video with Seedance 2 Fast",
+    title: "Cinematic AI Video with MiniMax H3",
     description: "Turn storyboards and prompts into film‑style motion in seconds.",
-    tag: "Seedance 2 Fast",
+    tag: "MiniMax H3",
   },
   {
     id: "gpt-image-2",
@@ -61,14 +62,13 @@ const heroBanners: HeroBanner[] = [
     tag: "GPT Image 2",
   },
   {
-    id: "suno",
-    type: "video",
-    mediaUrl: HOME_DEMO_VIDEO_URL,
-    posterUrl:
-      "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&auto=format&fit=crop&q=80",
-    title: "Original Soundtracks with Suno",
-    description: "Create music beds and hooks that sync with your visuals.",
-    tag: "Suno",
+    id: "qwen-image-3-pro",
+    type: "image",
+    mediaUrl:
+      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1200&auto=format&fit=crop&q=80",
+    title: "Detailed Visuals with Qwen Image 3.0 Pro",
+    description: "Create polished visual concepts from prompts and reference images.",
+    tag: "Qwen Image 3.0 Pro",
   },
   {
     id: "workflow",
@@ -76,7 +76,7 @@ const heroBanners: HeroBanner[] = [
     mediaUrl:
       "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80",
     title: "Unified Workflow in Flownana",
-    description: "Move between image, video and music creation in one simple workspace.",
+    description: "Move between image and video creation in one simple workspace.",
     tag: "Workflow",
   },
 ];
@@ -98,7 +98,6 @@ const promptExamples = [
 const creationModeOptions = [
   { id: "image" as const, label: "AI Image", icon: ImageIcon },
   { id: "video" as const, label: "AI Video", icon: Video },
-  { id: "music" as const, label: "AI Music", icon: Music },
 ];
 
 const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
@@ -197,7 +196,7 @@ export function CreateContent({
 }) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const [creationMode, setCreationMode] = useState<CreationType>("image");
+  const [creationMode, setCreationMode] = useState<ActiveCreationType>("image");
   const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [recentCreations, setRecentCreations] = useState<Creation[]>(initialRecentCreations);
@@ -312,9 +311,6 @@ export function CreateContent({
     if (creationMode === "video") {
       router.push(`/ai-video${encoded}`);
       return;
-    }
-    if (creationMode === "music") {
-      router.push(`/ai-music${encoded}`);
     }
   };
 
@@ -548,7 +544,7 @@ export function CreateContent({
                             ? "/ai-image"
                             : c.type === "video"
                               ? "/ai-video"
-                              : "/ai-music"
+                              : "/ai-image"
                         }
                         className="group overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md"
                       >
@@ -621,11 +617,6 @@ export function CreateContent({
                           AI Video
                         </Button>
                       </Link>
-                      <Link href="/ai-music">
-                        <Button variant="outline" size="sm" className="rounded-xl">
-                          AI Music
-                        </Button>
-                      </Link>
                     </div>
                   </div>
                 )
@@ -633,7 +624,7 @@ export function CreateContent({
                 <div className="rounded-xl border border-stone-200/50 bg-white px-6 py-8 text-center">
                   <p className="mb-2 text-sm text-stone-600">Sign in to see your creations</p>
                   <p className="mb-4 text-xs text-stone-400">
-                    Your images, videos, and music will be saved here.
+                    Your images and videos will be saved here. Existing audio remains available in the studio.
                   </p>
                   <Button
                     onClick={() => signInForCurrentEnvironment()}

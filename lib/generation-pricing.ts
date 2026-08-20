@@ -1,6 +1,6 @@
 export type VideoModelOptionId = string;
 
-type VideoModelFamily = "kling" | "veo" | "seedance" | "happyhorse" | "grok" | "minimax";
+type VideoModelFamily = "kling" | "veo" | "happyhorse" | "grok" | "minimax";
 export type VideoAspectRatio =
   | "Auto"
   | "16:9"
@@ -31,7 +31,6 @@ export function getVideoModelName(option: VideoModelOption): string {
   if (option.providerModel.startsWith("happyhorse-1-1/")) return "HappyHorse 1.1";
   if (option.family === "grok") return "Grok Imagine Video 1.5";
   if (option.family === "minimax") return "MiniMax H3";
-  if (option.providerModel === "bytedance/seedance-2-fast") return "Seedance 2 Fast";
   return option.label.split(" · ")[0] || option.label;
 }
 
@@ -40,7 +39,6 @@ const platformVideoCredits = (
   duration: VideoModelOption["duration"]
 ) => Math.round(apiCreditsPerSecond * duration * 0.3);
 
-const SEEDANCE_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
 const HAPPYHORSE_DURATIONS = Array.from({ length: 13 }, (_, index) => index + 3);
 const GROK_DURATIONS = Array.from({ length: 15 }, (_, index) => index + 1);
 const MINIMAX_H3_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
@@ -95,31 +93,6 @@ export function getDisplaySoundOptions(options: VideoModelOption[]): VideoSoundO
     return ["On"];
   }
   return [];
-}
-
-function createSeedanceOptions(params: {
-  idPrefix: string;
-  label: string;
-  providerModel: string;
-  priceByResolution: Partial<Record<VideoModelOption["resolution"], number>>;
-}): VideoModelOption[] {
-  return Object.entries(params.priceByResolution).flatMap(
-    ([resolution, apiCreditsPerSecond]) =>
-      SEEDANCE_DURATIONS.flatMap((duration) =>
-        ([false, true] as const).map((hasAudio) => ({
-          id: `${params.idPrefix}_${resolution.toLowerCase().replace("p", "")}${
-            hasAudio ? "_audio" : ""
-          }_${duration}`,
-          label: `${params.label} · ${resolution}${hasAudio ? "(有声音)" : ""} · ${duration}s`,
-          family: "seedance",
-          providerModel: params.providerModel,
-          resolution: resolution as VideoModelOption["resolution"],
-          duration,
-          hasAudio: hasAudio || undefined,
-          credits: platformVideoCredits(apiCreditsPerSecond, duration),
-        }))
-      )
-  );
 }
 
 function createHappyHorse11Options(): VideoModelOption[] {
@@ -190,15 +163,6 @@ function createMiniMaxH3Options(): VideoModelOption[] {
 }
 
 export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
-  ...createSeedanceOptions({
-    idPrefix: "seedance20fast",
-    label: "Seedance 2 Fast",
-    providerModel: "bytedance/seedance-2-fast",
-    priceByResolution: {
-      "480P": 15.5,
-      "720P": 33,
-    },
-  }),
   ...createMiniMaxH3Options(),
   ...createGrokImagineVideo15Options(),
   ...createHappyHorse11Options(),

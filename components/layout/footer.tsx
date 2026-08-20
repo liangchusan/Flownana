@@ -13,7 +13,7 @@ export function Footer() {
             <p className="text-sm mb-4">
               <span className="mt-2 block text-stone-300">
                 At Flownana, we believe technology should serve creativity. By integrating cutting-edge AI tools for image,
-                video, and audio with a professional-grade creative asset library, we’ve built a one-stop ecosystem for
+                image and video with a professional-grade creative asset library, we’ve built a focused ecosystem for
                 visual storytelling. Whether you are a professional editor or a budding enthusiast, Flownana provides the
                 tools and inspiration you need to create with confidence and redefine visual expression in the digital age.
               </span>
@@ -31,11 +31,6 @@ export function Footer() {
               <li>
                 <Link href="/ai-image" className="transition-all duration-300 hover:text-white">
                   AI Image
-                </Link>
-              </li>
-              <li>
-                <Link href="/ai-music" className="transition-all duration-300 hover:text-white">
-                  AI Music
                 </Link>
               </li>
             </ul>
@@ -75,5 +70,4 @@ export function Footer() {
     </footer>
   );
 }
-
 
