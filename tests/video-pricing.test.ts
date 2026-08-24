@@ -16,6 +16,13 @@ test("new video model platform credits follow KIE API credits times 0.3", () => 
   assert.equal(VIDEO_MODEL_OPTION_MAP.happyhorse11_1080_15.credits, 153);
 });
 
+test("Seedance Mini uses the approved Volcengine pricing with 480P first", () => {
+  assert.equal(VIDEO_MODEL_OPTIONS[0].id, "seedance2mini_480_4");
+  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.credits, 8);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_15.credits, 45);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.providerModel, "doubao-seedance-2-0-mini-260615");
+});
+
 test("new video model options use their KIE provider models", () => {
   assert.equal(
     VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.providerModel,
@@ -60,6 +67,7 @@ test("video parameter display rules keep only canonical aspect ratios", () => {
     "1:1",
     "4:3",
     "3:4",
+    "21:9",
   ]);
 });
 
@@ -80,5 +88,7 @@ test("video parameter display rules expose sound only when model supports it", (
     option.providerModel.startsWith("happyhorse-1-1/")
   );
   assert.deepEqual(getDisplaySoundOptions(happyHorseOptions), []);
-  assert.deepEqual(getDisplaySoundOptions(VIDEO_MODEL_OPTIONS), []);
+  assert.deepEqual(getDisplaySoundOptions(VIDEO_MODEL_OPTIONS), ["Auto", "On", "Off"]);
+  const seedanceOptions = VIDEO_MODEL_OPTIONS.filter((option) => option.family === "seedance");
+  assert.deepEqual(getDisplaySoundOptions(seedanceOptions), ["On", "Off"]);
 });

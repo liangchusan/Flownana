@@ -124,3 +124,6 @@
 10. 模拟 Blob 保存失败，确认任务失败、积分退回且不保存临时供应商 URL。
 11. 使用同一张 JPG/PNG/WebP 图片分别提交四个在售视频模型，确认请求均能创建任务，失败时显示对应标准分类。
 12. 图生视频手动选择非 Auto 比例，确认供应商请求仍由输入图片决定比例，不出现比例冲突。
+# Volcengine Seedance notes
+
+Seedance 2.0 Mini uses the same user-facing error catalog and credit-refund rules as other video models. Raw Volcengine response bodies remain server-only. Ark authentication, quota, rate-limit, content-policy, invalid-reference, timeout, and expired-task failures must be mapped to the existing stable error codes; consumed credits are refunded when a task cannot complete.

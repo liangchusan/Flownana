@@ -45,6 +45,51 @@ export async function persistOrReuseImageInput(params: {
   return persistImageInputMedia(params);
 }
 
+export async function persistOrReuseMediaInput(params: {
+  source: string;
+  userId: string;
+  requestId: string;
+  kind: "image" | "video" | "audio";
+}): Promise<StoredMedia> {
+  if (params.kind === "image") return persistOrReuseImageInput(params);
+
+  const source = params.source.trim();
+  const assetType = params.kind === "audio" ? "music" : "video";
+  const existing = await prisma.mediaAsset.findUnique({
+    where: { userId_url: { userId: params.userId, url: source } },
+    select: { type: true, url: true, contentType: true, sizeBytes: true },
+  });
+  if (existing?.type === assetType) {
+    return {
+      url: existing.url,
+      contentType: existing.contentType ?? undefined,
+      sizeBytes: existing.sizeBytes ?? undefined,
+    };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(source);
+  } catch {
+    throw new Error(`Input ${params.kind} URL is invalid.`);
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error(`Input ${params.kind} must be a public URL.`);
+  }
+  const response = await fetch(source, { method: "HEAD" });
+  if (!response.ok) throw new Error(`Input ${params.kind} is unavailable.`);
+  const contentType = response.headers.get("content-type")?.split(";")[0];
+  const sizeBytes = Number(response.headers.get("content-length") || 0) || undefined;
+  if (contentType && !contentType.startsWith(`${params.kind}/`)) {
+    throw new Error(`Input ${params.kind} file type is not supported.`);
+  }
+  const maxBytes = params.kind === "video" ? 50 * 1024 * 1024 : 15 * 1024 * 1024;
+  if (sizeBytes && sizeBytes > maxBytes) {
+    throw new Error(`Input ${params.kind} exceeds the maximum file size.`);
+  }
+  return { url: source, contentType, sizeBytes };
+}
+
 export async function syncGenerationMediaAssets(params: {
   generationId: string;
   userId: string;

@@ -44,7 +44,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 ## Composer
 
 - The composer stays at the bottom of Create. A single Image/Video dropdown sits before the model; explicit `/ai-image` and `/ai-video` routes keep their named default, while generic `/generate` restores the last choice and defaults a new user to Video. Audio generation is not selectable.
-- A lightweight plus menu offers image upload and Choose from Assets. Video and audio input rows remain visible but disabled with `Current model doesn’t support ... input` for the active P0 models. The composer owns one shared multi-attachment draft, so deleting an attachment persists across media-type switches.
+- A lightweight plus menu offers device upload and Choose from Assets. Seedance 2.0 Mini enables image, video, and audio reference inputs; other models keep unsupported rows disabled. The composer owns one shared multi-attachment draft, so deleting an attachment persists across media-type switches.
 - Model and settings use progressive disclosure.
 - The Generate action displays the total estimated credit cost.
 - After a valid submission starts, prompt and attachments clear; the current media type and generator settings remain.
@@ -62,7 +62,7 @@ The durable user deliverable is the generated media asset. The Create stream is 
 | Grok Imagine Video 1.5 | Image | 1 | Input required |
 | HappyHorse 1.1 | Image | 1 | Input optional |
 
-Video and audio files are not valid composer inputs for the currently active models. They remain visible but disabled in the plus menu. Referencing one keeps it visible as incompatible, shows one warning Toast, blocks generation, and offers Remove unsupported. Images beyond the selected model's limit use the same blocked state. Compatible attachments are never deleted automatically during a generator switch. Suno generation is retired; historical audio remains viewable, downloadable, and deletable, and audio Reprompt explains that generation is unavailable.
+Seedance 2.0 Mini accepts up to 9 images, 3 videos, and 3 audio references; provider-compatible limits are enforced before submission. Selected device files are uploaded to public Vercel Blob URLs because Volcengine must fetch them, and remain linked to the generation until deletion. For models that do not accept a media kind, the row remains disabled. Referencing an unsupported asset keeps it visible as incompatible, shows one warning Toast, blocks generation, and offers Remove unsupported. Attachments beyond a selected model's count limit use the same blocked state. Compatible attachments are never deleted automatically during a generator switch. Suno generation is retired; historical audio remains viewable, downloadable, and deletable, and audio Reprompt explains that generation is unavailable.
 
 ## Assets
 

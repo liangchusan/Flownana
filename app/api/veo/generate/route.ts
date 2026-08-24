@@ -35,11 +35,17 @@ import {
 import { persistGeneratedMedia } from "@/lib/media-storage";
 import type { StoredMedia } from "@/lib/media-storage";
 import {
-  persistOrReuseImageInput,
+  persistOrReuseMediaInput,
   syncGenerationMediaAssets,
 } from "@/lib/media-assets";
+import {
+  buildVolcengineVideoTaskBody,
+  parseVolcengineVideoResult,
+  type VideoReferenceInput,
+} from "@/lib/volcengine-video-request";
 
 const KIE_API_BASE = "https://api.kie.ai";
+const VOLCENGINE_API_BASE = "https://ark.cn-beijing.volces.com/api/v3";
 const VIDEO_TASK_TIMEOUT_MS = 45 * 60 * 1000;
 
 function videoErrorResponse(
@@ -66,7 +72,7 @@ function videoErrorResponse(
 
 const FAMILY_ENDPOINTS: Record<
   VideoModelOption["family"],
-  { create: string; detail: string; style: "veo" | "market" }
+  { create: string; detail: string; style: "veo" | "market" | "volcengine" }
 > = {
   veo: {
     create: "/api/v1/veo/generate",
@@ -93,6 +99,11 @@ const FAMILY_ENDPOINTS: Record<
     detail: "/api/v1/jobs/recordInfo",
     style: "market",
   },
+  seedance: {
+    create: "/contents/generations/tasks",
+    detail: "/contents/generations/tasks",
+    style: "volcengine",
+  },
 };
 
 function resolveVideoOption(params: {
@@ -115,10 +126,36 @@ function resolveVideoOption(params: {
 async function createVideoTask(params: {
   prompt: string;
   imageUrls?: string[];
+  inputs?: VideoReferenceInput[];
   aspectRatio?: string;
+  generateAudio?: boolean;
   watermark?: string;
   option: VideoModelOption;
 }) {
+  if (params.option.family === "seedance") {
+    const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
+    if (!apiKey) throw new Error("VOLCENGINE_ARK_API_KEY environment variable is not configured.");
+    const res = await fetch(`${VOLCENGINE_API_BASE}/contents/generations/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(buildVolcengineVideoTaskBody({
+        prompt: params.prompt,
+        inputs: params.inputs || [],
+        aspectRatio: params.aspectRatio,
+        generateAudio: params.generateAudio !== false,
+        option: params.option,
+      })),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Volcengine video task creation failed:", text);
+      throw new ProviderGenerationError(text || res.statusText, res.status);
+    }
+    const json = (await res.json()) as { id?: string };
+    if (!json.id) throw new ProviderGenerationError("Volcengine did not return a task id.");
+    return json.id;
+  }
+
   const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -213,6 +250,27 @@ function normalizeCreditConsumptionSnapshot(
 }
 
 async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
+  if (option.family === "seedance") {
+    const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
+    if (!apiKey) throw new Error("VOLCENGINE_ARK_API_KEY environment variable is not configured.");
+    try {
+      const res = await fetch(`${VOLCENGINE_API_BASE}/contents/generations/tasks/${encodeURIComponent(taskId)}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+          return { state: "failed" as const, error: new ProviderGenerationError(text || res.statusText, res.status).message };
+        }
+        return { state: "pending" as const };
+      }
+      return parseVolcengineVideoResult(await res.json());
+    } catch (error) {
+      console.error("Volcengine video details request failed:", error);
+      return { state: "pending" as const };
+    }
+  }
+
   const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -533,9 +591,10 @@ export async function POST(request: NextRequest) {
   let taskId: string | undefined;
   let userId: string | undefined;
   let promptForPersistence = "Untitled prompt";
-  let parametersForPersistence: Record<string, string | number> | undefined;
+  let parametersForPersistence: Record<string, string | number | string[]> | undefined;
   let inputUrlsForPersistence: string[] = [];
   let inputMediaForPersistence: StoredMedia[] = [];
+  let inputKindsForPersistence: VideoReferenceInput["kind"][] = [];
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -547,19 +606,23 @@ export async function POST(request: NextRequest) {
     const {
       prompt,
       imageUrls,
+      inputs,
       modelOptionId,
       model,
       aspectRatio,
       watermark,
       runId,
+      generateAudio,
     } = body as {
       prompt?: string;
       imageUrls?: string[];
+      inputs?: VideoReferenceInput[];
       modelOptionId?: string;
       model?: string;
       aspectRatio?: string;
       watermark?: string;
       runId?: string;
+      generateAudio?: boolean;
     };
 
     if (!prompt) {
@@ -572,16 +635,20 @@ export async function POST(request: NextRequest) {
       return videoErrorResponse("invalid_parameters");
     }
 
-    const inputSources = Array.isArray(imageUrls)
-      ? imageUrls.filter((url) => typeof url === "string" && url.trim().length > 0)
-      : [];
+    const requestedInputs: VideoReferenceInput[] = Array.isArray(inputs)
+      ? inputs.filter((input): input is VideoReferenceInput =>
+          !!input && typeof input.url === "string" && ["image", "video", "audio"].includes(input.kind)
+        )
+      : Array.isArray(imageUrls)
+        ? imageUrls.filter((url): url is string => typeof url === "string" && !!url.trim()).map((url) => ({ url, kind: "image" }))
+        : [];
     const inputCapabilities = getVideoInputCapabilities(getVideoModelName(option));
-
-    if (inputSources.length > inputCapabilities.maxImages) {
+    const counts = requestedInputs.reduce((value, input) => ({ ...value, [input.kind]: value[input.kind] + 1 }), { image: 0, video: 0, audio: 0 });
+    if (counts.image > inputCapabilities.maxImages || counts.video > inputCapabilities.maxVideos || counts.audio > inputCapabilities.maxAudios) {
       return videoErrorResponse("invalid_parameters");
     }
 
-    if (option.requiresImageInput && inputSources.length === 0) {
+    if (option.requiresImageInput && counts.image === 0) {
       return videoErrorResponse("input_image_required");
     }
 
@@ -589,28 +656,32 @@ export async function POST(request: NextRequest) {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const normalizedImageMedia =
-      inputSources.length > 0
+    const normalizedInputMedia =
+      requestedInputs.length > 0
         ? await Promise.all(
-            inputSources.map((source, index) =>
-              persistOrReuseImageInput({
-                source,
+            requestedInputs.map((input, index) =>
+              persistOrReuseMediaInput({
+                source: input.url,
                 userId: session.user.id,
                 requestId: `${requestId}-${index}`,
+                kind: input.kind,
               })
             )
           )
         : undefined;
-    const normalizedImageUrls = normalizedImageMedia?.map((media) => media.url);
-    inputUrlsForPersistence = normalizedImageUrls || [];
-    inputMediaForPersistence = normalizedImageMedia || [];
+    const normalizedInputs = normalizedInputMedia?.map((media, index) => ({ ...requestedInputs[index], url: media.url })) || [];
+    const normalizedImageUrls = normalizedInputs.filter((input) => input.kind === "image").map((input) => input.url);
+    inputUrlsForPersistence = normalizedInputs.map((input) => input.url);
+    inputMediaForPersistence = normalizedInputMedia || [];
+    inputKindsForPersistence = normalizedInputs.map((input) => input.kind);
 
     parametersForPersistence = {
       model: getVideoModelName(option),
       resolution: formatVideoResolution(option.resolution),
       aspectRatio: aspectRatio || "Auto",
       duration: option.duration,
-      audio: option.hasAudio ? "On" : "Off",
+      audio: option.hasAudio && generateAudio !== false ? "On" : "Off",
+      inputKinds: inputKindsForPersistence,
       mode:
         normalizedImageUrls?.length === 2
           ? "First and last frame to video"
@@ -627,7 +698,9 @@ export async function POST(request: NextRequest) {
     taskId = await createVideoTask({
       prompt,
       imageUrls: normalizedImageUrls,
+      inputs: normalizedInputs,
       aspectRatio,
+      generateAudio,
       watermark,
       option,
     });
@@ -666,7 +739,7 @@ export async function POST(request: NextRequest) {
       assets: inputMediaForPersistence.map((media, position) => ({
         media,
         role: "input",
-        type: "image",
+        type: normalizedInputs[position]?.kind === "audio" ? "music" : (normalizedInputs[position]?.kind || "image"),
         position,
       })),
     });
@@ -767,7 +840,7 @@ export async function POST(request: NextRequest) {
           assets: inputMediaForPersistence.map((media, position) => ({
             media,
             role: "input",
-            type: "image",
+            type: inputKindsForPersistence[position] === "audio" ? "music" : (inputKindsForPersistence[position] || "image"),
             position,
           })),
         });

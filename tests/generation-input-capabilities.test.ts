@@ -25,6 +25,15 @@ test("video input limits expose MiniMax first and last frames", () => {
   assert.equal(minimax.acceptsAudio, false);
 });
 
+test("Seedance Mini accepts the documented multimodal reference counts", () => {
+  const seedance = getVideoInputCapabilities("Seedance 2.0 Mini");
+  assert.equal(seedance.maxImages, 9);
+  assert.equal(seedance.maxVideos, 3);
+  assert.equal(seedance.maxAudios, 3);
+  assert.equal(getAttachmentLimit(seedance, "video"), 3);
+  assert.equal(getAttachmentLimit(seedance, "audio"), 3);
+});
+
 test("Grok requires one image while other active video models keep it optional", () => {
   assert.equal(
     getVideoInputCapabilities("Grok Imagine Video 1.5").imageRequired,

@@ -18,6 +18,7 @@ export interface GenerationParameters {
   outputIndex?: number;
   outputCount?: number;
   hiddenFromRecent?: boolean;
+  inputKinds?: Array<"image" | "video" | "audio">;
 }
 
 function readParameterString(value: unknown): string | undefined {
@@ -60,6 +61,9 @@ export function normalizeGenerationParameters(
     processingDurationMs,
     audio: readParameterString(candidate.audio),
     mode: readParameterString(candidate.mode),
+    ...(Array.isArray(candidate.inputKinds)
+      ? { inputKinds: candidate.inputKinds.filter((kind): kind is "image" | "video" | "audio" => ["image", "video", "audio"].includes(String(kind))) }
+      : {}),
     ...(readParameterString(candidate.runId)
       ? { runId: readParameterString(candidate.runId) }
       : {}),

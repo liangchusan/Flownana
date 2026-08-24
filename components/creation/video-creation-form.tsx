@@ -77,12 +77,14 @@ interface VideoCreationFormProps {
   initialPrompt?: string;
   initialImage?: string;
   initialImages?: string[];
+  inputAttachments?: Array<{ url: string; kind: "image" | "video" | "audio" }>;
   initialParameters?: GenerationParameters;
   variant?: "panel" | "composer";
   toolbarLeading?: ReactNode;
   submissionBlocked?: boolean;
   onPromptChange?: (prompt: string) => void;
   onInputImagesChange?: (urls: string[]) => void;
+  onInputAttachmentsChange?: (attachments: Array<{ url: string; kind: "image" | "video" | "audio" }>) => void;
   onInputCapabilityChange?: (capabilities: GenerationInputCapabilities) => void;
   onParametersChange?: (parameters: GenerationParameters) => void;
 }
@@ -100,12 +102,14 @@ export function VideoCreationForm({
   initialPrompt,
   initialImage,
   initialImages,
+  inputAttachments,
   initialParameters,
   variant = "panel",
   toolbarLeading,
   submissionBlocked = false,
   onPromptChange,
   onInputImagesChange,
+  onInputAttachmentsChange,
   onInputCapabilityChange,
   onParametersChange,
 }: VideoCreationFormProps) {
@@ -116,6 +120,8 @@ export function VideoCreationForm({
   const [uploadedImages, setUploadedImages] = useState<string[]>(
     initialImages || (initialImage ? [initialImage] : [])
   );
+  const requestInputs = inputAttachments || uploadedImages.map((url) => ({ url, kind: "image" as const }));
+  const inputImageCount = requestInputs.filter((input) => input.kind === "image").length;
   const [selectedModelName, setSelectedModelName] = useState<string>(
     initialParameters?.model || getVideoModelName(defaultOption)
   );
@@ -159,21 +165,21 @@ export function VideoCreationForm({
     const seen = new Set<string>();
     const names: string[] = [];
     for (const option of VIDEO_MODEL_OPTIONS) {
-      if (option.requiresImageInput && uploadedImages.length === 0) continue;
+      if (option.requiresImageInput && inputImageCount === 0) continue;
       const name = getVideoModelName(option);
       if (!seen.has(name)) { seen.add(name); names.push(name); }
     }
     return names;
-  }, [uploadedImages.length]);
+  }, [inputImageCount]);
 
   const optionsForModel = useMemo(
     () =>
       VIDEO_MODEL_OPTIONS.filter(
         (o) =>
           getVideoModelName(o) === selectedModelName &&
-          (!o.requiresImageInput || uploadedImages.length > 0)
+          (!o.requiresImageInput || inputImageCount > 0)
       ),
-    [selectedModelName, uploadedImages.length]
+    [selectedModelName, inputImageCount]
   );
 
   const aspectRatioOptions = useMemo(() => {
@@ -198,7 +204,7 @@ export function VideoCreationForm({
     () => getVideoInputCapabilities(selectedModelName),
     [selectedModelName]
   );
-  const imagesOverLimit = uploadedImages.length > inputCapabilities.maxImages;
+  const imagesOverLimit = inputImageCount > inputCapabilities.maxImages;
 
   const selectedOption = useMemo(() => {
     const matchingSettingOptions = optionsForModel.filter(
@@ -435,8 +441,11 @@ export function VideoCreationForm({
       resolution,
       aspectRatio,
       duration,
-      audio: showSound ? (selectedOption.hasAudio ? "On" : "Off") : undefined,
-      mode: uploadedImages.length === 2
+      audio: showSound ? (sound === "Off" ? "Off" : "On") : undefined,
+      inputKinds: requestInputs.map((input) => input.kind),
+      mode: requestInputs.some((input) => input.kind !== "image")
+        ? "Multimodal reference to video"
+        : uploadedImages.length === 2
         ? "First and last frame to video"
         : uploadedImages.length === 1
           ? "Image to video"
@@ -449,6 +458,7 @@ export function VideoCreationForm({
     });
     updatePrompt("");
     updateImages([]);
+    onInputAttachmentsChange?.([]);
     setIsGenerating?.(true);
     const requestAspectRatio = aspectRatio === "Auto" ? undefined : aspectRatio;
     trackEvent("generation_started", {
@@ -461,9 +471,10 @@ export function VideoCreationForm({
     try {
       const response = await axios.post("/api/veo/generate", {
         prompt: requestPrompt,
-        imageUrls: uploadedImages.length > 0 ? uploadedImages : undefined,
+        inputs: requestInputs.length > 0 ? requestInputs : undefined,
         modelOptionId: selectedOption.id,
         aspectRatio: requestAspectRatio,
+        generateAudio: showSound ? sound !== "Off" : false,
         runId: optimisticId,
       });
       if (response.data.success) {

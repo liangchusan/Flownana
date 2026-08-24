@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/components/blocks/app-toast-provider";
+import { upload } from "@vercel/blob/client";
 import type {
   ComposerAttachmentKind,
   GenerationInputCapabilities,
@@ -41,18 +42,27 @@ function createAttachmentId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 function mediaLabel(kind: ComposerAttachmentKind) {
   if (kind === "audio") return "Audio";
   return kind[0].toUpperCase() + kind.slice(1);
+}
+
+function readMediaDuration(file: File, kind: "video" | "audio") {
+  return new Promise<number>((resolve, reject) => {
+    const element = document.createElement(kind);
+    const objectUrl = URL.createObjectURL(file);
+    element.preload = "metadata";
+    element.onloadedmetadata = () => {
+      const duration = element.duration;
+      URL.revokeObjectURL(objectUrl);
+      Number.isFinite(duration) ? resolve(duration) : reject(new Error("Invalid duration"));
+    };
+    element.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Invalid media"));
+    };
+    element.src = objectUrl;
+  });
 }
 
 export function ComposerAttachments({
@@ -67,6 +77,8 @@ export function ComposerAttachments({
   if (attachments.length === 0) return null;
 
   let imageIndex = 0;
+  let videoIndex = 0;
+  let audioIndex = 0;
   return (
     <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Prompt attachments">
       {attachments.map((attachment) => {
@@ -75,8 +87,8 @@ export function ComposerAttachments({
           attachment.kind === "image"
             ? currentImageIndex < capabilities.maxImages
             : attachment.kind === "video"
-              ? capabilities.acceptsVideo
-              : capabilities.acceptsAudio;
+              ? videoIndex++ < capabilities.maxVideos
+              : audioIndex++ < capabilities.maxAudios;
         return (
           <div
             key={attachment.id}
@@ -144,8 +156,14 @@ export function ComposerToolbarLeading({
   const addRootRef = useRef<HTMLDivElement | null>(null);
   const typeRootRef = useRef<HTMLDivElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
   const imageCount = attachments.filter((attachment) => attachment.kind === "image").length;
   const availableImageSlots = Math.max(0, capabilities.maxImages - imageCount);
+  const videoCount = attachments.filter((attachment) => attachment.kind === "video").length;
+  const audioCount = attachments.filter((attachment) => attachment.kind === "audio").length;
+  const availableVideoSlots = Math.max(0, capabilities.maxVideos - videoCount);
+  const availableAudioSlots = Math.max(0, capabilities.maxAudios - audioCount);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -199,19 +217,87 @@ export function ComposerToolbarLeading({
         variant: "warning",
       });
     }
-    const urls = await Promise.all(accepted.map(readFileAsDataUrl));
-    onAdd(
-      accepted.map((file, index) => ({
-        id: createAttachmentId("upload"),
-        url: urls[index],
-        kind: "image" as const,
-        name: file.name,
-        source: "upload" as const,
-      }))
-    );
+    try {
+      const blobs = await Promise.all(
+        accepted.map((file) =>
+          upload(`generation-inputs/image/${file.name}`, file, {
+            access: "public",
+            handleUploadUrl: "/api/creations/upload",
+            clientPayload: "image",
+            multipart: file.size > 4 * 1024 * 1024,
+          })
+        )
+      );
+      onAdd(
+        accepted.map((file, index) => ({
+          id: createAttachmentId("upload"),
+          url: blobs[index].url,
+          kind: "image" as const,
+          name: file.name,
+          source: "upload" as const,
+        }))
+      );
+    } catch {
+      showToast({ title: "Upload failed", message: "The images could not be uploaded. Please try again.", variant: "warning" });
+      return;
+    }
     setAddOpen(false);
     setAssetView(false);
     if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  const handleMedia = async (kind: "video" | "audio", files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const count = kind === "video" ? videoCount : audioCount;
+    const limit = kind === "video" ? capabilities.maxVideos : capabilities.maxAudios;
+    const maxBytes = kind === "video" ? capabilities.maxVideoBytes : capabilities.maxAudioBytes;
+    if (count >= limit || file.size > maxBytes) {
+      showToast({
+        title: count >= limit ? `${mediaLabel(kind)} limit reached` : `${mediaLabel(kind)} is too large`,
+        message: count >= limit
+          ? `The current model accepts up to ${limit} ${kind} files.`
+          : `The current model accepts files up to ${Math.round(maxBytes / 1024 / 1024)} MB.`,
+        variant: "warning",
+      });
+      return;
+    }
+
+    try {
+      const mediaDuration = await readMediaDuration(file, kind);
+      if (mediaDuration < 2 || mediaDuration > 15) {
+        showToast({
+          title: `${mediaLabel(kind)} duration is unsupported`,
+          message: "Reference video and audio files must be between 2 and 15 seconds.",
+          variant: "warning",
+        });
+        return;
+      }
+      const blob = await upload(`generation-inputs/${kind}/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/creations/upload",
+        clientPayload: kind,
+        multipart: file.size > 4 * 1024 * 1024,
+      });
+      onAdd([{
+        id: createAttachmentId("upload"),
+        url: blob.url,
+        kind,
+        name: file.name,
+        source: "upload",
+      }]);
+      setAddOpen(false);
+      setAssetView(false);
+    } catch {
+      showToast({
+        title: "Upload failed",
+        message: `The ${kind} file could not be uploaded. Please try again.`,
+        variant: "warning",
+      });
+    } finally {
+      if (kind === "video" && videoInputRef.current) videoInputRef.current.value = "";
+      if (kind === "audio" && audioInputRef.current) audioInputRef.current.value = "";
+    }
   };
 
   const chooseAsset = (asset: ComposerAssetOption) => {
@@ -220,8 +306,8 @@ export function ComposerToolbarLeading({
       asset.kind === "image"
         ? availableImageSlots > 0
         : asset.kind === "video"
-          ? capabilities.acceptsVideo
-          : capabilities.acceptsAudio;
+          ? availableVideoSlots > 0
+          : availableAudioSlots > 0;
     if (duplicate || !supported) return;
     onAdd([
       {
@@ -253,10 +339,24 @@ export function ComposerToolbarLeading({
         <input
           ref={imageInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif"
           multiple
           className="sr-only"
           onChange={(event) => void handleImages(event.target.files)}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/mp4,video/quicktime"
+          className="sr-only"
+          onChange={(event) => void handleMedia("video", event.target.files)}
+        />
+        <input
+          ref={audioInputRef}
+          type="file"
+          accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav"
+          className="sr-only"
+          onChange={(event) => void handleMedia("audio", event.target.files)}
         />
         {addOpen && (
           <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-ui-lg border border-border bg-background shadow-float">
@@ -283,8 +383,8 @@ export function ComposerToolbarLeading({
                         asset.kind === "image"
                           ? availableImageSlots > 0
                           : asset.kind === "video"
-                            ? capabilities.acceptsVideo
-                            : capabilities.acceptsAudio;
+                            ? availableVideoSlots > 0
+                            : availableAudioSlots > 0;
                       const reason = duplicate
                         ? "Already added"
                         : supported
@@ -336,8 +436,16 @@ export function ComposerToolbarLeading({
                     </span>
                   </span>
                 </button>
-                <DisabledMediaRow kind="video" supported={capabilities.acceptsVideo} />
-                <DisabledMediaRow kind="audio" supported={capabilities.acceptsAudio} />
+                <MediaUploadRow
+                  kind="video"
+                  supported={capabilities.acceptsVideo && videoCount < capabilities.maxVideos}
+                  onClick={() => videoInputRef.current?.click()}
+                />
+                <MediaUploadRow
+                  kind="audio"
+                  supported={capabilities.acceptsAudio && audioCount < capabilities.maxAudios}
+                  onClick={() => audioInputRef.current?.click()}
+                />
                 <div className="my-1 border-t border-border" />
                 <button
                   type="button"
@@ -396,18 +504,21 @@ export function ComposerToolbarLeading({
   );
 }
 
-function DisabledMediaRow({
+function MediaUploadRow({
   kind,
   supported,
+  onClick,
 }: {
   kind: "video" | "audio";
   supported: boolean;
+  onClick: () => void;
 }) {
   const Icon = kind === "video" ? Video : FileAudio;
   return (
     <button
       type="button"
       disabled={!supported}
+      onClick={onClick}
       className="flex w-full items-center gap-3 rounded-ui px-2 py-2 text-left transition-all duration-300 hover:bg-surface-soft disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent"
     >
       <Icon className="h-4 w-4 text-muted-foreground" />

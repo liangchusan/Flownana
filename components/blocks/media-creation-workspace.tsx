@@ -58,7 +58,7 @@ export function MediaCreationWorkspace({
   const [inputCapabilities, setInputCapabilities] = useState<GenerationInputCapabilities>(
     initialType === "image"
       ? getImageInputCapabilities("gpt-image-2")
-      : getVideoInputCapabilities("MiniMax H3")
+      : getVideoInputCapabilities("Seedance 2.0 Mini")
   );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -182,12 +182,11 @@ export function MediaCreationWorkspace({
       status: "generating",
       urls: [],
       inputUrls: draft.attachments
-        .filter((attachment) => attachment.kind === "image")
-        .slice(0, inputCapabilities.maxImages)
+        .filter((attachment) => attachment.kind === "image" || attachment.kind === "video" || attachment.kind === "audio")
         .map((attachment) => attachment.url),
       prompt,
       createdAt: nowIso(),
-      parameters: { ...parameters, runId: optimisticId, outputIndex: index, outputCount },
+      parameters: { ...parameters, inputKinds: draft.attachments.map((attachment) => attachment.kind), runId: optimisticId, outputIndex: index, outputCount },
     }));
     setCreations((current) => mergeCreations([...current, ...optimistic], []));
   };
@@ -203,8 +202,14 @@ export function MediaCreationWorkspace({
 
   const imageAttachments = draft.attachments.filter((attachment) => attachment.kind === "image");
   const attachmentIncompatible = draft.attachments.some((attachment, index) => {
-    if (attachment.kind === "video") return !inputCapabilities.acceptsVideo;
-    if (attachment.kind === "audio") return !inputCapabilities.acceptsAudio;
+    if (attachment.kind === "video") {
+      const kindIndex = draft.attachments.slice(0, index + 1).filter((item) => item.kind === "video").length;
+      return kindIndex > inputCapabilities.maxVideos;
+    }
+    if (attachment.kind === "audio") {
+      const kindIndex = draft.attachments.slice(0, index + 1).filter((item) => item.kind === "audio").length;
+      return kindIndex > inputCapabilities.maxAudios;
+    }
     const imageIndex = draft.attachments
       .slice(0, index + 1)
       .filter((item) => item.kind === "image").length - 1;
@@ -246,7 +251,7 @@ export function MediaCreationWorkspace({
       return <GenerateForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.image} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeImageCount} isGenerating={activeImageCount >= 5} setIsGenerating={() => undefined} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, image: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
     }
     if (composerType === "video") {
-      return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeVideoCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
+      return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} inputAttachments={draft.attachments.map(({ url, kind }) => ({ url, kind }))} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeVideoCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputAttachmentsChange={(attachments) => setDraft((current) => ({ ...current, attachments: attachments.map((attachment, index) => ({ ...attachment, id: `input-${index}-${attachment.url.slice(-24)}`, name: `Input ${attachment.kind} ${index + 1}`, source: "reference" })) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
     }
     return null;
   })();
@@ -310,9 +315,11 @@ function filterCompatibleAttachments(
   capabilities: GenerationInputCapabilities
 ) {
   let imageCount = 0;
+  let videoCount = 0;
+  let audioCount = 0;
   return attachments.filter((attachment) => {
-    if (attachment.kind === "video") return capabilities.acceptsVideo;
-    if (attachment.kind === "audio") return capabilities.acceptsAudio;
+    if (attachment.kind === "video") return ++videoCount <= capabilities.maxVideos;
+    if (attachment.kind === "audio") return ++audioCount <= capabilities.maxAudios;
     imageCount += 1;
     return imageCount <= capabilities.maxImages;
   });
