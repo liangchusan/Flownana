@@ -1,9 +1,7 @@
 import type { VideoModelOption } from "./generation-pricing";
+import type { VideoReferenceInput } from "./video-reference-input";
 
-export type VideoReferenceInput = {
-  url: string;
-  kind: "image" | "video" | "audio";
-};
+export type { VideoReferenceInput } from "./video-reference-input";
 
 export function buildVolcengineVideoTaskBody(params: {
   prompt: string;

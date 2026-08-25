@@ -12,7 +12,11 @@ test("Volcengine request maps multimodal references and adaptive ratio", () => {
       { kind: "audio", url: "https://example.com/c.mp3" },
     ],
     generateAudio: true,
-    option: VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4,
+    option: {
+      ...VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4,
+      provider: "volcengine",
+      providerModel: "doubao-seedance-2-0-mini-260615",
+    },
   });
   assert.equal(body.model, "doubao-seedance-2-0-mini-260615");
   assert.equal(body.resolution, "480p");

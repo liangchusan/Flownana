@@ -41,8 +41,8 @@ import {
 import {
   buildVolcengineVideoTaskBody,
   parseVolcengineVideoResult,
-  type VideoReferenceInput,
 } from "@/lib/volcengine-video-request";
+import type { VideoReferenceInput } from "@/lib/video-reference-input";
 
 const KIE_API_BASE = "https://api.kie.ai";
 const VOLCENGINE_API_BASE = "https://ark.cn-beijing.volces.com/api/v3";
@@ -100,11 +100,32 @@ const FAMILY_ENDPOINTS: Record<
     style: "market",
   },
   seedance: {
-    create: "/contents/generations/tasks",
-    detail: "/contents/generations/tasks",
-    style: "volcengine",
+    create: "/api/v1/jobs/createTask",
+    detail: "/api/v1/jobs/recordInfo",
+    style: "market",
   },
 };
+
+const VOLCENGINE_SEEDANCE_MODEL = "doubao-seedance-2-0-mini-260615";
+
+function getPersistedVideoOption(
+  option: VideoModelOption,
+  parameters: unknown
+): VideoModelOption {
+  if (option.family !== "seedance") return option;
+  const provider =
+    parameters && typeof parameters === "object" && !Array.isArray(parameters)
+      ? (parameters as { provider?: unknown }).provider
+      : undefined;
+  if (provider === "kie") return option;
+
+  // Seedance tasks saved before the KIE switch were created through Volcengine.
+  return {
+    ...option,
+    provider: "volcengine",
+    providerModel: VOLCENGINE_SEEDANCE_MODEL,
+  };
+}
 
 function resolveVideoOption(params: {
   modelOptionId?: string;
@@ -132,7 +153,7 @@ async function createVideoTask(params: {
   watermark?: string;
   option: VideoModelOption;
 }) {
-  if (params.option.family === "seedance") {
+  if (params.option.provider === "volcengine") {
     const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
     if (!apiKey) throw new Error("VOLCENGINE_ARK_API_KEY environment variable is not configured.");
     const res = await fetch(`${VOLCENGINE_API_BASE}/contents/generations/tasks`, {
@@ -193,7 +214,9 @@ async function createVideoTask(params: {
     body = getKieMarketVideoTaskBody({
       prompt: params.prompt,
       imageUrls: params.imageUrls,
+      inputs: params.inputs,
       aspectRatio: params.aspectRatio,
+      generateAudio: params.generateAudio,
       option: params.option,
     });
   }
@@ -250,7 +273,7 @@ function normalizeCreditConsumptionSnapshot(
 }
 
 async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
-  if (option.family === "seedance") {
+  if (option.provider === "volcengine") {
     const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
     if (!apiKey) throw new Error("VOLCENGINE_ARK_API_KEY environment variable is not configured.");
     try {
@@ -563,6 +586,7 @@ export async function GET(request: NextRequest) {
       },
       select: {
         modelOptionId: true,
+        parameters: true,
       },
     });
     const option = resolveVideoOption({
@@ -575,7 +599,7 @@ export async function GET(request: NextRequest) {
     return settleVideoTask({
       userId: session.user.id,
       taskId,
-      option,
+      option: getPersistedVideoOption(option, generation?.parameters),
     });
   }
 
@@ -677,15 +701,19 @@ export async function POST(request: NextRequest) {
 
     parametersForPersistence = {
       model: getVideoModelName(option),
+      provider: option.provider,
       resolution: formatVideoResolution(option.resolution),
       aspectRatio: aspectRatio || "Auto",
       duration: option.duration,
       audio: option.hasAudio && generateAudio !== false ? "On" : "Off",
       inputKinds: inputKindsForPersistence,
       mode:
-        normalizedImageUrls?.length === 2
+        normalizedInputs.some((input) => input.kind !== "image") ||
+        normalizedImageUrls.length > 2
+          ? "Multimodal reference to video"
+          : normalizedImageUrls.length === 2
           ? "First and last frame to video"
-          : normalizedImageUrls?.length === 1
+          : normalizedImageUrls.length === 1
             ? "Image to video"
             : "Text to video",
       ...(typeof runId === "string" && runId.trim()

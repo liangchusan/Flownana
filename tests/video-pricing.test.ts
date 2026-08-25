@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  KIE_VIDEO_CREDIT_MULTIPLIER,
   VIDEO_MODEL_OPTION_MAP,
   VIDEO_MODEL_OPTIONS,
   getDisplayAspectRatios,
@@ -8,19 +9,21 @@ import {
   getDisplaySoundOptions,
 } from "../lib/generation-pricing.ts";
 
-test("new video model platform credits follow KIE API credits times 0.3", () => {
-  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.credits, 22);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_4.credits, 35);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_15.credits, 131);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.grok15_720_8.credits, 60);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.happyhorse11_1080_15.credits, 153);
+test("all KIE video model platform credits follow API credits times 0.2", () => {
+  assert.equal(KIE_VIDEO_CREDIT_MULTIPLIER, 0.2);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.credits, 14);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_4.credits, 23);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_15.credits, 87);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.grok15_720_8.credits, 40);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.happyhorse11_1080_15.credits, 102);
 });
 
-test("Seedance Mini uses the approved Volcengine pricing with 480P first", () => {
+test("Seedance Mini uses KIE no-video pricing for every input mode with 480P first", () => {
   assert.equal(VIDEO_MODEL_OPTIONS[0].id, "seedance2mini_480_4");
   assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.credits, 8);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_15.credits, 45);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.providerModel, "doubao-seedance-2-0-mini-260615");
+  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_15.credits, 66);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.provider, "kie");
+  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.providerModel, "bytedance/seedance-2-mini");
 });
 
 test("new video model options use their KIE provider models", () => {
@@ -51,8 +54,9 @@ test("retired video models are no longer exposed as generation options", () => {
   assert.equal(providerModels.has("kling-3.0/video"), false);
   assert.equal(providerModels.has("kling/v3-turbo-text-to-video"), false);
   assert.equal(providerModels.has("bytedance/seedance-2"), false);
-  assert.equal(providerModels.has("bytedance/seedance-2-mini"), false);
+  assert.equal(providerModels.has("bytedance/seedance-2-mini"), true);
   assert.equal(providerModels.has("bytedance/seedance-2-fast"), false);
+  assert.equal(providerModels.has("doubao-seedance-2-0-mini-260615"), false);
   assert.equal(providerModels.has("happyhorse/text-to-video"), false);
 });
 

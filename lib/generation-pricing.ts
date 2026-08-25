@@ -1,6 +1,7 @@
 export type VideoModelOptionId = string;
 
 type VideoModelFamily = "kling" | "veo" | "happyhorse" | "grok" | "minimax" | "seedance";
+export type VideoProvider = "kie" | "volcengine";
 export type VideoAspectRatio =
   | "Auto"
   | "16:9"
@@ -13,11 +14,13 @@ export type VideoAspectRatio =
   | "2:3";
 export type VideoResolutionOption = "Auto" | "480P" | "720P" | "1080P" | "2K" | "4K";
 export type VideoSoundOption = "Auto" | "On" | "Off";
+export const KIE_VIDEO_CREDIT_MULTIPLIER = 0.2;
 
 export type VideoModelOption = {
   id: VideoModelOptionId;
   label: string;
   family: VideoModelFamily;
+  provider: VideoProvider;
   providerModel: string;
   imageToVideoProviderModel?: string;
   requiresImageInput?: boolean;
@@ -39,7 +42,7 @@ export function getVideoModelName(option: VideoModelOption): string {
 const platformVideoCredits = (
   apiCreditsPerSecond: number,
   duration: VideoModelOption["duration"]
-) => Math.round(apiCreditsPerSecond * duration * 0.3);
+) => Math.round(apiCreditsPerSecond * duration * KIE_VIDEO_CREDIT_MULTIPLIER);
 
 const HAPPYHORSE_DURATIONS = Array.from({ length: 13 }, (_, index) => index + 3);
 const GROK_DURATIONS = Array.from({ length: 15 }, (_, index) => index + 1);
@@ -114,6 +117,7 @@ function createHappyHorse11Options(): VideoModelOption[] {
         id: `happyhorse11_${resolution.toLowerCase().replace("p", "")}_${duration}`,
         label: `HappyHorse 1.1 · ${resolution} · ${duration}s`,
         family: "happyhorse",
+        provider: "kie",
         providerModel: "happyhorse-1-1/text-to-video",
         imageToVideoProviderModel: "happyhorse-1-1/image-to-video",
         resolution: resolution as VideoModelOption["resolution"],
@@ -136,6 +140,7 @@ function createGrokImagineVideo15Options(): VideoModelOption[] {
         id: `grok15_${resolution.toLowerCase().replace("p", "")}_${duration}`,
         label: `Grok Imagine Video 1.5 · ${resolution} · ${duration}s`,
         family: "grok",
+        provider: "kie",
         providerModel: "grok-imagine-video-1-5-preview",
         imageToVideoProviderModel: "grok-imagine-video-1-5-preview",
         requiresImageInput: true,
@@ -159,6 +164,7 @@ function createMiniMaxH3Options(): VideoModelOption[] {
         id: `minimaxh3_${resolution.toLowerCase().replace("p", "")}_${duration}`,
         label: `MiniMax H3 · ${resolution} · ${duration}s`,
         family: "minimax",
+        provider: "kie",
         providerModel: "minimax-h3/text-to-video",
         imageToVideoProviderModel: "minimax-h3/image-to-video",
         resolution: resolution as VideoModelOption["resolution"],
@@ -170,9 +176,10 @@ function createMiniMaxH3Options(): VideoModelOption[] {
 }
 
 function createSeedanceMiniOptions(): VideoModelOption[] {
-  const creditsPerSecond: Record<"480P" | "720P", number> = {
-    "480P": 2,
-    "720P": 3,
+  // KIE's no-video-input tiers are used for every input combination.
+  const apiCreditsPerSecond: Record<"480P" | "720P", number> = {
+    "480P": 10,
+    "720P": 22,
   };
 
   return (["480P", "720P"] as const).flatMap((resolution) =>
@@ -180,12 +187,13 @@ function createSeedanceMiniOptions(): VideoModelOption[] {
       id: `seedance2mini_${resolution.toLowerCase().replace("p", "")}_${duration}`,
       label: `Seedance 2.0 Mini · ${resolution} · ${duration}s`,
       family: "seedance" as const,
-      providerModel: "doubao-seedance-2-0-mini-260615",
+      provider: "kie" as const,
+      providerModel: "bytedance/seedance-2-mini",
       resolution,
       duration,
       hasAudio: true,
       aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
-      credits: creditsPerSecond[resolution] * duration,
+      credits: platformVideoCredits(apiCreditsPerSecond[resolution], duration),
     }))
   );
 }

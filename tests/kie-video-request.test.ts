@@ -8,6 +8,7 @@ import {
   getKieMarketVideoTaskBody,
   getKieVideoResolution,
   getMiniMaxVideoInput,
+  getSeedanceMiniVideoInput,
 } from "../lib/kie-video-request.ts";
 
 test("Auto aspect ratio falls back for text-to-video but not image-to-video", () => {
@@ -87,6 +88,64 @@ test("Grok image-to-video sends image_urls only after an image is provided", () 
     nsfw_checker: true,
     aspect_ratio: "9:16",
   });
+});
+
+test("Seedance Mini keeps pure two-image input in first-and-last-frame mode", () => {
+  const input = getSeedanceMiniVideoInput({
+    prompt: "move naturally",
+    inputs: [
+      { kind: "image", url: "https://example.com/first.png" },
+      { kind: "image", url: "https://example.com/last.png" },
+    ],
+    aspectRatio: "Auto",
+    generateAudio: false,
+    option: VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4,
+  });
+
+  assert.deepEqual(input, {
+    prompt: "move naturally",
+    resolution: "480p",
+    duration: 4,
+    generate_audio: false,
+    aspect_ratio: "adaptive",
+    web_search: false,
+    nsfw_checker: true,
+    first_frame_url: "https://example.com/first.png",
+    last_frame_url: "https://example.com/last.png",
+  });
+  assert.equal("reference_image_urls" in input, false);
+});
+
+test("Seedance Mini uses mutually exclusive multimodal reference arrays", () => {
+  const body = getKieMarketVideoTaskBody({
+    prompt: "use every reference",
+    inputs: [
+      { kind: "image", url: "https://example.com/image.png" },
+      { kind: "video", url: "https://example.com/video.mp4" },
+      { kind: "audio", url: "https://example.com/audio.mp3" },
+    ],
+    aspectRatio: "21:9",
+    generateAudio: true,
+    option: VIDEO_MODEL_OPTION_MAP.seedance2mini_720_15,
+  });
+
+  assert.deepEqual(body, {
+    model: "bytedance/seedance-2-mini",
+    input: {
+      prompt: "use every reference",
+      resolution: "720p",
+      duration: 15,
+      generate_audio: true,
+      aspect_ratio: "21:9",
+      web_search: false,
+      nsfw_checker: true,
+      reference_image_urls: ["https://example.com/image.png"],
+      reference_video_urls: ["https://example.com/video.mp4"],
+      reference_audio_urls: ["https://example.com/audio.mp3"],
+    },
+  });
+  assert.equal("first_frame_url" in body.input, false);
+  assert.equal("last_frame_url" in body.input, false);
 });
 
 test("active KIE video models use their documented request contracts", () => {
