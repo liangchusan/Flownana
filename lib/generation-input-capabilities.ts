@@ -55,6 +55,37 @@ export function getImageInputCapabilities(
 export function getVideoInputCapabilities(
   modelName: string
 ): GenerationInputCapabilities {
+  if (modelName === "Gemini Omni Video") {
+    return {
+      maxImages: 7,
+      maxImageBytes: 10 * 1024 * 1024,
+      imageRequired: false,
+      imageRoles: Array.from({ length: 7 }, (_, index) => `Reference ${index + 1}`),
+      acceptsVideo: false,
+      acceptsAudio: false,
+      maxVideos: 0,
+      maxVideoBytes: DEFAULT_MAX_VIDEO_BYTES,
+      maxAudios: 0,
+      maxAudioBytes: DEFAULT_MAX_AUDIO_BYTES,
+    };
+  }
+  if (modelName === "Wan 3.0 Video") {
+    return {
+      maxImages: 10,
+      maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
+      imageRequired: false,
+      imageRoles: Array.from({ length: 10 }, (_, index) =>
+        index === 0 ? "First frame / Reference 1" : index === 1 ? "Last frame / Reference 2" : `Reference ${index + 1}`
+      ),
+      acceptsVideo: true,
+      acceptsAudio: true,
+      // Conservative P0 limits keep total reference duration within KIE's 15s cap.
+      maxVideos: 1,
+      maxVideoBytes: DEFAULT_MAX_VIDEO_BYTES,
+      maxAudios: 1,
+      maxAudioBytes: DEFAULT_MAX_AUDIO_BYTES,
+    };
+  }
   if (modelName === "Seedance 2.0 Mini") {
     return {
       maxImages: 9,

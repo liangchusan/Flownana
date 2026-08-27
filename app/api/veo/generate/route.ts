@@ -104,6 +104,16 @@ const FAMILY_ENDPOINTS: Record<
     detail: "/api/v1/jobs/recordInfo",
     style: "market",
   },
+  gemini: {
+    create: "/api/v1/jobs/createTask",
+    detail: "/api/v1/jobs/recordInfo",
+    style: "market",
+  },
+  wan: {
+    create: "/api/v1/jobs/createTask",
+    detail: "/api/v1/jobs/recordInfo",
+    style: "market",
+  },
 };
 
 const VOLCENGINE_SEEDANCE_MODEL = "doubao-seedance-2-0-mini-260615";
@@ -669,6 +679,10 @@ export async function POST(request: NextRequest) {
     const inputCapabilities = getVideoInputCapabilities(getVideoModelName(option));
     const counts = requestedInputs.reduce((value, input) => ({ ...value, [input.kind]: value[input.kind] + 1 }), { image: 0, video: 0, audio: 0 });
     if (counts.image > inputCapabilities.maxImages || counts.video > inputCapabilities.maxVideos || counts.audio > inputCapabilities.maxAudios) {
+      return videoErrorResponse("invalid_parameters");
+    }
+
+    if (option.family === "wan" && counts.video > 0 && option.duration > 15) {
       return videoErrorResponse("invalid_parameters");
     }
 

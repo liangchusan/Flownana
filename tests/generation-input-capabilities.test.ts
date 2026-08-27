@@ -34,6 +34,21 @@ test("Seedance Mini accepts the documented multimodal reference counts", () => {
   assert.equal(getAttachmentLimit(seedance, "audio"), 3);
 });
 
+test("Gemini Omni and Wan 3.0 expose their safe P0 reference limits", () => {
+  const gemini = getVideoInputCapabilities("Gemini Omni Video");
+  assert.equal(gemini.maxImages, 7);
+  assert.equal(gemini.maxImageBytes, 10 * 1024 * 1024);
+  assert.equal(gemini.acceptsVideo, false);
+  assert.equal(gemini.acceptsAudio, false);
+
+  const wan = getVideoInputCapabilities("Wan 3.0 Video");
+  assert.equal(wan.maxImages, 10);
+  assert.equal(wan.maxVideos, 1);
+  assert.equal(wan.maxAudios, 1);
+  assert.equal(wan.acceptsVideo, true);
+  assert.equal(wan.acceptsAudio, true);
+});
+
 test("Grok requires one image while other active video models keep it optional", () => {
   assert.equal(
     getVideoInputCapabilities("Grok Imagine Video 1.5").imageRequired,

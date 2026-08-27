@@ -16,6 +16,11 @@ test("all KIE video model platform credits follow API credits times 0.2", () => 
   assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_15.credits, 87);
   assert.equal(VIDEO_MODEL_OPTION_MAP.grok15_720_8.credits, 40);
   assert.equal(VIDEO_MODEL_OPTION_MAP.happyhorse11_1080_15.credits, 102);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.geminiomni_720_4.credits, 18);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.geminiomni_4k_10.credits, 60);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.wan30_480_5.credits, 30);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.wan30_720_5.credits, 50);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.wan30_1080_5.credits, 90);
 });
 
 test("Seedance Mini uses KIE no-video pricing for every input mode with 480P first", () => {
@@ -43,6 +48,14 @@ test("new video model options use their KIE provider models", () => {
   assert.equal(
     VIDEO_MODEL_OPTION_MAP.happyhorse11_720_3.imageToVideoProviderModel,
     "happyhorse-1-1/image-to-video"
+  );
+  assert.equal(
+    VIDEO_MODEL_OPTION_MAP.geminiomni_720_4.providerModel,
+    "gemini-omni-video"
+  );
+  assert.equal(
+    VIDEO_MODEL_OPTION_MAP.wan30_480_2.providerModel,
+    "wan/3-0-video"
   );
 });
 
@@ -85,6 +98,16 @@ test("video parameter display rules keep only canonical resolutions", () => {
     (option) => option.providerModel === "minimax-h3/text-to-video"
   );
   assert.deepEqual(getDisplayResolutions(minimaxOptions), ["720P", "2K"]);
+
+  const geminiOptions = VIDEO_MODEL_OPTIONS.filter(
+    (option) => option.providerModel === "gemini-omni-video"
+  );
+  assert.deepEqual(getDisplayResolutions(geminiOptions), ["720P", "1080P", "4K"]);
+
+  const wanOptions = VIDEO_MODEL_OPTIONS.filter(
+    (option) => option.providerModel === "wan/3-0-video"
+  );
+  assert.deepEqual(getDisplayResolutions(wanOptions), ["480P", "720P", "1080P"]);
 });
 
 test("video parameter display rules expose sound only when model supports it", () => {
@@ -95,4 +118,6 @@ test("video parameter display rules expose sound only when model supports it", (
   assert.deepEqual(getDisplaySoundOptions(VIDEO_MODEL_OPTIONS), ["Auto", "On", "Off"]);
   const seedanceOptions = VIDEO_MODEL_OPTIONS.filter((option) => option.family === "seedance");
   assert.deepEqual(getDisplaySoundOptions(seedanceOptions), ["On", "Off"]);
+  const wanOptions = VIDEO_MODEL_OPTIONS.filter((option) => option.family === "wan");
+  assert.deepEqual(getDisplaySoundOptions(wanOptions), ["On", "Off"]);
 });

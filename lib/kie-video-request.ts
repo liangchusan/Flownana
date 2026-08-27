@@ -21,6 +21,14 @@ export function getKieVideoResolution(option: VideoModelOption) {
     return option.resolution === "2K" ? "2K" : "768P";
   }
 
+  if (option.family === "wan") {
+    return option.resolution;
+  }
+
+  if (option.family === "gemini" && option.resolution === "4K") {
+    return "4k";
+  }
+
   if (option.resolution === "1080P") return "1080p";
   if (option.resolution === "480P") return "480p";
   return "720p";
@@ -132,6 +140,66 @@ export function getSeedanceMiniVideoInput(params: {
   return input;
 }
 
+export function getGeminiOmniVideoInput(params: {
+  prompt: string;
+  imageUrls?: string[];
+  aspectRatio?: string;
+  option: VideoModelOption;
+}) {
+  const input: Record<string, unknown> = {
+    prompt: params.prompt,
+    duration: String(params.option.duration),
+    aspect_ratio:
+      params.aspectRatio && params.aspectRatio !== "Auto"
+        ? params.aspectRatio
+        : "16:9",
+    resolution: getKieVideoResolution(params.option),
+  };
+
+  if (params.imageUrls?.length) {
+    input.image_urls = params.imageUrls;
+  }
+
+  return input;
+}
+
+export function getWan30VideoInput(params: {
+  prompt: string;
+  inputs?: VideoReferenceInput[];
+  aspectRatio?: string;
+  generateAudio?: boolean;
+  option: VideoModelOption;
+}) {
+  const inputs = params.inputs || [];
+  const imageUrls = inputs.filter((input) => input.kind === "image").map((input) => input.url);
+  const videoUrls = inputs.filter((input) => input.kind === "video").map((input) => input.url);
+  const audioUrls = inputs.filter((input) => input.kind === "audio").map((input) => input.url);
+  const useMultimodalReferences =
+    imageUrls.length > 2 || videoUrls.length > 0 || audioUrls.length > 0;
+  const input: Record<string, unknown> = {
+    prompt: params.prompt,
+    resolution: getKieVideoResolution(params.option),
+    aspect_ratio:
+      params.aspectRatio && params.aspectRatio !== "Auto"
+        ? params.aspectRatio
+        : "adaptive",
+    duration: params.option.duration,
+    audio: params.generateAudio !== false,
+    nsfw_checker: true,
+  };
+
+  if (useMultimodalReferences) {
+    if (imageUrls.length > 0) input.reference_image_urls = imageUrls;
+    if (videoUrls.length > 0) input.reference_video_urls = videoUrls;
+    if (audioUrls.length > 0) input.reference_audio_urls = audioUrls;
+  } else if (imageUrls[0]) {
+    input.first_frame_url = imageUrls[0];
+    if (imageUrls[1]) input.last_frame_url = imageUrls[1];
+  }
+
+  return input;
+}
+
 export function getKieMarketVideoTaskBody(params: {
   prompt: string;
   imageUrls?: string[];
@@ -154,6 +222,22 @@ export function getKieMarketVideoTaskBody(params: {
   let input: Record<string, unknown>;
   if (params.option.family === "seedance") {
     input = getSeedanceMiniVideoInput({
+      prompt: params.prompt,
+      inputs:
+        params.inputs || imageUrls.map((url) => ({ kind: "image" as const, url })),
+      aspectRatio: params.aspectRatio,
+      generateAudio: params.generateAudio,
+      option: params.option,
+    });
+  } else if (params.option.family === "gemini") {
+    input = getGeminiOmniVideoInput({
+      prompt: params.prompt,
+      imageUrls,
+      aspectRatio: params.aspectRatio,
+      option: params.option,
+    });
+  } else if (params.option.family === "wan") {
+    input = getWan30VideoInput({
       prompt: params.prompt,
       inputs:
         params.inputs || imageUrls.map((url) => ({ kind: "image" as const, url })),

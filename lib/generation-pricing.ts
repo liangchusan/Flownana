@@ -1,6 +1,14 @@
 export type VideoModelOptionId = string;
 
-type VideoModelFamily = "kling" | "veo" | "happyhorse" | "grok" | "minimax" | "seedance";
+type VideoModelFamily =
+  | "kling"
+  | "veo"
+  | "happyhorse"
+  | "grok"
+  | "minimax"
+  | "seedance"
+  | "gemini"
+  | "wan";
 export type VideoProvider = "kie" | "volcengine";
 export type VideoAspectRatio =
   | "Auto"
@@ -27,12 +35,15 @@ export type VideoModelOption = {
   resolution: "480P" | "720P" | "1080P" | "2K" | "4K" | "/";
   duration: number;
   hasAudio?: boolean;
+  audioConfigurable?: boolean;
   aspectRatios?: VideoAspectRatio[];
   credits: number;
 };
 
 export function getVideoModelName(option: VideoModelOption): string {
   if (option.family === "seedance") return "Seedance 2.0 Mini";
+  if (option.family === "gemini") return "Gemini Omni Video";
+  if (option.family === "wan") return "Wan 3.0 Video";
   if (option.providerModel.startsWith("happyhorse-1-1/")) return "HappyHorse 1.1";
   if (option.family === "grok") return "Grok Imagine Video 1.5";
   if (option.family === "minimax") return "MiniMax H3";
@@ -44,10 +55,15 @@ const platformVideoCredits = (
   duration: VideoModelOption["duration"]
 ) => Math.round(apiCreditsPerSecond * duration * KIE_VIDEO_CREDIT_MULTIPLIER);
 
+const platformVideoTaskCredits = (apiCredits: number) =>
+  Math.round(apiCredits * KIE_VIDEO_CREDIT_MULTIPLIER);
+
 const HAPPYHORSE_DURATIONS = Array.from({ length: 13 }, (_, index) => index + 3);
 const GROK_DURATIONS = Array.from({ length: 15 }, (_, index) => index + 1);
 const MINIMAX_H3_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
 const SEEDANCE_MINI_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
+const GEMINI_OMNI_DURATIONS = [4, 6, 8, 10];
+const WAN_30_DURATIONS = Array.from({ length: 29 }, (_, index) => index + 2);
 export const DEFAULT_VIDEO_ASPECT_RATIOS: VideoAspectRatio[] = [
   "Auto",
   "16:9",
@@ -90,7 +106,7 @@ export function getDisplayResolutions(options: VideoModelOption[]): VideoResolut
 }
 
 export function getDisplaySoundOptions(options: VideoModelOption[]): VideoSoundOption[] {
-  if (options.length > 0 && options.every((option) => option.family === "seedance")) {
+  if (options.length > 0 && options.every((option) => option.audioConfigurable)) {
     return ["On", "Off"];
   }
   const supportsAudioOn = options.some((option) => option.hasAudio);
@@ -192,7 +208,61 @@ function createSeedanceMiniOptions(): VideoModelOption[] {
       resolution,
       duration,
       hasAudio: true,
+      audioConfigurable: true,
       aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
+      credits: platformVideoCredits(apiCreditsPerSecond[resolution], duration),
+    }))
+  );
+}
+
+function createGeminiOmniVideoOptions(): VideoModelOption[] {
+  // KIE bills text/image-reference tasks at a flat rate by duration and resolution.
+  const apiCreditsByResolutionAndDuration: Record<
+    "720P" | "1080P" | "4K",
+    Record<number, number>
+  > = {
+    "720P": { 4: 90, 6: 120, 8: 150, 10: 180 },
+    "1080P": { 4: 90, 6: 120, 8: 150, 10: 180 },
+    "4K": { 4: 210, 6: 240, 8: 270, 10: 300 },
+  };
+
+  return (["720P", "1080P", "4K"] as const).flatMap((resolution) =>
+    GEMINI_OMNI_DURATIONS.map((duration) => ({
+      id: `geminiomni_${resolution.toLowerCase().replace("p", "")}_${duration}`,
+      label: `Gemini Omni Video · ${resolution} · ${duration}s`,
+      family: "gemini" as const,
+      provider: "kie" as const,
+      providerModel: "gemini-omni-video",
+      resolution,
+      duration,
+      hasAudio: true,
+      aspectRatios: ["16:9", "9:16"] as VideoAspectRatio[],
+      credits: platformVideoTaskCredits(
+        apiCreditsByResolutionAndDuration[resolution][duration]
+      ),
+    }))
+  );
+}
+
+function createWan30VideoOptions(): VideoModelOption[] {
+  const apiCreditsPerSecond: Record<"480P" | "720P" | "1080P", number> = {
+    "480P": 30,
+    "720P": 50,
+    "1080P": 90,
+  };
+
+  return (["480P", "720P", "1080P"] as const).flatMap((resolution) =>
+    WAN_30_DURATIONS.map((duration) => ({
+      id: `wan30_${resolution.toLowerCase().replace("p", "")}_${duration}`,
+      label: `Wan 3.0 Video · ${resolution} · ${duration}s`,
+      family: "wan" as const,
+      provider: "kie" as const,
+      providerModel: "wan/3-0-video",
+      resolution,
+      duration,
+      hasAudio: true,
+      audioConfigurable: true,
+      aspectRatios: ["Auto", "16:9", "9:16", "1:1", "4:3", "3:4"] as VideoAspectRatio[],
       credits: platformVideoCredits(apiCreditsPerSecond[resolution], duration),
     }))
   );
@@ -200,6 +270,8 @@ function createSeedanceMiniOptions(): VideoModelOption[] {
 
 export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
   ...createSeedanceMiniOptions(),
+  ...createGeminiOmniVideoOptions(),
+  ...createWan30VideoOptions(),
   ...createMiniMaxH3Options(),
   ...createGrokImagineVideo15Options(),
   ...createHappyHorse11Options(),

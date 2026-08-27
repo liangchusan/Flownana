@@ -122,6 +122,7 @@ export function VideoCreationForm({
   );
   const requestInputs = inputAttachments || uploadedImages.map((url) => ({ url, kind: "image" as const }));
   const inputImageCount = requestInputs.filter((input) => input.kind === "image").length;
+  const hasVideoInput = requestInputs.some((input) => input.kind === "video");
   const [selectedModelName, setSelectedModelName] = useState<string>(
     initialParameters?.model || getVideoModelName(defaultOption)
   );
@@ -177,9 +178,10 @@ export function VideoCreationForm({
       VIDEO_MODEL_OPTIONS.filter(
         (o) =>
           getVideoModelName(o) === selectedModelName &&
-          (!o.requiresImageInput || inputImageCount > 0)
+          (!o.requiresImageInput || inputImageCount > 0) &&
+          !(o.family === "wan" && hasVideoInput && o.duration > 15)
       ),
-    [selectedModelName, inputImageCount]
+    [selectedModelName, inputImageCount, hasVideoInput]
   );
 
   const aspectRatioOptions = useMemo(() => {

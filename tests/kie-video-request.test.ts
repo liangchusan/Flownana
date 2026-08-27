@@ -3,12 +3,14 @@ import test from "node:test";
 import { VIDEO_MODEL_OPTION_MAP } from "../lib/generation-pricing.ts";
 import {
   getGrokVideoInput,
+  getGeminiOmniVideoInput,
   getHappyHorseVideoInput,
   getKieVideoAspectRatio,
   getKieMarketVideoTaskBody,
   getKieVideoResolution,
   getMiniMaxVideoInput,
   getSeedanceMiniVideoInput,
+  getWan30VideoInput,
 } from "../lib/kie-video-request.ts";
 
 test("Auto aspect ratio falls back for text-to-video but not image-to-video", () => {
@@ -138,6 +140,85 @@ test("Seedance Mini uses mutually exclusive multimodal reference arrays", () => 
       generate_audio: true,
       aspect_ratio: "21:9",
       web_search: false,
+      nsfw_checker: true,
+      reference_image_urls: ["https://example.com/image.png"],
+      reference_video_urls: ["https://example.com/video.mp4"],
+      reference_audio_urls: ["https://example.com/audio.mp3"],
+    },
+  });
+  assert.equal("first_frame_url" in body.input, false);
+  assert.equal("last_frame_url" in body.input, false);
+});
+
+test("Gemini Omni sends documented text and image-reference fields", () => {
+  const input = getGeminiOmniVideoInput({
+    prompt: "keep the character consistent",
+    imageUrls: [
+      "https://example.com/character.png",
+      "https://example.com/scene.png",
+    ],
+    aspectRatio: "9:16",
+    option: VIDEO_MODEL_OPTION_MAP.geminiomni_4k_8,
+  });
+
+  assert.deepEqual(input, {
+    prompt: "keep the character consistent",
+    duration: "8",
+    aspect_ratio: "9:16",
+    resolution: "4k",
+    image_urls: [
+      "https://example.com/character.png",
+      "https://example.com/scene.png",
+    ],
+  });
+});
+
+test("Wan 3.0 keeps pure two-image input in first-and-last-frame mode", () => {
+  const input = getWan30VideoInput({
+    prompt: "transition between the frames",
+    inputs: [
+      { kind: "image", url: "https://example.com/first.png" },
+      { kind: "image", url: "https://example.com/last.png" },
+    ],
+    aspectRatio: "Auto",
+    generateAudio: false,
+    option: VIDEO_MODEL_OPTION_MAP.wan30_720_10,
+  });
+
+  assert.deepEqual(input, {
+    prompt: "transition between the frames",
+    resolution: "720P",
+    aspect_ratio: "adaptive",
+    duration: 10,
+    audio: false,
+    nsfw_checker: true,
+    first_frame_url: "https://example.com/first.png",
+    last_frame_url: "https://example.com/last.png",
+  });
+  assert.equal("reference_image_urls" in input, false);
+});
+
+test("Wan 3.0 uses mutually exclusive multimodal reference arrays", () => {
+  const body = getKieMarketVideoTaskBody({
+    prompt: "use every reference",
+    inputs: [
+      { kind: "image", url: "https://example.com/image.png" },
+      { kind: "video", url: "https://example.com/video.mp4" },
+      { kind: "audio", url: "https://example.com/audio.mp3" },
+    ],
+    aspectRatio: "3:4",
+    generateAudio: true,
+    option: VIDEO_MODEL_OPTION_MAP.wan30_1080_15,
+  });
+
+  assert.deepEqual(body, {
+    model: "wan/3-0-video",
+    input: {
+      prompt: "use every reference",
+      resolution: "1080P",
+      aspect_ratio: "3:4",
+      duration: 15,
+      audio: true,
       nsfw_checker: true,
       reference_image_urls: ["https://example.com/image.png"],
       reference_video_urls: ["https://example.com/video.mp4"],
