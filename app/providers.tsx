@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
 import { AppToastProvider } from "@/components/blocks/app-toast-provider";
+import { PricingModalProvider } from "@/components/pricing/pricing-modal-provider";
 
 export function Providers({
   children,
@@ -13,7 +14,9 @@ export function Providers({
 }) {
   return (
     <SessionProvider session={session}>
-      <AppToastProvider>{children}</AppToastProvider>
+      <AppToastProvider>
+        <PricingModalProvider>{children}</PricingModalProvider>
+      </AppToastProvider>
     </SessionProvider>
   );
 }

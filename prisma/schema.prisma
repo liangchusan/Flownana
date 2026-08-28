@@ -12,6 +12,8 @@ model User {
   email            String         @unique
   name             String?
   image            String?
+  providerImage    String?
+  customAvatarUrl  String?
   stripeCustomerId String?        @unique
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt

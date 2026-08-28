@@ -2,34 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { UpgradeModal } from "@/components/billing/upgrade-modal";
+import { useToast } from "@/components/blocks/app-toast-provider";
 import {
   getPriceKey,
   isLowerTier,
   isPriceKey,
   isUpgradeAllowed,
   PLAN_CATALOG,
+  PLAN_DISPLAY,
   PLAN_KEYS,
+  type BillingKey,
   type PlanKey,
   type PriceKey,
 } from "@/lib/plans";
-import { UpgradeModal } from "@/components/billing/upgrade-modal";
-import { useToast } from "@/components/blocks/app-toast-provider";
 import { trackEvent } from "@/lib/analytics";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { fetchBillingSummary } from "@/lib/billing-summary-client";
 
 const SHARED_FEATURES = [
-  "Access to top-quality video models",
-  "Image-to-Video generation",
-  "Text-to-Video generation",
-  "Fast generation mode",
-  "Private creation",
-  "No watermarks",
+  "All available image and video models",
+  "Private creations with no watermarks",
+  "Credits refresh every month",
 ];
-
-type BillingMode = "monthly" | "yearly";
 
 const PLANS = PLAN_KEYS.map((planKey) => ({
   planKey,
@@ -37,10 +34,29 @@ const PLANS = PLAN_KEYS.map((planKey) => ({
   popular: planKey === "pro",
 }));
 
-export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
+type PricingPlansProps = {
+  stripeEnabled: boolean;
+  initialBilling?: BillingKey;
+  variant?: "page" | "modal";
+};
+
+type UpgradeDetails = {
+  currentLabel: string;
+  targetLabel: string;
+  currentPrice: string;
+  targetPrice: string;
+  targetCredits: number;
+  targetBilling: BillingKey;
+} | null;
+
+export function PricingPlans({
+  stripeEnabled,
+  initialBilling = "monthly",
+  variant = "page",
+}: PricingPlansProps) {
   const { data: session, status } = useSession();
   const { showToast } = useToast();
-  const [billing, setBilling] = useState<BillingMode>("monthly");
+  const [billing, setBilling] = useState<BillingKey>(initialBilling);
   const [summary, setSummary] = useState<{
     subscription: {
       planType: string;
@@ -49,6 +65,7 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
   } | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeKey, setUpgradeKey] = useState<PriceKey | null>(null);
+  const [upgradeDetails, setUpgradeDetails] = useState<UpgradeDetails>(null);
   const [upgradeChargeLine, setUpgradeChargeLine] = useState<string | null>(null);
   const [upgradeQuoteError, setUpgradeQuoteError] = useState<string | null>(null);
   const [loadingUpgradeQuote, setLoadingUpgradeQuote] = useState(false);
@@ -64,80 +81,6 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       .catch(() => setSummary(null));
   }, [session]);
 
-  const subscribe = async (pk: PriceKey) => {
-    if (!session) {
-      trackEvent("signup_started", { source: "pricing", price_key: pk });
-      await signInForCurrentEnvironment();
-      return;
-    }
-    if (!stripeEnabled) {
-      showToast({
-        title: "Checkout unavailable",
-        message: "Stripe is not configured. Set STRIPE_PRICE_* in .env.",
-        variant: "warning",
-      });
-      return;
-    }
-    setLoading(pk);
-    trackEvent("checkout_started", {
-      price_key: pk,
-      checkout_type: "new_subscription",
-    });
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceKey: pk }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Checkout failed");
-      if (data.url) window.location.href = data.url;
-    } catch (e: unknown) {
-      showToast({
-        title: "Checkout failed",
-        message: e instanceof Error ? e.message : "Checkout failed",
-        variant: "error",
-      });
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const upgradeNow = async (pk: PriceKey) => {
-    if (!session) {
-      trackEvent("signup_started", { source: "pricing_upgrade", price_key: pk });
-      await signInForCurrentEnvironment();
-      return;
-    }
-    setLoading(pk);
-    trackEvent("checkout_started", {
-      price_key: pk,
-      checkout_type: "upgrade",
-    });
-    try {
-      const res = await fetch("/api/stripe/change-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceKey: pk }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upgrade failed");
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      window.location.href = "/account/billing?upgrade=success";
-    } catch (e: unknown) {
-      showToast({
-        title: "Upgrade failed",
-        message: e instanceof Error ? e.message : "Upgrade failed",
-        variant: "error",
-      });
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const formatMoney = (amountCents: number, currency: string) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -146,62 +89,162 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
       maximumFractionDigits: 2,
     }).format(amountCents / 100);
 
-  const openUpgradeModal = async (pk: PriceKey) => {
-    setUpgradeKey(pk);
+  const subscribe = async (priceKey: PriceKey) => {
+    if (!session) {
+      trackEvent("signup_started", { source: "pricing", price_key: priceKey });
+      await signInForCurrentEnvironment();
+      return;
+    }
+    if (!stripeEnabled) {
+      showToast({
+        title: "Checkout unavailable",
+        message: "Stripe is not configured for this environment.",
+        variant: "warning",
+      });
+      return;
+    }
+
+    setLoading(priceKey);
+    trackEvent("checkout_started", {
+      price_key: priceKey,
+      checkout_type: "new_subscription",
+    });
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceKey }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Checkout failed");
+      if (data.url) window.location.href = data.url;
+    } catch (error) {
+      showToast({
+        title: "Checkout failed",
+        message: error instanceof Error ? error.message : "Checkout failed",
+        variant: "error",
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const upgradeNow = async (priceKey: PriceKey) => {
+    if (!session) {
+      trackEvent("signup_started", {
+        source: "pricing_upgrade",
+        price_key: priceKey,
+      });
+      await signInForCurrentEnvironment();
+      return;
+    }
+
+    setLoading(priceKey);
+    trackEvent("checkout_started", {
+      price_key: priceKey,
+      checkout_type: "upgrade",
+    });
+    try {
+      const response = await fetch("/api/stripe/change-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceKey }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Upgrade failed");
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      window.location.href = "/account/billing?upgrade=success";
+    } catch (error) {
+      showToast({
+        title: "Upgrade failed",
+        message: error instanceof Error ? error.message : "Upgrade failed",
+        variant: "error",
+      });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const openUpgradeModal = async (priceKey: PriceKey) => {
+    setUpgradeKey(priceKey);
     setUpgradeOpen(true);
     setUpgradeChargeLine(null);
     setUpgradeQuoteError(null);
     setLoadingUpgradeQuote(true);
+
+    const currentValue = summary?.subscription
+      ? `${summary.subscription.planType}_${summary.subscription.billingCycle}`
+      : "";
+    setUpgradeDetails(
+      isPriceKey(currentValue)
+        ? {
+            currentLabel: PLAN_DISPLAY[currentValue].label,
+            targetLabel: PLAN_DISPLAY[priceKey].label,
+            currentPrice: `$${
+              PLAN_DISPLAY[currentValue].billing === "monthly"
+                ? PLAN_CATALOG[PLAN_DISPLAY[currentValue].plan].monthlyPrice
+                : PLAN_CATALOG[PLAN_DISPLAY[currentValue].plan].yearlyPrice
+            }/${PLAN_DISPLAY[currentValue].billing === "monthly" ? "month" : "year"}`,
+            targetPrice: `$${
+              PLAN_DISPLAY[priceKey].billing === "monthly"
+                ? PLAN_CATALOG[PLAN_DISPLAY[priceKey].plan].monthlyPrice
+                : PLAN_CATALOG[PLAN_DISPLAY[priceKey].plan].yearlyPrice
+            }/${PLAN_DISPLAY[priceKey].billing === "monthly" ? "month" : "year"}`,
+            targetCredits: PLAN_CATALOG[PLAN_DISPLAY[priceKey].plan].credits,
+            targetBilling: PLAN_DISPLAY[priceKey].billing,
+          }
+        : null
+    );
+
     try {
-      const res = await fetch(
-        `/api/stripe/change-plan/quote?priceKey=${encodeURIComponent(pk)}`
+      const response = await fetch(
+        `/api/stripe/change-plan/quote?priceKey=${encodeURIComponent(priceKey)}`
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to get upgrade quote");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to get upgrade quote");
+      }
 
       const currency = data.currency || "usd";
       const payable = formatMoney(data.payableAmountCents || 0, currency);
       const credit = Number(data.creditAmountCents || 0);
       const months = Number(data.remainingMonths || 0);
-      const newPlanTotal = formatMoney((data.payableAmountCents || 0) + (data.creditAmountCents || 0), currency);
+      const targetTotal = formatMoney(data.targetAmountCents || 0, currency);
 
       if (credit > 0) {
-        const creditText = formatMoney(credit, currency);
         setUpgradeChargeLine(
-          `Today's charge: ${payable}\n${newPlanTotal} (new plan) − ${creditText} credit (${months} unused month${months === 1 ? "" : "s"} remaining on current plan) = ${payable}\nNew subscription starts immediately. Current plan will be canceled.`
+          `Due today: ${payable}\n${targetTotal} new plan − ${formatMoney(credit, currency)} credit for ${months} unused month${months === 1 ? "" : "s"}.\nYour new subscription starts immediately.`
         );
       } else {
         setUpgradeChargeLine(
-          `Today's charge: ${payable}\nNew subscription starts immediately. Current plan will be canceled.`
+          `Due today: ${payable}\n${targetTotal} for the new billing period.\nYour new subscription starts immediately.`
         );
       }
-    } catch (e: unknown) {
+    } catch (error) {
       setUpgradeQuoteError(
-        e instanceof Error ? e.message : "Failed to get upgrade quote."
+        error instanceof Error ? error.message : "Failed to get upgrade quote."
       );
     } finally {
       setLoadingUpgradeQuote(false);
     }
   };
 
-  const ctaForPlan = (plan: PlanKey): {
-    label: string;
-    disabled: boolean;
-    note?: string;
-    onClick: () => void;
-  } => {
-    const pk = getPriceKey(plan, billing);
-    const sub = summary?.subscription;
-    if (!sub) {
+  const ctaForPlan = (plan: PlanKey) => {
+    const priceKey = getPriceKey(plan, billing);
+    const subscription = summary?.subscription;
+    if (!subscription) {
       return {
-        label: "Subscribe",
+        label: "Choose plan",
         disabled: false,
-        onClick: () => subscribe(pk),
+        onClick: () => subscribe(priceKey),
       };
     }
 
-    const currentKeyValue = `${sub.planType}_${sub.billingCycle}`;
-    if (!isPriceKey(currentKeyValue)) {
+    const currentValue = `${subscription.planType}_${subscription.billingCycle}`;
+    if (!isPriceKey(currentValue)) {
       return {
         label: "Manage plan",
         disabled: false,
@@ -211,154 +254,169 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         },
       };
     }
-    const currentKey = currentKeyValue;
-    if (currentKey === pk) {
-      return { label: "Current plan", disabled: true, onClick: () => {} };
+    if (currentValue === priceKey) {
+      return {
+        label: "Current plan",
+        disabled: true,
+        onClick: () => undefined,
+      };
     }
-
-    if (isUpgradeAllowed(currentKey, pk)) {
+    if (isUpgradeAllowed(currentValue, priceKey)) {
       return {
         label: "Upgrade",
         disabled: false,
-        onClick: () => openUpgradeModal(pk),
+        onClick: () => openUpgradeModal(priceKey),
       };
     }
-
-    if (isLowerTier(pk, currentKey)) {
+    if (isLowerTier(priceKey, currentValue)) {
       return {
         label: "Not available",
         disabled: true,
-        note: "To downgrade, manage your subscription in the billing portal.",
-        onClick: () => {},
+        note: "Downgrades are managed in the billing portal.",
+        onClick: () => undefined,
       };
     }
-
     return {
       label: "Not available",
       disabled: true,
       note:
-        sub.billingCycle === "yearly" && billing === "monthly"
-          ? "Yearly plans can only upgrade to a higher yearly plan."
-          : undefined,
-      onClick: () => {},
+        subscription.billingCycle === "yearly" && billing === "monthly"
+          ? "Yearly plans can only move to a higher yearly plan."
+          : "This upgrade path is not available.",
+      onClick: () => undefined,
     };
   };
 
   return (
     <>
-      <div className="mb-10 flex justify-center">
-        <div className="inline-flex rounded-xl border border-stone-200/50 bg-stone-50 p-1">
+      <div className={variant === "modal" ? "mb-6 flex justify-center" : "mb-10 flex justify-center"}>
+        <div className="inline-flex items-center rounded-full border border-border bg-surface-soft p-1">
           <button
             type="button"
             onClick={() => setBilling("monthly")}
-            className={`rounded-lg px-6 py-2 text-sm font-medium transition-all duration-300 ${
+            className={`h-9 rounded-full px-4 text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-5 ${
               billing === "monthly"
-                ? "bg-white text-stone-900 shadow-sm"
-                : "text-stone-600"
+                ? "bg-background text-foreground shadow-soft"
+                : "text-muted-foreground hover:text-foreground"
             }`}
+            aria-pressed={billing === "monthly"}
           >
             Monthly
           </button>
           <button
             type="button"
             onClick={() => setBilling("yearly")}
-            className={`rounded-lg px-6 py-2 text-sm font-medium transition-all duration-300 ${
+            className={`flex h-9 items-center rounded-full px-4 text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-5 ${
               billing === "yearly"
-                ? "bg-white text-stone-900 shadow-sm"
-                : "text-stone-600"
+                ? "bg-background text-foreground shadow-soft"
+                : "text-muted-foreground hover:text-foreground"
             }`}
+            aria-pressed={billing === "yearly"}
           >
-            Yearly{" "}
-            <span className="ml-1 text-xs text-stone-700">50% off</span>
+            Yearly
+            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-active">
+              Save 50%
+            </span>
           </button>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 md:grid-cols-3">
+      <div
+        className={`mx-auto grid grid-cols-1 gap-4 md:grid-cols-3 ${
+          variant === "page" ? "max-w-6xl md:gap-6" : "max-w-5xl"
+        }`}
+      >
         {PLANS.map((plan) => {
           const cta = ctaForPlan(plan.planKey);
-          const pk = getPriceKey(plan.planKey, billing);
+          const priceKey = getPriceKey(plan.planKey, billing);
           const monthlyEquivalent =
             billing === "monthly" ? plan.monthlyPrice : plan.yearlyPrice / 12;
-          const unitPrice = monthlyEquivalent / plan.credits;
+          const currentValue = summary?.subscription
+            ? `${summary.subscription.planType}_${summary.subscription.billingCycle}`
+            : null;
+          const isCurrent = currentValue === priceKey;
+          const featured = plan.popular;
+
           return (
-            <div
+            <article
               key={plan.planKey}
-              className={`relative rounded-2xl border-2 bg-white p-7 transition-all duration-300 ${
-                plan.popular
-                  ? "border-stone-700 shadow-lg shadow-stone-200/20"
-                  : "border-stone-200/50 shadow-sm hover:border-stone-300"
+              className={`relative flex min-w-0 flex-col rounded-ui-xl border p-5 transition-all duration-300 sm:p-6 ${
+                featured
+                  ? "border-surface-dark bg-surface-dark text-background shadow-float"
+                  : "border-border bg-background text-foreground hover:border-primary/35"
               }`}
             >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="rounded-full bg-stone-700 px-3 py-1 text-xs font-semibold text-white">
-                    Popular
+              <div className="flex min-h-7 items-start justify-between gap-3">
+                <h3 className="text-lg font-semibold">{plan.name}</h3>
+                {(isCurrent || featured) && (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                      featured
+                        ? "bg-background/10 text-background"
+                        : "bg-surface-soft text-muted-foreground"
+                    }`}
+                  >
+                    {isCurrent ? "Current plan" : "Most popular"}
                   </span>
-                </div>
-              )}
-              <h3 className="mb-1 text-2xl font-bold text-stone-900">
-                {plan.name}
-              </h3>
-              <p className="mb-6 text-sm text-stone-600">
-                {plan.resolution} output · {plan.credits} credits / month
-              </p>
-              <div className="mb-2">
-                <span className="text-4xl font-bold text-stone-900">
+                )}
+              </div>
+
+              <div className="mt-5 flex items-end gap-1.5">
+                <span className="font-display text-5xl font-medium leading-none">
                   ${monthlyEquivalent.toFixed(0)}
                 </span>
-                <span className="text-stone-600">/month</span>
+                <span className={featured ? "pb-1 text-xs text-background/65" : "pb-1 text-xs text-muted-foreground"}>
+                  / month
+                </span>
               </div>
-              {billing === "yearly" && (
-                <p className="mb-4 text-sm text-stone-500">
-                  Billed ${plan.yearlyPrice}/year. Credits issued monthly. Unused
-                  credits expire after 30 days.
-                </p>
-              )}
-              {billing === "monthly" && (
-                <p className="mb-4 text-sm text-stone-500">
-                  ${plan.monthlyPrice}/month billed monthly.
-                </p>
-              )}
+              <p className={`mt-2 min-h-10 text-xs leading-relaxed ${featured ? "text-background/65" : "text-muted-foreground"}`}>
+                {billing === "yearly"
+                  ? `$${plan.yearlyPrice} billed yearly. Credits issued monthly.`
+                  : `$${plan.monthlyPrice} billed monthly.`}
+              </p>
 
-              <div className="mb-6 rounded-xl border border-stone-200/50 bg-stone-50 px-4 py-3">
-                <p className="text-sm font-semibold text-stone-900">
+              <div className={`mt-4 rounded-ui-lg px-4 py-3 ${featured ? "bg-surface-elevated" : "bg-surface-soft"}`}>
+                <p className="text-sm font-semibold">
                   {plan.credits.toLocaleString()} credits / month
                 </p>
-                <p className="mt-1 text-xs text-stone-600">
-                  ${unitPrice.toFixed(2)} per credit · {plan.resolution} output
+                <p className={`mt-1 text-xs ${featured ? "text-background/60" : "text-muted-foreground"}`}>
+                  Up to {plan.resolution} output
                 </p>
               </div>
 
-              <ul className="mb-8 space-y-2 text-sm">
-                {SHARED_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-stone-600" />
-                    <span className="text-stone-700">{f}</span>
+              <ul className={`mt-5 flex-1 space-y-2.5 text-sm ${featured ? "text-background/80" : "text-stone-700"}`}>
+                {SHARED_FEATURES.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2.5">
+                    <Check className={`mt-0.5 h-4 w-4 shrink-0 ${featured ? "text-primary" : "text-primary-active"}`} />
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
 
               <Button
-                className="w-full"
-                variant={plan.popular ? "default" : "outline"}
-                disabled={cta.disabled || loading === pk || status === "loading"}
+                className={`mt-6 w-full ${
+                  featured && !cta.disabled
+                    ? "bg-primary text-white hover:bg-primary-active"
+                    : featured
+                      ? "border-background/15 bg-background/10 text-background"
+                      : ""
+                }`}
+                variant={featured ? "default" : "outline"}
+                disabled={cta.disabled || loading === priceKey || status === "loading"}
                 onClick={cta.onClick}
               >
-                {loading === pk ? "…" : cta.label}
+                {loading === priceKey ? "Opening checkout…" : cta.label}
               </Button>
-              {cta.note && (
-                <p className="mt-2 text-center text-xs text-stone-500">{cta.note}</p>
-              )}
-            </div>
+              <p className={`mt-2 min-h-8 text-center text-[11px] leading-relaxed ${featured ? "text-background/55" : "text-muted-foreground"}`}>
+                {cta.note || (billing === "yearly" ? "Yearly commitment" : "Cancel in billing portal")}
+              </p>
+            </article>
           );
         })}
       </div>
 
-      <p className="mx-auto mt-10 max-w-2xl text-center text-xs text-stone-500">
-        Credits are issued monthly, not all at once on yearly plans. All payments
-        are non-refundable. Upgrading grants new credits immediately; existing
-        credits stay valid until they expire.
+      <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-relaxed text-muted-foreground">
+        Credits expire 30 days after each monthly grant. Payments are non-refundable.
       </p>
 
       <UpgradeModal
@@ -367,11 +425,15 @@ export function PricingPlans({ stripeEnabled }: { stripeEnabled: boolean }) {
         isLoadingQuote={loadingUpgradeQuote}
         chargeLine={upgradeChargeLine}
         error={upgradeQuoteError}
+        currentPlan={upgradeDetails?.currentLabel ?? null}
+        targetPlan={upgradeDetails?.targetLabel ?? null}
+        currentPrice={upgradeDetails?.currentPrice ?? null}
+        targetPrice={upgradeDetails?.targetPrice ?? null}
+        targetCredits={upgradeDetails?.targetCredits ?? null}
+        targetBilling={upgradeDetails?.targetBilling ?? null}
         onConfirm={() => {
           setUpgradeOpen(false);
-          if (upgradeKey) {
-            upgradeNow(upgradeKey);
-          }
+          if (upgradeKey) upgradeNow(upgradeKey);
         }}
       />
     </>

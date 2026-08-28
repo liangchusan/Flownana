@@ -109,7 +109,7 @@ export function WorkspaceSidebar({
             <div className="h-10 animate-pulse rounded-ui bg-background/70" />
           ) : session ? (
             <div className={`flex flex-col gap-2 ${collapsed ? "lg:items-center" : ""}`}>
-              <CreditsWidget variant="sidebar" />
+              <CreditsWidget variant="sidebar" compact={collapsed} />
               <UserMenu align="left" compact={collapsed} variant="sidebar" user={{ name: session.user?.name, email: session.user?.email, image: session.user?.image }} />
             </div>
           ) : (

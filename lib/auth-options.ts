@@ -3,6 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import { getTestAuthCreditAmount } from "@/lib/test-auth-config";
+import { upsertAppUser } from "@/lib/user-sync";
 
 if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
   process.env.GLOBAL_AGENT_HTTP_PROXY =
@@ -149,6 +150,18 @@ export const authOptions: NextAuthOptions = {
           hasAccessToken: !!account?.access_token,
         });
       }
+      if (user?.id && user.email) {
+        try {
+          await upsertAppUser({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          });
+        } catch (error) {
+          console.error("Could not sync signed-in user profile:", error);
+        }
+      }
       return true;
     },
     async jwt({ token, user, trigger, session }) {
@@ -156,7 +169,15 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
-        token.picture = user.image;
+        try {
+          const profile = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { image: true },
+          });
+          token.picture = profile?.image ?? user.image;
+        } catch {
+          token.picture = user.image;
+        }
       }
       const updateName =
         typeof session?.user?.name === "string"
@@ -166,6 +187,16 @@ export const authOptions: NextAuthOptions = {
             : "";
       if (trigger === "update" && updateName.trim()) {
         token.name = updateName.trim();
+      }
+      const updatedImage = (
+        session as { user?: { image?: string | null } } | undefined
+      )?.user;
+      if (
+        trigger === "update" &&
+        updatedImage &&
+        Object.prototype.hasOwnProperty.call(updatedImage, "image")
+      ) {
+        token.picture = updatedImage.image ?? null;
       }
       return token;
     },

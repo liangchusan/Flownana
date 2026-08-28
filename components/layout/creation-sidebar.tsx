@@ -92,7 +92,7 @@ function SidebarContent() {
           </div>
         ) : session ? (
           <div className="flex flex-col items-center gap-2">
-            <CreditsWidget variant="sidebar" />
+            <CreditsWidget variant="sidebar" compact />
             <UserMenu
               align="left"
               compact

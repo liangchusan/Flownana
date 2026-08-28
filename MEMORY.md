@@ -142,6 +142,14 @@
   和并发请求去重。
 - 修改显示名称通过已登录 `PATCH /api/account/profile`，成功后调用 NextAuth
   `update()` 刷新 Session。
+- `docs/PRODUCT.md` 已确认新的侧栏 Upgrade、用户菜单、Pricing 弹窗、
+  `/account/profile` 和删除账号规则。当前代码已完成这批 UI、头像管理、
+  活跃任务删除保护、Stripe 取消后删号及自有 Vercel Blob 媒体清理能力。
+- 工作区 Upgrade 使用全局 Pricing 弹窗，默认年付并保留当前 Prompt 和附件；
+  用户入口展示会员状态和余额，账户菜单在移动端使用全宽底部面板。
+- `/account/profile` 支持修改显示名称、上传/移除自定义头像和永久删除账号。
+  删除前要求精确输入 `DELETE`；活跃生成、Stripe 取消失败或 Blob 清理失败都会
+  阻止数据库账号删除。
 
 ## 计费实现
 
@@ -170,6 +178,10 @@
   `[userId, type, createdAt desc]` 历史索引。
 - `20260812090000_add_generation_input_urls` 增加 `Generation.inputUrls`、
   `MediaAsset`、`GenerationMedia` 并回填可恢复的历史输入输出。
+- `20260828170000_add_user_avatar_sources` 增加 `User.providerImage` 和
+  `User.customAvatarUrl`，用于区分 OAuth 头像和用户上传头像。迁移文件已生成，
+  但截至 2026-08-28 尚未应用到 Supabase；代码为迁移前读取和删号提供兼容，
+  自定义头像写入必须等迁移完成。
 - 空的旧目录 `prisma/migrations/20260402053151_init` 仍会阻止正常
   `prisma migrate deploy`；修复迁移历史前，生产迁移可能仍需直接 SQL 加
   `prisma migrate resolve`。
@@ -239,6 +251,11 @@
 
 ## 当前工程风险与 TODO
 
+- 在获得生产数据库变更批准后应用并验证
+  `20260828170000_add_user_avatar_sources`；当前本地连接与生产使用同一 Supabase
+  数据库，因此本次开发没有执行迁移。
+- 在 Stripe 测试模式和独立测试 Blob 数据上端到端验证删号流程；外部订阅取消、
+  Blob 删除与数据库删除无法形成单一事务，中途外部失败仍需运维排查。
 - 修复空的旧 Prisma Migration 目录，使标准部署迁移流程恢复可靠。
 - 用 Flownana 自有媒体替换首页临时演示视频。
 - 在历史 Provider URL 仍可访问时回填旧生成媒体。
