@@ -240,8 +240,9 @@
 
 ### Production
 
-- `https://www.flownana.com` 最近记录在 2026-08-28 指向 Ready 部署
-  `dpl_3kqAdSfZEqZrrVgKrnnf5piWzGRG`，对应 Git 提交 `e176e77`。
+- 账户与 Pricing 功能代码在 2026-08-28 通过 Ready 生产部署
+  `dpl_3kqAdSfZEqZrrVgKrnnf5piWzGRG` 上线，对应 Git 提交 `e176e77`；后续仅文档
+  状态提交也由 Git 集成生成 Ready 部署，不改变运行时代码。
 - 生产已应用并回读验证历史索引、`Generation.parameters` 和长期媒体 Migration。
 - 生产已应用并回读验证用户 Provider/自定义头像字段；新部署错误日志扫描为空。
 - 媒体迁移从 17 条历史 Generation 回填 14 个输出资产和关系，没有可回填的
