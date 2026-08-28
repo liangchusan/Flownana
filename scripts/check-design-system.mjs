@@ -8,7 +8,8 @@ const sourceExtensions = new Set([".ts", ".tsx", ".css"]);
 const requiredFiles = [
   "AGENTS.md",
   "MEMORY.md",
-  "DESIGN.md",
+  "docs/PRODUCT.md",
+  "docs/DESIGN.md",
   "components.json",
   "app/globals.css",
   "tailwind.config.ts",
