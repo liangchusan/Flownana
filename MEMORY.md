@@ -179,9 +179,9 @@
 - `20260812090000_add_generation_input_urls` 增加 `Generation.inputUrls`、
   `MediaAsset`、`GenerationMedia` 并回填可恢复的历史输入输出。
 - `20260828170000_add_user_avatar_sources` 增加 `User.providerImage` 和
-  `User.customAvatarUrl`，用于区分 OAuth 头像和用户上传头像。迁移文件已生成，
-  但截至 2026-08-28 尚未应用到 Supabase；代码为迁移前读取和删号提供兼容，
-  自定义头像写入必须等迁移完成。
+  `User.customAvatarUrl`，用于区分 OAuth 头像和用户上传头像。2026-08-28 已通过
+  Supabase Migration `add_user_avatar_sources` 应用并回读验证两个新列和现有头像
+  回填；代码仍保留迁移前读取和删号兼容。
 - 空的旧目录 `prisma/migrations/20260402053151_init` 仍会阻止正常
   `prisma migrate deploy`；修复迁移历史前，生产迁移可能仍需直接 SQL 加
   `prisma migrate resolve`。
@@ -240,22 +240,23 @@
 
 ### Production
 
-- `https://www.flownana.com` 最近记录在 2026-08-12 指向 Ready 部署
-  `dpl_89EksargNEycssYGaPgz7GNpXsP9`。
+- `https://www.flownana.com` 最近记录在 2026-08-28 指向 Ready 部署
+  `dpl_3kqAdSfZEqZrrVgKrnnf5piWzGRG`，对应 Git 提交 `e176e77`。
 - 生产已应用并回读验证历史索引、`Generation.parameters` 和长期媒体 Migration。
+- 生产已应用并回读验证用户 Provider/自定义头像字段；新部署错误日志扫描为空。
 - 媒体迁移从 17 条历史 Generation 回填 14 个输出资产和关系，没有可回填的
   历史输入 URL。
-- 最近记录的生产冒烟测试通过主页、图片/视频、媒体、受保护 API、Cron 和
-  视频选项。
+- 最近记录的生产冒烟测试通过主页、图片/视频、静态媒体、受保护 API、Cron、
+  Suno 下线契约和视频选项。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
 
 ## 当前工程风险与 TODO
 
-- 在获得生产数据库变更批准后应用并验证
-  `20260828170000_add_user_avatar_sources`；当前本地连接与生产使用同一 Supabase
-  数据库，因此本次开发没有执行迁移。
 - 在 Stripe 测试模式和独立测试 Blob 数据上端到端验证删号流程；外部订阅取消、
   Blob 删除与数据库删除无法形成单一事务，中途外部失败仍需运维排查。
+- Supabase Security Advisor 报告 `MediaAsset`、`GenerationMedia` 和
+  `_prisma_migrations` 在公开 Schema 中未启用 RLS；不得直接启用而不设计服务端
+  访问策略，应单独评估 Data API 暴露范围和所需 Policies。
 - 修复空的旧 Prisma Migration 目录，使标准部署迁移流程恢复可靠。
 - 用 Flownana 自有媒体替换首页临时演示视频。
 - 在历史 Provider URL 仍可访问时回填旧生成媒体。
