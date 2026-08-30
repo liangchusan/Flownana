@@ -28,7 +28,9 @@ BEGIN
 END
 $$;
 
-ALTER ROLE flownana_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+-- Supabase's managed postgres role may create a least-privilege role but may
+-- not ALTER SUPERUSER/BYPASSRLS attributes afterwards. Those attributes are
+-- fixed at creation; the release process enables LOGIN and sets the password.
 
 -- Apply the intended RLS state to every current business and infrastructure
 -- table. Repeating ENABLE is safe and makes a fresh migration replay match

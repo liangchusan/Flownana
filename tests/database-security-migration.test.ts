@@ -62,7 +62,7 @@ test("future postgres-owned public objects default to no browser access", () => 
 test("only the dedicated server role receives policies and migration metadata stays isolated", () => {
   assert.doesNotMatch(migration, /TO\s+(anon|authenticated|service_role)/i);
   assert.match(migration, /CREATE ROLE flownana_app[\s\S]*NOBYPASSRLS/);
-  assert.match(migration, /ALTER ROLE flownana_app[\s\S]*NOBYPASSRLS/);
+  assert.doesNotMatch(migration, /ALTER ROLE flownana_app[^;]*(SUPERUSER|BYPASSRLS)/i);
   assert.doesNotMatch(migration, /REVOKE EXECUTE ON ALL FUNCTIONS/);
   assert.match(migration, /CREATE POLICY flownana_server_all[\s\S]*TO flownana_app/);
   const appGrant = migration.match(/GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE([\s\S]*?)TO flownana_app;/);

@@ -189,11 +189,15 @@
   `User.customAvatarUrl`，用于区分 OAuth 头像和用户上传头像。2026-08-28 已通过
   Supabase Migration `add_user_avatar_sources` 应用并回读验证两个新列和现有头像
   回填；代码仍保留迁移前读取和删号兼容。
-- `20260830035253_harden_public_data_api_access` 已在仓库准备但尚未应用到生产：
+- `20260830035253_harden_public_data_api_access` 已于 2026-08-30 应用到生产：
   对八张核心业务/基础设施表启用 RLS，回收 `PUBLIC`、`anon`、
   `authenticated` 的表权限，并撤销 `postgres` 在 `public` Schema 中为这些
   浏览器角色自动授予未来表、序列和函数权限的默认 ACL。当前不创建浏览器
   Policy，也不启用 FORCE RLS；Next.js Server 仍通过 Prisma 访问数据库。
+- 生产运行时使用独立 `flownana_app` 登录角色；该角色无 Superuser、CreateDB、
+  CreateRole、Inherit 或 BypassRLS，仅通过八张应用表上的
+  `flownana_server_all` Policy 和显式 CRUD Grant 工作，且不能读取
+  `_prisma_migrations`。Migration 继续由独立 owner/admin 连接执行。
 - 2026-08-30 已在临时 PostgreSQL 17 从空库完整重放全部十个 Migration：匿名
   `MediaAsset` 查询被拒绝，`flownana_app` 真实登录连接可通过 Prisma 完成 CRUD，
   且该角色不能读取 `_prisma_migrations`。临时数据库验证后已删除。
@@ -264,6 +268,10 @@
   历史输入 URL。
 - 最近记录的生产冒烟测试通过主页、图片/视频、静态媒体、受保护 API、Cron、
   Suno 下线契约和视频选项。
+- 2026-08-30 已应用数据库安全 Migration，Vercel Production
+  `DATABASE_URL` 已切换为最小权限 `flownana_app` Pooler 连接；Supabase 项目
+  Data API 已全局关闭，控制台确认所有 Schema 均不可通过 PostgREST 查询，
+  Auth 和 Storage 保持启用。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
 - Next.js 16 / React 19 升级已在本地通过测试、ESLint、类型检查、Turbopack
   Production Build 和完整 `npm audit`；生产仍运行上一个 Next.js 14 部署，直到
@@ -273,24 +281,24 @@
 
 - 在 Stripe 测试模式和独立测试 Blob 数据上端到端验证删号流程；外部订阅取消、
   Blob 删除与数据库删除无法形成单一事务，中途外部失败仍需运维排查。
-- 2026-08-30 只读安全审计确认生产 `MediaAsset`、`GenerationMedia` 和
-  `_prisma_migrations` 仍可由 Data API 的 `anon` / `authenticated` 角色直接
-  读取，并具有写权限。仓库修复 Migration 已准备但未应用，生产风险仍然存在。
-  当前 Prisma 连接为表 owner `postgres` 且具备 BYPASSRLS，因此普通 ENABLE
-  RLS 与回收浏览器角色权限不会阻断现有 Server 访问；本地完整 Migration 和
-  专用角色 Prisma 流程已验证，上线仍需验证生产 Pooler 登录和真实业务路径。
-- `supabase_admin` 在 `public` Schema 中仍有向 Data API 角色自动授权新对象的
-  默认 ACL，而当前 `postgres` 不是该角色成员，不能在 Prisma Migration 中安全
-  修改。关闭 Data API 或调整平台暴露 Schema 前，必须避免通过 Dashboard 创建
-  新的公开业务对象，并在具有相应管理权限的独立变更中处理该默认 ACL。
+- 2026-08-30 数据库安全 Migration 已消除审计确认的直接泄漏面：九张目标表均
+  开启 RLS，`PUBLIC`、`anon`、`authenticated`、`service_role` 均无表权限；
+  当前 Supabase REST 请求读取 `MediaAsset`、`GenerationMedia` 和
+  `_prisma_migrations` 均返回拒绝。生产 Pooler 上的 `flownana_app` 已通过真实
+  Prisma 事务 CRUD 和迁移表拒绝测试，Vercel Production `DATABASE_URL` 也已切换。
+- `supabase_admin` 的历史默认 ACL 不受 Prisma Migration owner 管理；全局关闭
+  Data API 后不再形成浏览器访问面。若未来重新启用 Data API，必须先用平台管理
+  权限审计并清理该默认 ACL，且不得通过 Dashboard 创建未审计的公开业务对象。
 - 用 Flownana 自有媒体替换首页临时演示视频。
 - 在历史 Provider URL 仍可访问时回填旧生成媒体。
 - 付费放量前监控 Qwen 多输入图片成本。
 - 上线前分别验证真实 Stripe、Webhook、数据库和 Provider 集成，不能用本地测试
   代替线上验证。
-- 早期部署文档曾把真实格式的认证和 API 凭据提交到 Git。即使工作区文件删除，
-  Git 历史仍可能保留；上线前必须确认相关 NextAuth、Google OAuth 和生成 API
-  凭据均已轮换，必要时再决定是否清理历史。
+- 早期部署文档曾把真实格式的认证和 API 凭据提交到 Git；生产
+  `NEXTAUTH_SECRET`、Google OAuth Client Secret 和数据库连接已核对为不同于
+  历史值。Google Client ID 不是秘密且保持不变。KIE 兼容生成凭据按负责人本轮
+  决定不轮换，这是已接受的剩余风险；若后续安全策略改变，应立即轮换并再评估
+  是否清理 Git 历史。
 
 ## 持久工程决策
 

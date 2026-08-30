@@ -26,9 +26,13 @@ store it only in the production secret manager.
 
    ```sql
    ALTER ROLE flownana_app
-     LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS
+     LOGIN
      PASSWORD '<fresh-secret-from-password-manager>';
    ```
+
+   The migration creates this role with `NOSUPERUSER`, `NOCREATEDB`,
+   `NOCREATEROLE`, `NOINHERIT`, and `NOBYPASSRLS`; verify those attributes
+   before switching the application connection.
 
 3. Test the new role through the same Supabase transaction-pooler endpoint the
    Vercel application will use. Its pooler username is
