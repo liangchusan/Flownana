@@ -275,16 +275,21 @@
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
 - 生产安全变更已经通过 Ready 部署 `dpl_24GQFYJeDDjzJd5Dmxk3RjonAqgE`
   上线：服务端 Provider 调用只读取 `KIE_API_KEY`，不再兼容
-  `NANO_BANANA_API_KEY`；Vercel Production、Preview、Development 已预置新的
-  Sensitive `KIE_API_KEY`，旧变量和旧 key 暂时保留到真实生成验证通过后再撤销。
+  `NANO_BANANA_API_KEY`；Vercel Production、Preview、Development 已配置新的
+  Sensitive `KIE_API_KEY`。最低成本真实生成验证成功后，KIE 控制台中的旧
+  `Default` key 已撤销，旧 `NANO_BANANA_API_KEY` Vercel 环境变量也已从三个环境
+  删除；最终生产重新部署后，运行时只保留新 key。
 - 同一生产安全变更在 Vercel Production 使用 Stripe 测试 key 时，仅允许
   `STRIPE_TEST_MODE_ALLOWED_EMAILS` 中的账号访问测试结账、套餐变更、Checkout
   回填、Webhook 写入和年度积分发放；生产 Test Auth 则无条件关闭。Stripe Live
   模式不受该测试保护逻辑影响。
 - 新 key 的首次最低成本生产图片验证已成功从 KIE 取得图片，但 Node 20+ 默认
   `autoSelectFamily` 要求自定义 DNS lookup 在 `all=true` 时返回地址数组，导致安全
-  下载器以 `ERR_INVALID_IP_ADDRESS` 失败；2 credits 已自动退回。当前待发布修复
-  在不放松逐跳公网 DNS 校验和固定 IP 连接的前提下兼容两种 lookup callback 合同。
+  下载器以 `ERR_INVALID_IP_ADDRESS` 失败；该次 2 credits 已自动退回。兼容修复已
+  通过提交 `957e620` 和 Ready 部署 `dpl_B9AKHENrNfRsBSXXezMyAKBgyTng` 发布，且不
+  放松逐跳公网 DNS 校验、固定 IP 连接、Host/SNI 或 TLS 证书校验。第二次同配置
+  生产验证成功，仅实际扣除 2 credits；生成记录、输出媒体关系和 Vercel Blob 均
+  已回读验证，Blob HEAD 返回 HTTP 200 和 `image/png`。
 - Next.js 16 / React 19、数据库与媒体安全加固已于 2026-08-30 通过 Ready 生产
   部署 `dpl_G9qUDx772o8k3ND5F3GDYEpEvWdm` 首次发布，运行时代码基线提交为
   `7a7a32d`；后续纯发布记录提交只生成等价构建，不改变运行时代码。最终
@@ -309,10 +314,10 @@
 - 上线前分别验证真实 Stripe、Webhook、数据库和 Provider 集成，不能用本地测试
   代替线上验证。
 - 早期部署文档曾把真实格式的认证和 API 凭据提交到 Git；生产
-  `NEXTAUTH_SECRET`、Google OAuth Client Secret 和数据库连接已核对为不同于
-  历史值。Google Client ID 不是秘密且保持不变。KIE 历史凭据轮换已经启动：
-  新 key 已写入三个 Vercel 环境，仍需完成新部署真实生成验证、撤销旧 key、删除
-  旧 `NANO_BANANA_API_KEY` 环境变量，并评估是否清理 Git 历史。
+  `NEXTAUTH_SECRET`、Google OAuth Client Secret、数据库连接和 KIE key 均已轮换
+  或核对为不同于历史值，旧 KIE key 已撤销，旧 Vercel 变量已删除。Google Client
+  ID 不是秘密且保持不变。历史凭据副本仍存在于 Git 历史，但当前均已失效；是否
+  执行破坏性的历史重写仅作为可选纵深防御评估，不是当前上线阻塞项。
 
 ## 持久工程决策
 
