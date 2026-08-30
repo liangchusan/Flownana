@@ -273,9 +273,10 @@
   Data API 已全局关闭，控制台确认所有 Schema 均不可通过 PostgREST 查询，
   Auth 和 Storage 保持启用。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
-- Next.js 16 / React 19 升级已在本地通过测试、ESLint、类型检查、Turbopack
-  Production Build 和完整 `npm audit`；生产仍运行上一个 Next.js 14 部署，直到
-  本轮数据库加固完成后统一发布。
+- Next.js 16 / React 19、数据库与媒体安全加固已于 2026-08-30 通过 Ready 生产
+  部署 `dpl_G9qUDx772o8k3ND5F3GDYEpEvWdm` 发布，发布基线提交为 `7a7a32d`。
+  `https://www.flownana.com` 已指向该部署；完整 `npm run smoke:prod` 通过，发布后
+  Function 日志未出现 Prisma、RLS 或运行时错误。
 
 ## 当前工程风险与 TODO
 
