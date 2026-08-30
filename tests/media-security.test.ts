@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isPublicNetworkAddress } from "../lib/safe-remote-media.ts";
+import {
+  createPinnedLookup,
+  isPublicNetworkAddress,
+} from "../lib/safe-remote-media.ts";
 import {
   getUploadIdFromBlobUrl,
   parseMediaUploadPayload,
@@ -22,6 +25,22 @@ test("remote media rejects private, loopback, link-local, and mapped addresses",
   ]) assert.equal(isPublicNetworkAddress(address), false, address);
   assert.equal(isPublicNetworkAddress("8.8.8.8"), true);
   assert.equal(isPublicNetworkAddress("2606:4700:4700::1111"), true);
+});
+
+test("remote media pins the validated address for single and all-address lookups", () => {
+  const resolved = { address: "8.8.8.8", family: 4 };
+  const pinnedLookup = createPinnedLookup(resolved);
+
+  pinnedLookup("ignored.example", { all: false }, (error, address, family) => {
+    assert.ifError(error);
+    assert.equal(address, resolved.address);
+    assert.equal(family, resolved.family);
+  });
+
+  pinnedLookup("ignored.example", { all: true }, (error, addresses) => {
+    assert.ifError(error);
+    assert.deepEqual(addresses, [resolved]);
+  });
 });
 
 test("upload payload requires a bounded UUID reservation", () => {

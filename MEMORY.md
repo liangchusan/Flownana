@@ -273,13 +273,18 @@
   Data API 已全局关闭，控制台确认所有 Schema 均不可通过 PostgREST 查询，
   Auth 和 Storage 保持启用。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
-- 当前待发布安全变更统一要求服务端 Provider 调用只读取 `KIE_API_KEY`，不再兼容
+- 生产安全变更已经通过 Ready 部署 `dpl_24GQFYJeDDjzJd5Dmxk3RjonAqgE`
+  上线：服务端 Provider 调用只读取 `KIE_API_KEY`，不再兼容
   `NANO_BANANA_API_KEY`；Vercel Production、Preview、Development 已预置新的
-  Sensitive `KIE_API_KEY`，旧变量和旧 key 暂时保留到新部署通过真实生成验证后再撤销。
-- 当前待发布安全变更还会在 Vercel Production 使用 Stripe 测试 key 时，仅允许
+  Sensitive `KIE_API_KEY`，旧变量和旧 key 暂时保留到真实生成验证通过后再撤销。
+- 同一生产安全变更在 Vercel Production 使用 Stripe 测试 key 时，仅允许
   `STRIPE_TEST_MODE_ALLOWED_EMAILS` 中的账号访问测试结账、套餐变更、Checkout
   回填、Webhook 写入和年度积分发放；生产 Test Auth 则无条件关闭。Stripe Live
   模式不受该测试保护逻辑影响。
+- 新 key 的首次最低成本生产图片验证已成功从 KIE 取得图片，但 Node 20+ 默认
+  `autoSelectFamily` 要求自定义 DNS lookup 在 `all=true` 时返回地址数组，导致安全
+  下载器以 `ERR_INVALID_IP_ADDRESS` 失败；2 credits 已自动退回。当前待发布修复
+  在不放松逐跳公网 DNS 校验和固定 IP 连接的前提下兼容两种 lookup callback 合同。
 - Next.js 16 / React 19、数据库与媒体安全加固已于 2026-08-30 通过 Ready 生产
   部署 `dpl_G9qUDx772o8k3ND5F3GDYEpEvWdm` 首次发布，运行时代码基线提交为
   `7a7a32d`；后续纯发布记录提交只生成等价构建，不改变运行时代码。最终

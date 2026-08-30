@@ -61,6 +61,20 @@ async function resolvePublicAddress(hostname: string) {
   return addresses[0];
 }
 
+export function createPinnedLookup(resolved: {
+  address: string;
+  family: number;
+}): import("node:net").LookupFunction {
+  return (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [resolved]);
+      return;
+    }
+
+    callback(null, resolved.address, resolved.family);
+  };
+}
+
 function validateRemoteUrl(value: string, previous?: URL) {
   const url = new URL(value, previous);
   if (
@@ -170,8 +184,7 @@ export async function safeRemoteMediaFetch(params: {
           {
             method: "GET",
             headers: { accept: "image/*,video/*,audio/*" },
-            lookup: (_hostname, _options, callback) =>
-              callback(null, resolved.address, resolved.family),
+            lookup: createPinnedLookup(resolved),
           },
           resolve
         );
