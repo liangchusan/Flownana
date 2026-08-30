@@ -23,15 +23,16 @@ const EMPTY_UPGRADE_INFO: UpgradeInfo = {
 };
 
 export default async function BillingPage({
-  searchParams = {},
+  searchParams,
 }: {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const session = await getServerSession(authOptions);
   const requestedCompletion =
-    getParam(searchParams, "checkout") === "success" ||
-    getParam(searchParams, "upgrade") === "success";
-  const sessionId = getParam(searchParams, "session_id");
+    getParam(resolvedSearchParams, "checkout") === "success" ||
+    getParam(resolvedSearchParams, "upgrade") === "success";
+  const sessionId = getParam(resolvedSearchParams, "session_id");
   let isNewCheckout = false;
   let upgradeInfo = EMPTY_UPGRADE_INFO;
   let isPaymentSyncPending = false;

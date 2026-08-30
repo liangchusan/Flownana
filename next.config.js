@@ -8,7 +8,6 @@ if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ["lh3.googleusercontent.com"],
     remotePatterns: [
       {
         protocol: "https",
@@ -19,14 +18,6 @@ const nextConfig = {
         hostname: "**.public.blob.vercel-storage.com",
       },
     ],
-  },
-  webpack: (config, { dev }) => {
-    // 解决本地 dev 环境偶发的 webpack runtime/cache 损坏导致的 _next 静态资源 500/404
-    // 关闭持久化文件系统缓存，稳定开发预览体验
-    if (dev) {
-      config.cache = false;
-    }
-    return config;
   },
   // 增加 API 路由超时时间
   experimental: {

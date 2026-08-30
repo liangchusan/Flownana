@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { CreateContent } from "./create-content";
 import { CreateFlowSkeleton } from "@/components/layout/create-flow-skeleton";
 
-export default function CreateModePage({
-  params,
-}: {
-  params: { mode: string };
-}) {
+export default async function CreateModePage(
+  props: {
+    params: Promise<{ mode: string }>;
+  }
+) {
+  const params = await props.params;
   if (params.mode === "voice") {
     redirect("/ai-image");
   }

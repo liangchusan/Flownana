@@ -14,9 +14,9 @@
 
 ## 当前技术栈
 
-- Next.js 14 App Router
+- Next.js 16 App Router（Turbopack production build）
 - TypeScript
-- React 18
+- React 19
 - Tailwind CSS 与 shadcn 风格基础组件
 - NextAuth
 - Prisma + Supabase PostgreSQL
@@ -265,6 +265,9 @@
 - 最近记录的生产冒烟测试通过主页、图片/视频、静态媒体、受保护 API、Cron、
   Suno 下线契约和视频选项。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
+- Next.js 16 / React 19 升级已在本地通过测试、ESLint、类型检查、Turbopack
+  Production Build 和完整 `npm audit`；生产仍运行上一个 Next.js 14 部署，直到
+  本轮数据库加固完成后统一发布。
 
 ## 当前工程风险与 TODO
 
