@@ -274,9 +274,10 @@
   Auth 和 Storage 保持启用。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
 - Next.js 16 / React 19、数据库与媒体安全加固已于 2026-08-30 通过 Ready 生产
-  部署 `dpl_G9qUDx772o8k3ND5F3GDYEpEvWdm` 发布，发布基线提交为 `7a7a32d`。
-  `https://www.flownana.com` 已指向该部署；完整 `npm run smoke:prod` 通过，发布后
-  Function 日志未出现 Prisma、RLS 或运行时错误。
+  部署 `dpl_G9qUDx772o8k3ND5F3GDYEpEvWdm` 首次发布，运行时代码基线提交为
+  `7a7a32d`；后续纯发布记录提交只生成等价构建，不改变运行时代码。最终
+  `main` SHA 后已复核 `https://www.flownana.com` 为 Ready，完整
+  `npm run smoke:prod` 通过，Function 日志未出现 Prisma、RLS 或运行时错误。
 
 ## 当前工程风险与 TODO
 
