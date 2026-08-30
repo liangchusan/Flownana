@@ -10,6 +10,7 @@ import {
   getNextYearlyCreditAt,
   getYearlyCreditGrantKey,
 } from "@/lib/yearly-credit-schedule";
+import { cleanupOrphanedMediaUploads } from "@/lib/media-upload-cleanup";
 
 export const dynamic = "force-dynamic";
 const MS_PER_DAY = 86_400_000;
@@ -109,5 +110,13 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, granted, duplicates, failed });
+  let mediaCleanup;
+  try {
+    mediaCleanup = await cleanupOrphanedMediaUploads(now);
+  } catch (error) {
+    console.error("[cron/monthly-credits] Media upload cleanup failed:", error);
+    mediaCleanup = { error: true };
+  }
+
+  return NextResponse.json({ ok: true, granted, duplicates, failed, mediaCleanup });
 }

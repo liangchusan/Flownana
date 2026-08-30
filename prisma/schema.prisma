@@ -3,24 +3,42 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id               String         @id
-  email            String         @unique
-  name             String?
-  image            String?
-  providerImage    String?
-  customAvatarUrl  String?
-  stripeCustomerId String?        @unique
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  subscriptions    Subscription[]
-  creditBatches    CreditBatch[]
-  generations      Generation[]
-  mediaAssets      MediaAsset[]
+  id                String             @id
+  email             String             @unique
+  name              String?
+  image             String?
+  providerImage     String?
+  customAvatarUrl   String?
+  stripeCustomerId  String?            @unique
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  subscriptions     Subscription[]
+  creditBatches     CreditBatch[]
+  generations       Generation[]
+  mediaAssets       MediaAsset[]
+  mediaUploadGrants MediaUploadGrant[]
+}
+
+model MediaUploadGrant {
+  id          String    @id
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String
+  maxBytes    Int
+  blobUrl     String?   @unique
+  actualBytes Int?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([userId, createdAt])
+  @@index([userId, completedAt])
 }
 
 model Subscription {
@@ -65,22 +83,22 @@ model ProcessedStripeEvent {
 }
 
 model Generation {
-  id                String   @id @default(cuid())
+  id                String            @id @default(cuid())
   userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   type              String
   status            String
-  urls              String[] @default([])
-  inputUrls         String[] @default([])
+  urls              String[]          @default([])
+  inputUrls         String[]          @default([])
   prompt            String
-  taskId            String?  @unique
+  taskId            String?           @unique
   error             String?
   modelOptionId     String?
   parameters        Json?
   creditsCost       Int?
   creditConsumption Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   media             GenerationMedia[]
 
   @@index([userId, createdAt(sort: Desc)])
@@ -89,15 +107,15 @@ model Generation {
 }
 
 model MediaAsset {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   type        String
   url         String
   contentType String?
   sizeBytes   Int?
   origin      String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime          @default(now())
   generations GenerationMedia[]
 
   @@unique([userId, url])

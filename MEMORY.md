@@ -1,6 +1,6 @@
 # Flownana 工程记忆
 
-最近复核：2026-08-28
+最近复核：2026-08-30
 
 本文档记录当前代码实现、基础设施、部署状态和工程风险，不承担产品需求定义。
 
@@ -73,6 +73,11 @@
   `/api/creations/download?creationId=...`；接口暂时兼容旧 `id` 参数并验证所有权。
 - 公开 Vercel Blob 输出重定向到 CDN `download=1`，旧第三方媒体由服务端代理下载。
 - 删除未引用的自有媒体时删除 Blob 与资产记录；仍作为其他任务输入的媒体保留。
+- 浏览器上传使用十分钟一次性 `MediaUploadGrant`，按用户限制预约频率、每日字节和
+  累计字节；完成回调和生成时的延迟登记都会锁定预约行，防止并发复用，过期的
+  未完成预约不能补登记。每日 Cron 清理超过回调宽限期的孤儿 Blob。
+- Provider 输出和历史第三方下载只允许公共 HTTPS/443，逐跳验证 DNS 与重定向，
+  并限制 MIME、文件签名、连接/总时限和实际读取字节数。
 
 ## 图片 Provider 实现
 
@@ -124,6 +129,8 @@
 - Provider 原文只进入服务端日志；API、Toast 和历史卡片只展示
   `docs/PRODUCT.md` 中的稳定产品文案。
 - 图片扣费后失败立即退款；视频保留扣费快照，首次退款失败后可在后续轮询重试。
+- 视频成功和失败结算锁定同一 `Generation` 行；状态落库、媒体关系登记和积分退款
+  在事务内争夺唯一终态，失败结果不能覆盖已成功任务，成功结果不能覆盖已退款任务。
 - 主要位置：
   - 图片接口：`app/api/generate/route.ts`
   - 视频接口：`app/api/veo/generate/route.ts`
@@ -182,9 +189,17 @@
   `User.customAvatarUrl`，用于区分 OAuth 头像和用户上传头像。2026-08-28 已通过
   Supabase Migration `add_user_avatar_sources` 应用并回读验证两个新列和现有头像
   回填；代码仍保留迁移前读取和删号兼容。
-- 空的旧目录 `prisma/migrations/20260402053151_init` 仍会阻止正常
-  `prisma migrate deploy`；修复迁移历史前，生产迁移可能仍需直接 SQL 加
-  `prisma migrate resolve`。
+- `20260830035253_harden_public_data_api_access` 已在仓库准备但尚未应用到生产：
+  对八张核心业务/基础设施表启用 RLS，回收 `PUBLIC`、`anon`、
+  `authenticated` 的表权限，并撤销 `postgres` 在 `public` Schema 中为这些
+  浏览器角色自动授予未来表、序列和函数权限的默认 ACL。当前不创建浏览器
+  Policy，也不启用 FORCE RLS；Next.js Server 仍通过 Prisma 访问数据库。
+- 2026-08-30 已在临时 PostgreSQL 17 从空库完整重放全部十个 Migration：匿名
+  `MediaAsset` 查询被拒绝，`flownana_app` 真实登录连接可通过 Prisma 完成 CRUD，
+  且该角色不能读取 `_prisma_migrations`。临时数据库验证后已删除。
+- 本地未跟踪的空目录 `prisma/migrations/20260402053151_init` 已清理，不再阻断
+  当前工作树的 Prisma Migration 扫描；生产应用安全 Migration 前仍需在非生产
+  数据库完整重放迁移并核对 `_prisma_migrations` 历史。
 
 ## Analytics 实现
 
@@ -255,10 +270,16 @@
 
 - 在 Stripe 测试模式和独立测试 Blob 数据上端到端验证删号流程；外部订阅取消、
   Blob 删除与数据库删除无法形成单一事务，中途外部失败仍需运维排查。
-- Supabase Security Advisor 报告 `MediaAsset`、`GenerationMedia` 和
-  `_prisma_migrations` 在公开 Schema 中未启用 RLS；不得直接启用而不设计服务端
-  访问策略，应单独评估 Data API 暴露范围和所需 Policies。
-- 修复空的旧 Prisma Migration 目录，使标准部署迁移流程恢复可靠。
+- 2026-08-30 只读安全审计确认生产 `MediaAsset`、`GenerationMedia` 和
+  `_prisma_migrations` 仍可由 Data API 的 `anon` / `authenticated` 角色直接
+  读取，并具有写权限。仓库修复 Migration 已准备但未应用，生产风险仍然存在。
+  当前 Prisma 连接为表 owner `postgres` 且具备 BYPASSRLS，因此普通 ENABLE
+  RLS 与回收浏览器角色权限不会阻断现有 Server 访问；本地完整 Migration 和
+  专用角色 Prisma 流程已验证，上线仍需验证生产 Pooler 登录和真实业务路径。
+- `supabase_admin` 在 `public` Schema 中仍有向 Data API 角色自动授权新对象的
+  默认 ACL，而当前 `postgres` 不是该角色成员，不能在 Prisma Migration 中安全
+  修改。关闭 Data API 或调整平台暴露 Schema 前，必须避免通过 Dashboard 创建
+  新的公开业务对象，并在具有相应管理权限的独立变更中处理该默认 ACL。
 - 用 Flownana 自有媒体替换首页临时演示视频。
 - 在历史 Provider URL 仍可访问时回填旧生成媒体。
 - 付费放量前监控 Qwen 多输入图片成本。

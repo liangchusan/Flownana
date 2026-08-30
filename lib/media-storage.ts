@@ -1,4 +1,5 @@
 import { put } from "@vercel/blob";
+import { safeRemoteMediaFetch } from "@/lib/safe-remote-media";
 
 type MediaKind = "image" | "video" | "music";
 export interface StoredMedia {
@@ -7,6 +8,11 @@ export interface StoredMedia {
   sizeBytes?: number;
 }
 const MAX_INPUT_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_GENERATED_BYTES: Record<MediaKind, number> = {
+  image: 40 * 1024 * 1024,
+  video: 500 * 1024 * 1024,
+  music: 50 * 1024 * 1024,
+};
 
 const EXTENSION_BY_CONTENT_TYPE: Record<string, string> = {
   "image/png": "png",
@@ -74,6 +80,12 @@ function parseDataUrl(value: string): {
   const contentType = match[1].toLowerCase();
   const isBase64 = !!match[2];
   const payload = match[3];
+  const estimatedBytes = isBase64
+    ? Math.ceil((payload.length * 3) / 4)
+    : Buffer.byteLength(payload, "utf8");
+  if (estimatedBytes > MAX_INPUT_IMAGE_BYTES) {
+    throw new Error("Input image exceeds the maximum file size of 20 MB.");
+  }
   const bytes = isBase64
     ? Buffer.from(payload, "base64")
     : Buffer.from(decodeURIComponent(payload), "utf8");
@@ -92,22 +104,17 @@ export async function persistGeneratedMedia(params: {
   }
 
   try {
-    const response = await fetch(params.sourceUrl);
-    if (!response.ok || !response.body) {
-      throw new Error(`Failed to download media: ${response.status}`);
-    }
-
-    const contentType = response.headers.get("content-type");
-    const contentLength = Number(response.headers.get("content-length") || 0);
-    if (!isExpectedContentType(params.kind, contentType)) {
-      throw new Error(
-        `Unexpected ${params.kind} content type while downloading generated media: ${contentType}`
-      );
-    }
+    const response = await safeRemoteMediaFetch({
+      url: params.sourceUrl,
+      kind: params.kind,
+      maxBytes: MAX_GENERATED_BYTES[params.kind],
+      timeoutMs: params.kind === "video" ? 120_000 : 60_000,
+    });
+    const contentType = response.contentType;
 
     const extension = extensionFor({
       contentType,
-      sourceUrl: params.sourceUrl,
+      sourceUrl: response.url,
       kind: params.kind,
     });
     const pathname = [
@@ -121,14 +128,14 @@ export async function persistGeneratedMedia(params: {
       access: "public",
       addRandomSuffix: false,
       allowOverwrite: true,
-      contentType: contentType || undefined,
+      contentType,
       multipart: true,
     });
 
     return {
       url: blob.url,
-      contentType: contentType?.split(";")[0] || undefined,
-      sizeBytes: contentLength > 0 ? contentLength : undefined,
+      contentType,
+      sizeBytes: response.sizeBytes,
     };
   } catch (error) {
     console.error("Failed to persist generated media to Vercel Blob:", error);
@@ -146,12 +153,7 @@ export async function persistImageInputMedia(params: {
     throw new Error("Input image is empty.");
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    if (source.startsWith("http://") || source.startsWith("https://")) {
-      return { url: source };
-    }
-    throw new Error("Image upload storage is not configured.");
-  }
+  if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("Image upload storage is not configured.");
 
   let body: Blob | ReadableStream<Uint8Array>;
   let contentType: string | null = null;
@@ -173,31 +175,7 @@ export async function persistImageInputMedia(params: {
       sourceUrl: "input.png",
       kind: "image",
     })}`;
-  } else {
-    let url: URL;
-    try {
-      url = new URL(source);
-    } catch {
-      throw new Error("Input image URL is invalid.");
-    }
-
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("Input image URL must be a public image URL.");
-    }
-
-    const response = await fetch(source);
-    if (!response.ok || !response.body) {
-      throw new Error(`Failed to download input image: ${response.status}`);
-    }
-
-    contentType = response.headers.get("content-type");
-    const contentLength = Number(response.headers.get("content-length") || 0);
-    if (contentLength > MAX_INPUT_IMAGE_BYTES) {
-      throw new Error("Input image exceeds the maximum file size of 20 MB.");
-    }
-    body = response.body;
-    sizeBytes = contentLength > 0 ? contentLength : undefined;
-  }
+  } else throw new Error("Input image URLs must come from an owned upload or asset.");
 
   if (!isExpectedContentType("image", contentType)) {
     throw new Error(`Input image file type is not supported: ${contentType || "unknown"}`);

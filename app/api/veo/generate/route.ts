@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
+import { del } from "@vercel/blob";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import {
@@ -8,6 +9,7 @@ import {
   InsufficientCreditsError,
   consumeCreditsFIFO,
   refundConsumedCredits,
+  refundConsumedCreditsWithClient,
   type CreditConsumptionSnapshot,
 } from "@/lib/credit-consumption";
 import {
@@ -386,47 +388,103 @@ async function failVideoGeneration(params: {
   error: unknown;
   source: "app" | "provider";
 }) {
-  const consumedCredits = normalizeCreditConsumptionSnapshot(
-    params.generation.creditConsumption
-  );
+  let consumedCredits = normalizeCreditConsumptionSnapshot(params.generation.creditConsumption);
   let creditsRefunded = false;
   let refundPending = false;
+  let settledParameters = withProcessingDuration(params.generation.parameters, params.generation.createdAt);
+  let display = withGenerationCreditOutcome(
+    getGenerationErrorDisplay(params.error, { mediaType: "video", source: params.source }),
+    { creditsConsumed: consumedCredits.length > 0, creditsRefunded, refundPending }
+  );
 
-  if (consumedCredits.length > 0) {
-    try {
-      await refundConsumedCredits(consumedCredits);
-      creditsRefunded = true;
-    } catch (refundError) {
-      refundPending = true;
-      console.error("Failed to refund async video credits:", refundError);
+  try {
+    const outcome = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{
+        status: string;
+        urls: string[];
+        prompt: string;
+        taskId: string | null;
+        creditsCost: number | null;
+        modelOptionId: string | null;
+        parameters: Prisma.JsonValue | null;
+        inputUrls: string[];
+        creditConsumption: Prisma.JsonValue | null;
+        createdAt: Date;
+      }>>`SELECT "status", "urls", "prompt", "taskId", "creditsCost", "modelOptionId", "parameters", "inputUrls", "creditConsumption", "createdAt"
+          FROM "Generation" WHERE "id" = ${params.generation.id} FOR UPDATE`;
+      const locked = rows[0];
+      if (!locked) throw new Error("Generation not found while settling failure.");
+      if (locked.status === "success") return { kind: "success" as const, locked };
+
+      consumedCredits = normalizeCreditConsumptionSnapshot(locked.creditConsumption);
+      if (consumedCredits.length > 0) {
+        await refundConsumedCreditsWithClient(tx, consumedCredits);
+        creditsRefunded = true;
+      }
+      settledParameters = withProcessingDuration(locked.parameters, locked.createdAt);
+      display = withGenerationCreditOutcome(
+        getGenerationErrorDisplay(params.error, { mediaType: "video", source: params.source }),
+        { creditsConsumed: consumedCredits.length > 0, creditsRefunded, refundPending: false }
+      );
+      await tx.generation.update({
+        where: { id: params.generation.id },
+        data: {
+          status: "failed",
+          error: display.message,
+          parameters: settledParameters as Prisma.InputJsonValue,
+          creditConsumption: Prisma.JsonNull,
+        },
+      });
+      return { kind: "failed" as const };
+    });
+    if (outcome.kind === "success") {
+      return NextResponse.json({
+        success: true,
+        pending: false,
+        status: "success",
+        videoUrl: outcome.locked.urls[0],
+        prompt: outcome.locked.prompt,
+        taskId: outcome.locked.taskId,
+        creditsCost: outcome.locked.creditsCost,
+        modelOptionId: outcome.locked.modelOptionId,
+        parameters: outcome.locked.parameters,
+        inputUrls: outcome.locked.inputUrls,
+      });
+    }
+  } catch (refundError) {
+    creditsRefunded = false;
+    refundPending = consumedCredits.length > 0;
+    console.error("Failed to atomically settle async video failure:", refundError);
+    display = withGenerationCreditOutcome(
+      getGenerationErrorDisplay(params.error, { mediaType: "video", source: params.source }),
+      { creditsConsumed: consumedCredits.length > 0, creditsRefunded: false, refundPending }
+    );
+    const updated = await prisma.generation.updateMany({
+      where: { id: params.generation.id, status: { not: "success" } },
+      data: {
+        status: "failed",
+        error: display.message,
+        parameters: settledParameters as Prisma.InputJsonValue,
+      },
+    });
+    if (updated.count === 0) {
+      const winner = await prisma.generation.findUnique({ where: { id: params.generation.id } });
+      if (winner?.status === "success") {
+        return NextResponse.json({
+          success: true,
+          pending: false,
+          status: "success",
+          videoUrl: winner.urls[0],
+          prompt: winner.prompt,
+          taskId: winner.taskId,
+          creditsCost: winner.creditsCost,
+          modelOptionId: winner.modelOptionId,
+          parameters: winner.parameters,
+          inputUrls: winner.inputUrls,
+        });
+      }
     }
   }
-
-  const display = withGenerationCreditOutcome(
-    getGenerationErrorDisplay(params.error, {
-      mediaType: "video",
-      source: params.source,
-    }),
-    {
-      creditsConsumed: consumedCredits.length > 0,
-      creditsRefunded,
-      refundPending,
-    }
-  );
-  const settledParameters = withProcessingDuration(
-    params.generation.parameters,
-    params.generation.createdAt
-  );
-
-  await prisma.generation.update({
-    where: { id: params.generation.id },
-    data: {
-      status: "failed",
-      error: display.message,
-      parameters: settledParameters as Prisma.InputJsonValue,
-      ...(refundPending ? {} : { creditConsumption: Prisma.JsonNull }),
-    },
-  });
 
   const payload = getGenerationErrorPayload(
     {
@@ -535,13 +593,6 @@ async function settleVideoTask(params: {
       taskId: params.taskId,
       kind: "video",
     });
-    await syncGenerationMediaAssets({
-      generationId: generation.id,
-      userId: params.userId,
-      assets: [
-        { media: generatedVideo, role: "output", type: "video", position: 0 },
-      ],
-    });
   } catch (error) {
     console.error("Failed to persist or register completed video:", error);
     return failVideoGeneration({
@@ -554,16 +605,40 @@ async function settleVideoTask(params: {
     generation.parameters,
     generation.createdAt
   );
-  await prisma.generation.update({
-    where: { id: generation.id },
-    data: {
-      status: "success",
-      urls: [generatedVideo.url],
-      error: null,
-      parameters: settledParameters as Prisma.InputJsonValue,
-      creditConsumption: Prisma.JsonNull,
-    },
+  const settlement = await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ status: string }>>`
+      SELECT "status" FROM "Generation" WHERE "id" = ${generation.id} FOR UPDATE`;
+    if (!rows[0]) throw new Error("Generation not found while settling success.");
+    if (rows[0].status !== "generating") return rows[0].status;
+    await syncGenerationMediaAssets({
+      generationId: generation.id,
+      userId: params.userId,
+      assets: [{ media: generatedVideo, role: "output", type: "video", position: 0 }],
+      tx,
+    });
+    await tx.generation.update({
+      where: { id: generation.id },
+      data: {
+        status: "success",
+        urls: [generatedVideo.url],
+        error: null,
+        parameters: settledParameters as Prisma.InputJsonValue,
+        creditConsumption: Prisma.JsonNull,
+      },
+    });
+    return "success";
   });
+  if (settlement === "failed") {
+    try {
+      await del(generatedVideo.url);
+    } catch (cleanupError) {
+      console.error("Failed to remove an unclaimed generated video:", cleanupError);
+    }
+    const winner = await prisma.generation.findUnique({ where: { id: generation.id } });
+    if (winner?.status === "failed") {
+      return failVideoGeneration({ generation: winner, error: winner.error || "Generation failed.", source: "app" });
+    }
+  }
 
   return NextResponse.json({
     success: true,

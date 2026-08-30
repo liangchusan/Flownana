@@ -219,14 +219,15 @@ export function ComposerToolbarLeading({
     }
     try {
       const blobs = await Promise.all(
-        accepted.map((file) =>
-          upload(`generation-inputs/image/${file.name}`, file, {
+        accepted.map((file) => {
+          const uploadId = crypto.randomUUID();
+          return upload(`generation-inputs/image/${uploadId}/${file.name}`, file, {
             access: "public",
             handleUploadUrl: "/api/creations/upload",
-            clientPayload: "image",
+            clientPayload: JSON.stringify({ kind: "image", sizeBytes: file.size, uploadId }),
             multipart: file.size > 4 * 1024 * 1024,
-          })
-        )
+          });
+        })
       );
       onAdd(
         accepted.map((file, index) => ({
@@ -273,10 +274,11 @@ export function ComposerToolbarLeading({
         });
         return;
       }
-      const blob = await upload(`generation-inputs/${kind}/${file.name}`, file, {
+      const uploadId = crypto.randomUUID();
+      const blob = await upload(`generation-inputs/${kind}/${uploadId}/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/creations/upload",
-        clientPayload: kind,
+        clientPayload: JSON.stringify({ kind, sizeBytes: file.size, uploadId }),
         multipart: file.size > 4 * 1024 * 1024,
       });
       onAdd([{

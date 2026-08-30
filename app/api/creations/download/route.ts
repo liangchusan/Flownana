@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { buildVercelBlobDownloadUrl } from "@/lib/creation-download";
+import { safeRemoteMediaFetch, type RemoteMediaKind } from "@/lib/safe-remote-media";
 
 export const dynamic = "force-dynamic";
 
@@ -74,16 +75,14 @@ export async function GET(request: Request) {
       });
     }
 
-    const mediaRes = await fetch(url);
-    if (!mediaRes.ok || !mediaRes.body) {
-      return NextResponse.json(
-        { error: "Media unavailable" },
-        { status: 502 }
-      );
-    }
-
-    const contentType =
-      mediaRes.headers.get("content-type") || "application/octet-stream";
+    const kind: RemoteMediaKind = creation.type === "video" ? "video" : creation.type === "music" ? "music" : "image";
+    const mediaRes = await safeRemoteMediaFetch({
+      url,
+      kind,
+      maxBytes: kind === "video" ? 500 * 1024 * 1024 : kind === "music" ? 50 * 1024 * 1024 : 40 * 1024 * 1024,
+      timeoutMs: kind === "video" ? 120_000 : 60_000,
+    });
+    const contentType = mediaRes.contentType;
     const extension =
       extensionFromUrl(url) || extensionFromContentType(contentType);
     const filename = `flownana-${sanitizeFilePart(creation.type)}-${Date.now()}.${extension}`;

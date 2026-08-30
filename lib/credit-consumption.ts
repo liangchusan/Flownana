@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   planCreditConsumption,
@@ -88,12 +89,19 @@ export async function refundConsumedCredits(
 ): Promise<void> {
   if (!consumed.length) return;
 
-  await prisma.$transaction(
-    consumed.map((c) =>
-      prisma.creditBatch.update({
+  await prisma.$transaction(async (tx) => {
+    await refundConsumedCreditsWithClient(tx, consumed);
+  });
+}
+
+export async function refundConsumedCreditsWithClient(
+  client: Prisma.TransactionClient,
+  consumed: CreditConsumptionSnapshot
+): Promise<void> {
+  for (const c of consumed) {
+    await client.creditBatch.update({
         where: { id: c.batchId },
         data: { remaining: { increment: c.amount } },
-      })
-    )
-  );
+    });
+  }
 }

@@ -174,6 +174,8 @@ Flownana 是一个 0→1 的 AI 媒体生成产品，当前重点是快速上线
 - Gemini 的源视频、上传音频和 Character ID 在定价和 Provider ID 方案获批
   前不进入 P0。
 - 视频任务等待超过 45 分钟后标记超时并退款。
+- 同一视频任务的成功与失败结算必须通过数据库事务争夺唯一终态；并发轮询不得
+  重复退款、覆盖已成功任务或产生“成功且已退款”的状态。
 
 ## 8. Assets 与媒体生命周期
 
@@ -187,6 +189,31 @@ Flownana 是一个 0→1 的 AI 媒体生成产品，当前重点是快速上线
 - 删除未被引用的生成输出时，同时删除自有存储对象和资产记录；仍被任务引用
   的媒体继续保留。
 - 历史 Provider 媒体 URL 失效时，可以尝试刷新为新的可访问 URL。
+- 新上传必须使用已登录用户的一次性预约：Token 最长有效 10 分钟，每用户每小时
+  最多 60 个预约、24 小时预约总量最多 1 GB；单文件上限为图片 20 MB、视频
+  50 MB、音频 15 MB，累计有效上传预约最多 5 GB。上传完成后必须登记用户归属，
+  未登记的任意远程 URL 不得作为生成输入；每日任务清理已过回调宽限期的孤儿
+  Blob 和过期预约。
+- 服务端抓取 Provider 输出和代理下载时必须只连接公共 HTTPS 地址，逐跳校验
+  DNS 与重定向，并执行内容类型、文件签名、总时限和实际流量上限；图片、视频、
+  音频输出上限分别为 40 MB、500 MB、50 MB。
+
+### 8.1 数据库访问边界
+
+- 浏览器不得通过 Supabase Data API、PostgREST 或 GraphQL 直接访问核心业务表；
+  所有业务数据访问必须经过 Next.js Server 和 Prisma。
+- `User`、`Subscription`、`CreditBatch`、`Generation`、`MediaAsset`、
+  `GenerationMedia`、`ProcessedStripeEvent`、`MediaUploadGrant` 和
+  `_prisma_migrations` 不向 `anon`、`authenticated` 或 `service_role`
+  数据库角色开放直接访问。
+- 这些表在 `public` Schema 中必须启用 RLS 作为纵深防御，但在当前 NextAuth
+  架构下不为浏览器角色创建用户级 Policy。
+- 数据库权限收紧后，Next.js Server 的 Prisma 读写、Stripe Webhook、Cron、
+  生成、历史和媒体生命周期行为必须保持不变。
+- Prisma Runtime 使用专用 `NOBYPASSRLS` 角色和显式 Server Policy；Migration
+  使用独立 Owner/Admin 直连，并且 Runtime 不得访问 `_prisma_migrations`。
+- Supabase Data API 必须关闭；Supabase 仅承担 PostgreSQL、Auth、Storage 等
+  基础能力。
 
 ## 9. 登录与账户
 
@@ -351,6 +378,11 @@ Provider、超时和媒体持久化失败必须退款。
 - 改动 UI 在 390px 和 1440px 可用，并覆盖相关空、加载、成功、错误、
   hover、focus 和 disabled 状态
 - 落地页、登录、结账、生成和结果主流程没有严重阻断
+- Supabase `anon` 和 `authenticated` 角色不能直接读取或修改核心业务表及
+  `_prisma_migrations`
+- RLS 和 GRANT 收紧后，Next.js Server 通过 Prisma 的正常读写仍然可用
+- 匿名 Key、登录 JWT 和 Service Key 均不能通过 Data API 访问核心业务表
+- 上传预约配额、用户归属、远程地址校验、字节上限和视频并发终态结算通过验证
 
 ## 14. 当前优先级与风险
 
