@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getKieApiKey } from "@/lib/kie";
 
 /**
  * 测试环境变量是否正确加载
@@ -19,14 +20,7 @@ export async function GET() {
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET 
       ? "✅ Set" 
       : "❌ Not set",
-    NANO_BANANA_API_KEY: process.env.NANO_BANANA_API_KEY 
-      ? "✅ Set" 
-      : "❌ Not set",
-    KIE_API_KEY: process.env.KIE_API_KEY 
-      ? "✅ Set" 
-      : process.env.NANO_BANANA_API_KEY 
-        ? "✅ Using NANO_BANANA_API_KEY as fallback" 
-        : "❌ Not set",
+    KIE_API_KEY: getKieApiKey() ? "✅ Set" : "❌ Not set",
   };
 
   return NextResponse.json({

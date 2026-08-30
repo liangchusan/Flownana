@@ -15,6 +15,7 @@ import {
   buildUpgradeQuote,
   isUpgradeAllowed,
 } from "@/lib/upgrade-logic";
+import { canCreateStripeCheckout } from "@/lib/stripe-production-access";
 
 type ChangePlanBody = {
   priceKey?: string;
@@ -25,6 +26,20 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id || !session.user.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (
+      !canCreateStripeCheckout({
+        email: session.user.email,
+        secretKey: process.env.STRIPE_SECRET_KEY,
+        vercelEnv: process.env.VERCEL_ENV,
+        allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS,
+      })
+    ) {
+      return NextResponse.json(
+        { error: "Checkout is unavailable until live payments are enabled." },
+        { status: 503 }
+      );
     }
 
     const body = (await request.json()) as ChangePlanBody;

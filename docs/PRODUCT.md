@@ -287,6 +287,10 @@ Provider、超时和媒体持久化失败必须退款。
   页面展示一致。
 - Query 参数中的套餐名称或价格不能作为付款凭证。
 - Webhook 和返回页的购买完成处理必须幂等。
+- 当生产部署仍配置 Stripe Test Mode 时，公众用户不得创建或完成测试 Checkout，
+  测试 Webhook 也不得向生产业务数据写入订阅或积分。只有
+  `STRIPE_TEST_MODE_ALLOWED_EMAILS` 中的专用 QA 账号可以从返回页完成测试结账；
+  正式切换完整的 Live Key、Price 和 Webhook 套件后自动恢复公众结账。
 - 产品不提供降级操作，用户需要进入 Billing Portal。
 
 允许的升级规则：
@@ -397,7 +401,8 @@ Provider、超时和媒体持久化失败必须退款。
 
 - 图片和视频在售，历史音频仍可见但不能重新生成
 - Qwen 的 Provider 成本随输入图片数量增加，当前用户价格保持固定
-- Stripe 仍是测试模式，正式上线前需要有意配置 Live Key、Price 和 Webhook
+- Stripe 仍是测试模式，公众生产结账默认关闭；正式上线前需要有意配置完整的
+  Live Key、Price 和 Webhook 套件
 - 历史 Provider 媒体可能在完成回填前过期
 - 首页临时演示视频还不是 Flownana 自有资产
 

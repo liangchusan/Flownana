@@ -11,6 +11,7 @@ import {
   getYearlyCreditGrantKey,
 } from "@/lib/yearly-credit-schedule";
 import { cleanupOrphanedMediaUploads } from "@/lib/media-upload-cleanup";
+import { canCreateStripeCheckout } from "@/lib/stripe-production-access";
 
 export const dynamic = "force-dynamic";
 const MS_PER_DAY = 86_400_000;
@@ -41,13 +42,27 @@ export async function GET(request: Request) {
       status: { in: ["active", "trialing"] },
       nextCreditAt: { lte: now },
     },
+    include: { user: { select: { email: true } } },
   });
 
   let granted = 0;
   let duplicates = 0;
+  let ignored = 0;
   const failed: string[] = [];
 
   for (const sub of subs) {
+    if (
+      !canCreateStripeCheckout({
+        email: sub.user.email,
+        secretKey: process.env.STRIPE_SECRET_KEY,
+        vercelEnv: process.env.VERCEL_ENV,
+        allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS,
+      })
+    ) {
+      ignored += 1;
+      continue;
+    }
+
     const parsed = getPriceKeyFromStripePriceId(sub.stripePriceId);
     if (!parsed || parsed.billing !== "yearly") {
       console.error(
@@ -118,5 +133,12 @@ export async function GET(request: Request) {
     mediaCleanup = { error: true };
   }
 
-  return NextResponse.json({ ok: true, granted, duplicates, failed, mediaCleanup });
+  return NextResponse.json({
+    ok: true,
+    granted,
+    duplicates,
+    ignored,
+    failed,
+    mediaCleanup,
+  });
 }

@@ -273,6 +273,13 @@
   Data API 已全局关闭，控制台确认所有 Schema 均不可通过 PostgREST 查询，
   Auth 和 Storage 保持启用。
 - Stripe 仍是测试模式，直到有意配置 Live Key、Price 和 Webhook Secret。
+- 当前待发布安全变更统一要求服务端 Provider 调用只读取 `KIE_API_KEY`，不再兼容
+  `NANO_BANANA_API_KEY`；Vercel Production、Preview、Development 已预置新的
+  Sensitive `KIE_API_KEY`，旧变量和旧 key 暂时保留到新部署通过真实生成验证后再撤销。
+- 当前待发布安全变更还会在 Vercel Production 使用 Stripe 测试 key 时，仅允许
+  `STRIPE_TEST_MODE_ALLOWED_EMAILS` 中的账号访问测试结账、套餐变更、Checkout
+  回填、Webhook 写入和年度积分发放；生产 Test Auth 则无条件关闭。Stripe Live
+  模式不受该测试保护逻辑影响。
 - Next.js 16 / React 19、数据库与媒体安全加固已于 2026-08-30 通过 Ready 生产
   部署 `dpl_G9qUDx772o8k3ND5F3GDYEpEvWdm` 首次发布，运行时代码基线提交为
   `7a7a32d`；后续纯发布记录提交只生成等价构建，不改变运行时代码。最终
@@ -298,9 +305,9 @@
   代替线上验证。
 - 早期部署文档曾把真实格式的认证和 API 凭据提交到 Git；生产
   `NEXTAUTH_SECRET`、Google OAuth Client Secret 和数据库连接已核对为不同于
-  历史值。Google Client ID 不是秘密且保持不变。KIE 兼容生成凭据按负责人本轮
-  决定不轮换，这是已接受的剩余风险；若后续安全策略改变，应立即轮换并再评估
-  是否清理 Git 历史。
+  历史值。Google Client ID 不是秘密且保持不变。KIE 历史凭据轮换已经启动：
+  新 key 已写入三个 Vercel 环境，仍需完成新部署真实生成验证、撤销旧 key、删除
+  旧 `NANO_BANANA_API_KEY` 环境变量，并评估是否清理 Git 历史。
 
 ## 持久工程决策
 

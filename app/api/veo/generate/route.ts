@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { del } from "@vercel/blob";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
+import { getKieApiKey } from "@/lib/kie";
 import {
   CreditConsumptionConflictError,
   InsufficientCreditsError,
@@ -189,7 +190,7 @@ async function createVideoTask(params: {
     return json.id;
   }
 
-  const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
+  const apiKey = getKieApiKey();
   if (!apiKey) {
     throw new Error(
       "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."
@@ -306,7 +307,7 @@ async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
     }
   }
 
-  const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
+  const apiKey = getKieApiKey();
   if (!apiKey) {
     throw new Error(
       "KIE_API_KEY environment variable is not configured. Please add it to .env and try again."

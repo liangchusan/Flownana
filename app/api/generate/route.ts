@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
+import { getKieApiKey } from "@/lib/kie";
 import {
   CreditConsumptionConflictError,
   InsufficientCreditsError,
@@ -105,7 +106,7 @@ async function createImageTask(params: {
   outputFormat?: "png" | "jpg" | "jpeg";
   inputUrls?: string[];
 }) {
-  const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
+  const apiKey = getKieApiKey();
 
   if (!apiKey) {
     throw new Error(
@@ -182,7 +183,7 @@ async function createImageTask(params: {
 }
 
 async function pollImageResult(taskId: string, modelLabel: string) {
-  const apiKey = process.env.KIE_API_KEY || process.env.NANO_BANANA_API_KEY;
+  const apiKey = getKieApiKey();
 
   if (!apiKey) {
     throw new Error(

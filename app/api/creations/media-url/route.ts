@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
+import { getKieApiKey } from "@/lib/kie";
 
 const KIE_DOWNLOAD_URL_ENDPOINT = "https://api.kie.ai/api/v1/common/download-url";
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ url });
     }
 
-    const apiKey = process.env.NANO_BANANA_API_KEY || process.env.KIE_API_KEY;
+    const apiKey = getKieApiKey();
     if (!apiKey) {
       return NextResponse.json(
         { error: "Media refresh is not configured" },

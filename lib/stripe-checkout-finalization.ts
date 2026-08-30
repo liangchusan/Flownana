@@ -8,6 +8,7 @@ import {
 import { getStripe } from "@/lib/stripe";
 import { grantCreditsForCurrentPeriodIfNeeded } from "@/lib/subscription-credit-grant";
 import { upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { canFinalizeStripeCheckout } from "@/lib/stripe-production-access";
 
 export type CheckoutFinalizationResult = {
   priceKey: PriceKey;
@@ -88,6 +89,22 @@ export async function finalizeCheckoutSession(params: {
   );
   if (completionError) throw new Error(completionError);
   if (!userId) throw new Error("Checkout Session has no user");
+
+  const checkoutUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  });
+  if (
+    !checkoutUser?.email ||
+    !canFinalizeStripeCheckout({
+      email: checkoutUser.email,
+      livemode: checkoutSession.livemode,
+      vercelEnv: process.env.VERCEL_ENV,
+      allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS,
+    })
+  ) {
+    throw new Error("Test-mode Checkout is not allowed for this account");
+  }
 
   const customerId = getObjectId(checkoutSession.customer);
   const subscriptionId = getObjectId(checkoutSession.subscription);

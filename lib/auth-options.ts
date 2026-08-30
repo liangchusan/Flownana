@@ -2,7 +2,10 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
-import { getTestAuthCreditAmount } from "@/lib/test-auth-config";
+import {
+  getTestAuthCreditAmount,
+  isServerTestAuthEnabled,
+} from "@/lib/test-auth-config";
 import { upsertAppUser } from "@/lib/user-sync";
 
 if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
@@ -23,11 +26,7 @@ const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 const nextAuthUrl = process.env.NEXTAUTH_URL;
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-const isProductionDeployment =
-  process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production";
-const testAuthEnabled =
-  !isProductionDeployment &&
-  (process.env.NODE_ENV !== "production" || process.env.ENABLE_TEST_AUTH === "true");
+const testAuthEnabled = isServerTestAuthEnabled(process.env);
 const testUserId = process.env.TEST_AUTH_USER_ID || "test-user-local";
 const testUserEmail = process.env.TEST_AUTH_EMAIL || "test@flownana.local";
 const testUserName = process.env.TEST_AUTH_NAME || "Test User";

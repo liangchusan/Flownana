@@ -7,6 +7,7 @@ import { upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
 import { getStripeStateSyncKind } from "@/lib/stripe-event-policy";
 import { grantCreditsForCurrentPeriodIfNeeded } from "@/lib/subscription-credit-grant";
 import { finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
+import { shouldIgnoreStripeTestWebhook } from "@/lib/stripe-production-access";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,15 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error("Stripe webhook signature error:", e);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  if (
+    shouldIgnoreStripeTestWebhook({
+      livemode: event.livemode,
+      vercelEnv: process.env.VERCEL_ENV,
+    })
+  ) {
+    return NextResponse.json({ received: true, ignored: true });
   }
 
   if (await prisma.processedStripeEvent.findUnique({ where: { id: event.id } })) {
