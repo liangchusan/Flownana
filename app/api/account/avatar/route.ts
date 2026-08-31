@@ -1,14 +1,16 @@
 import { del, put } from "@vercel/blob";
+import { randomUUID } from "node:crypto";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth-options";
+import { matchesRequestAccount } from "@/lib/account-scope";
+import { sessionAccountWhere } from "@/lib/account-session";
 import {
   getAvatarValidationError,
   isOwnedBlobUrl,
   isMissingProfileSchemaError,
 } from "@/lib/account-profile";
 import { prisma } from "@/lib/prisma";
-import { upsertAppUser } from "@/lib/user-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -22,22 +24,16 @@ function safePathSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 96) || "user";
 }
 
-async function getAuthenticatedUser() {
+async function getAuthenticatedUser(request: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || !session.user.email) return null;
+  if (!session?.user?.id || !session.user.email || !matchesRequestAccount(request, session.user)) return null;
 
-  await upsertAppUser({
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
   return session.user;
 }
 
 export async function POST(request: Request) {
   try {
-    const sessionUser = await getAuthenticatedUser();
+    const sessionUser = await getAuthenticatedUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -59,29 +55,37 @@ export async function POST(request: Request) {
     }
 
     const previous = await prisma.user.findUnique({
-      where: { id: sessionUser.id },
+      where: sessionAccountWhere(sessionUser),
       select: { customAvatarUrl: true },
     });
+    if (!previous) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const extension = EXTENSIONS[file.type] || "webp";
     const blob = await put(
-      `avatars/${safePathSegment(sessionUser.id)}/profile.${extension}`,
+      `avatars/${safePathSegment(sessionUser.id)}/${randomUUID()}.${extension}`,
       file,
       {
         access: "public",
         addRandomSuffix: false,
-        allowOverwrite: true,
+        allowOverwrite: false,
         contentType: file.type,
       }
     );
 
-    const user = await prisma.user.update({
-      where: { id: sessionUser.id },
-      data: {
-        image: blob.url,
-        customAvatarUrl: blob.url,
-      },
-      select: { id: true, name: true, email: true, image: true },
-    });
+    let user;
+    try {
+      user = await prisma.user.update({
+        where: sessionAccountWhere(sessionUser),
+        data: { image: blob.url, customAvatarUrl: blob.url },
+        select: { id: true, name: true, email: true, image: true },
+      });
+    } catch (error) {
+      await del(blob.url).catch((cleanupError) => {
+        console.error("Could not clean up an unsaved profile photo:", cleanupError);
+      });
+      throw error;
+    }
 
     if (
       previous?.customAvatarUrl &&
@@ -109,15 +113,15 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
-    const sessionUser = await getAuthenticatedUser();
+    const sessionUser = await getAuthenticatedUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const current = await prisma.user.findUnique({
-      where: { id: sessionUser.id },
+      where: sessionAccountWhere(sessionUser),
       select: { customAvatarUrl: true, providerImage: true },
     });
     if (!current) {
@@ -135,7 +139,7 @@ export async function DELETE() {
     }
 
     const user = await prisma.user.update({
-      where: { id: sessionUser.id },
+      where: sessionAccountWhere(sessionUser),
       data: {
         customAvatarUrl: null,
         image: current.providerImage,

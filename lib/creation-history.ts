@@ -61,8 +61,8 @@ export function normalizeGenerationParameters(
     processingDurationMs,
     audio: readParameterString(candidate.audio),
     mode: readParameterString(candidate.mode),
-    ...(Array.isArray(candidate.inputKinds)
-      ? { inputKinds: candidate.inputKinds.filter((kind): kind is "image" | "video" | "audio" => ["image", "video", "audio"].includes(String(kind))) }
+    ...(Array.isArray(candidate.inputKinds) && candidate.inputKinds.every((kind) => ["image", "video", "audio"].includes(kind))
+      ? { inputKinds: candidate.inputKinds as Array<"image" | "video" | "audio"> }
       : {}),
     ...(readParameterString(candidate.runId)
       ? { runId: readParameterString(candidate.runId) }
@@ -137,6 +137,10 @@ export function formatConversationTimestamp(
 }
 
 export interface CreationHistoryItem {
+  /** Client-only: a lost reply is not a terminal generation failure. */
+  statusUncertain?: boolean;
+  /** Client-only records; never persisted as account history. */
+  optimistic?: boolean;
   id: string;
   type: "image" | "video" | "music";
   status: CreationStatus;
@@ -154,6 +158,22 @@ export interface CreationHistoryItem {
 
 export function creationIdentity(creation: CreationHistoryItem): string {
   return creation.taskId || creation.id;
+}
+
+/** Server rows are authoritative, including removed URLs and hidden/deleted state.
+ * Absence from a bounded page is not a deletion. Keep only unmatched local work
+ * and previously loaded rows outside that page. Never compare status ranks here.
+ */
+export function reconcileCreationSnapshot(current: CreationHistoryItem[], snapshot: CreationHistoryItem[], pageSize = 100) {
+  const same = (left: CreationHistoryItem, right: CreationHistoryItem) =>
+    left.id === right.id || (!!left.taskId && left.taskId === right.taskId) ||
+    (!!left.parameters?.runId && left.parameters.runId === right.parameters?.runId &&
+      (left.parameters.outputIndex ?? 0) === (right.parameters?.outputIndex ?? 0));
+  const complete = snapshot.length < pageSize;
+  const oldest = snapshot.length ? Math.min(...snapshot.map((row) => new Date(row.createdAt).getTime())) : Infinity;
+  return [...snapshot, ...current.filter((item) => !snapshot.some((row) => same(item, row)) &&
+    (item.optimistic || (!complete && new Date(item.createdAt).getTime() <= oldest)))]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getCreationTimelineKey(creations: CreationHistoryItem[]) {

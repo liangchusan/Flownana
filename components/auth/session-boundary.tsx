@@ -1,14 +1,15 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
 
 export function SessionBoundary({
   children,
-  session,
 }: {
   children: React.ReactNode;
   session: Session | null;
 }) {
-  return <SessionProvider session={session}>{children}</SessionProvider>;
+  // The root Providers owns the only NextAuth SessionProvider. NextAuth v4
+  // shares a global refresh callback, so nested providers can disagree forever.
+  // Private server seeds carry their own explicit account scope at the caller.
+  return children;
 }

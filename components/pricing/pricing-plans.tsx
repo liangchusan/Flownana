@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,9 @@ import {
 import { trackEvent } from "@/lib/analytics";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { fetchBillingSummary } from "@/lib/billing-summary-client";
+import { getAccountScope } from "@/lib/account-scope";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
 
 const SHARED_FEATURES = [
   "All available image and video models",
@@ -49,12 +52,18 @@ type UpgradeDetails = {
   targetBilling: BillingKey;
 } | null;
 
-export function PricingPlans({
+export function PricingPlans(props: PricingPlansProps) {
+  const { data: session } = useSession();
+  return <ScopedPricingPlans key={getAccountScope(session?.user) || "anonymous"} {...props} />;
+}
+
+function ScopedPricingPlans({
   stripeEnabled,
   initialBilling = "monthly",
   variant = "page",
 }: PricingPlansProps) {
   const { data: session, status } = useSession();
+  const { accountScope, capture } = useAccountOperation();
   const { showToast } = useToast();
   const [billing, setBilling] = useState<BillingKey>(initialBilling);
   const [summary, setSummary] = useState<{
@@ -70,16 +79,23 @@ export function PricingPlans({
   const [upgradeQuoteError, setUpgradeQuoteError] = useState<string | null>(null);
   const [loadingUpgradeQuote, setLoadingUpgradeQuote] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
+  const [summaryState, setSummaryState] = useState<"loading" | "ready" | "error">("loading");
+  const [summaryRetry, setSummaryRetry] = useState(0);
+  const quoteRevision = useRef(0);
 
   useEffect(() => {
-    if (!session?.user) {
+    if (!accountScope) {
       setSummary(null);
       return;
     }
-    fetchBillingSummary()
-      .then(setSummary)
-      .catch(() => setSummary(null));
-  }, [session]);
+    let active = true;
+    setSummary(null);
+    setSummaryState("loading");
+    fetchBillingSummary(accountScope).then((data) => {
+      if (active) { setSummary(data); setSummaryState(data ? "ready" : "error"); }
+    });
+    return () => { active = false; };
+  }, [accountScope, summaryRetry]);
 
   const formatMoney = (amountCents: number, currency: string) =>
     new Intl.NumberFormat("en-US", {
@@ -90,6 +106,7 @@ export function PricingPlans({
     }).format(amountCents / 100);
 
   const subscribe = async (priceKey: PriceKey) => {
+    if (loading || status === "loading" || (accountScope && summaryState !== "ready")) return;
     if (!session) {
       trackEvent("signup_started", { source: "pricing", price_key: priceKey });
       await signInForCurrentEnvironment();
@@ -110,15 +127,19 @@ export function PricingPlans({
       checkout_type: "new_subscription",
     });
     try {
+      const operation = capture();
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
         body: JSON.stringify({ priceKey }),
       });
       const data = await response.json();
+      operation.assertCurrent();
       if (!response.ok) throw new Error(data.error || "Checkout failed");
       if (data.url) window.location.href = data.url;
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       showToast({
         title: "Checkout failed",
         message: error instanceof Error ? error.message : "Checkout failed",
@@ -130,6 +151,7 @@ export function PricingPlans({
   };
 
   const upgradeNow = async (priceKey: PriceKey) => {
+    if (loading || status === "loading" || (accountScope && summaryState !== "ready")) return;
     if (!session) {
       trackEvent("signup_started", {
         source: "pricing_upgrade",
@@ -145,12 +167,15 @@ export function PricingPlans({
       checkout_type: "upgrade",
     });
     try {
+      const operation = capture();
       const response = await fetch("/api/stripe/change-plan", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
         body: JSON.stringify({ priceKey }),
       });
       const data = await response.json();
+      operation.assertCurrent();
       if (!response.ok) throw new Error(data.error || "Upgrade failed");
       if (data.url) {
         window.location.href = data.url;
@@ -158,6 +183,7 @@ export function PricingPlans({
       }
       window.location.href = "/account/billing?upgrade=success";
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       showToast({
         title: "Upgrade failed",
         message: error instanceof Error ? error.message : "Upgrade failed",
@@ -169,6 +195,7 @@ export function PricingPlans({
   };
 
   const openUpgradeModal = async (priceKey: PriceKey) => {
+    const revision = ++quoteRevision.current;
     setUpgradeKey(priceKey);
     setUpgradeOpen(true);
     setUpgradeChargeLine(null);
@@ -200,10 +227,14 @@ export function PricingPlans({
     );
 
     try {
+      const operation = capture();
       const response = await fetch(
-        `/api/stripe/change-plan/quote?priceKey=${encodeURIComponent(priceKey)}`
+        `/api/stripe/change-plan/quote?priceKey=${encodeURIComponent(priceKey)}`,
+        { headers: operation.headers, signal: operation.signal, cache: "no-store" }
       );
       const data = await response.json();
+      operation.assertCurrent();
+      if (revision !== quoteRevision.current) return;
       if (!response.ok) {
         throw new Error(data.error || "Failed to get upgrade quote");
       }
@@ -224,15 +255,22 @@ export function PricingPlans({
         );
       }
     } catch (error) {
+      if (isAccountOperationCancelled(error) || revision !== quoteRevision.current) return;
       setUpgradeQuoteError(
         error instanceof Error ? error.message : "Failed to get upgrade quote."
       );
     } finally {
-      setLoadingUpgradeQuote(false);
+      if (revision === quoteRevision.current) setLoadingUpgradeQuote(false);
     }
   };
 
   const ctaForPlan = (plan: PlanKey) => {
+    if (accountScope && summaryState !== "ready") return {
+      label: summaryState === "loading" ? "Loading your plan…" : "Retry plan lookup",
+      disabled: summaryState === "loading",
+      note: summaryState === "error" ? "Your current plan could not be verified." : undefined,
+      onClick: () => setSummaryRetry((value) => value + 1),
+    };
     const priceKey = getPriceKey(plan, billing);
     const subscription = summary?.subscription;
     if (!subscription) {
@@ -402,7 +440,7 @@ export function PricingPlans({
                       : ""
                 }`}
                 variant={featured ? "default" : "outline"}
-                disabled={cta.disabled || loading === priceKey || status === "loading"}
+                disabled={cta.disabled || loading !== null || status === "loading"}
                 onClick={cta.onClick}
               >
                 {loading === priceKey ? "Opening checkout…" : cta.label}
@@ -421,7 +459,7 @@ export function PricingPlans({
 
       <UpgradeModal
         open={upgradeOpen}
-        onClose={() => setUpgradeOpen(false)}
+        onClose={() => { quoteRevision.current += 1; setUpgradeOpen(false); }}
         isLoadingQuote={loadingUpgradeQuote}
         chargeLine={upgradeChargeLine}
         error={upgradeQuoteError}

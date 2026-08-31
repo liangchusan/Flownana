@@ -7,7 +7,8 @@ import {
 } from "@/lib/plans";
 import { getStripe } from "@/lib/stripe";
 import { grantCreditsForCurrentPeriodIfNeeded } from "@/lib/subscription-credit-grant";
-import { upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { BILLING_READ_OPTIONS } from "@/lib/subscription-sync";
+import { BillingOwnershipError, getSubscriptionOwnershipError, stripeObjectId } from "@/lib/stripe-billing-policy";
 import { canFinalizeStripeCheckout } from "@/lib/stripe-production-access";
 
 export type CheckoutFinalizationResult = {
@@ -19,59 +20,15 @@ export type CheckoutFinalizationResult = {
   creditsGranted: boolean;
 };
 
-function getObjectId(value: string | { id: string } | null): string | null {
-  return typeof value === "string" ? value : value?.id ?? null;
-}
-
-async function cancelPreviousSubscription(params: {
-  stripe: ReturnType<typeof getStripe>;
-  userId: string;
-  subscriptionId: string;
-}) {
-  let previous = await params.stripe.subscriptions.retrieve(
-    params.subscriptionId
-  );
-
-  if (previous.status !== "canceled") {
-    try {
-      previous = await params.stripe.subscriptions.cancel(
-        params.subscriptionId,
-        { prorate: false }
-      );
-    } catch (error) {
-      // A webhook and the return page can finalize the same Checkout Session at
-      // nearly the same time. Accept the race only if Stripe now confirms that
-      // the previous subscription is canceled.
-      const refreshed = await params.stripe.subscriptions.retrieve(
-        params.subscriptionId
-      );
-      if (refreshed.status !== "canceled") throw error;
-      previous = refreshed;
-    }
-  }
-
-  const oldPriceId = previous.items.data[0]?.price?.id;
-  if (!oldPriceId) {
-    throw new Error(
-      `Canceled subscription ${params.subscriptionId} has no price`
-    );
-  }
-
-  await upsertSubscriptionFromStripe({
-    userId: params.userId,
-    stripeSubscription: previous,
-    stripePriceId: oldPriceId,
-  });
-}
-
 export async function finalizeCheckoutSession(params: {
   sessionId: string;
   expectedUserId?: string;
+  expectedAccountCreatedAt?: string;
   source: string;
 }): Promise<CheckoutFinalizationResult> {
   const stripe = getStripe();
   const checkoutSession = await stripe.checkout.sessions.retrieve(
-    params.sessionId
+    params.sessionId, {}, BILLING_READ_OPTIONS
   );
 
   const userId =
@@ -92,8 +49,16 @@ export async function finalizeCheckoutSession(params: {
 
   const checkoutUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true },
+    select: { id: true, email: true, createdAt: true, stripeCustomerId: true },
   });
+  if (!checkoutUser || (params.expectedAccountCreatedAt &&
+    checkoutUser.createdAt.toISOString() !== params.expectedAccountCreatedAt) ||
+    (checkoutSession.metadata?.accountCreatedAt &&
+      checkoutUser.createdAt.toISOString() !== checkoutSession.metadata.accountCreatedAt) ||
+    (!checkoutSession.metadata?.accountCreatedAt &&
+      (!Number.isFinite(checkoutSession.created) || checkoutSession.created * 1000 < checkoutUser.createdAt.getTime()))) {
+    throw new BillingOwnershipError("Checkout account no longer exists");
+  }
   if (
     !checkoutUser?.email ||
     !canFinalizeStripeCheckout({
@@ -106,16 +71,16 @@ export async function finalizeCheckoutSession(params: {
     throw new Error("Test-mode Checkout is not allowed for this account");
   }
 
-  const customerId = getObjectId(checkoutSession.customer);
-  const subscriptionId = getObjectId(checkoutSession.subscription);
-  if (!customerId || !subscriptionId) {
-    throw new Error("Checkout Session is missing its customer or subscription");
+  const customerId = stripeObjectId(checkoutSession.customer);
+  const subscriptionId = stripeObjectId(checkoutSession.subscription);
+  const invoiceId = stripeObjectId(checkoutSession.invoice);
+  if (!customerId || !subscriptionId || !invoiceId) {
+    throw new Error("Checkout Session is missing its customer, subscription or invoice");
   }
 
-  const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  if (sub.status !== "active" && sub.status !== "trialing") {
-    throw new Error(`Subscription is not active (${sub.status})`);
-  }
+  const sub: Stripe.Subscription = await stripe.subscriptions.retrieve(subscriptionId, {}, BILLING_READ_OPTIONS);
+  const ownershipError = getSubscriptionOwnershipError(checkoutUser, sub, checkoutSession.created);
+  if (ownershipError) throw new BillingOwnershipError(ownershipError);
 
   const priceId = sub.items.data[0]?.price?.id;
   const parsed = priceId ? getPriceKeyFromStripePriceId(priceId) : null;
@@ -123,34 +88,18 @@ export async function finalizeCheckoutSession(params: {
     throw new Error("Subscription price is not recognized");
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { stripeCustomerId: customerId },
-  });
-
-  await upsertSubscriptionFromStripe({
-    userId,
-    stripeSubscription: sub,
-    stripePriceId: priceId,
-  });
-
   const upgradeFromSubscriptionId =
-    checkoutSession.metadata?.upgradeFromSubscriptionId || null;
-  if (
-    upgradeFromSubscriptionId &&
-    upgradeFromSubscriptionId !== subscriptionId
-  ) {
-    await cancelPreviousSubscription({
-      stripe,
-      userId,
-      subscriptionId: upgradeFromSubscriptionId,
-    });
+    sub.metadata.upgradeFromSubscriptionId || null;
+  if ((checkoutSession.metadata?.upgradeFromSubscriptionId || null) !== upgradeFromSubscriptionId) {
+    throw new Error("Checkout upgrade metadata does not match subscription");
   }
 
   const creditsGranted = await grantCreditsForCurrentPeriodIfNeeded({
     userId,
     sub,
-    parsed: { plan: parsed.plan, billing: parsed.billing },
+    invoiceId,
+    expectedAccountCreatedAt: checkoutUser.createdAt.toISOString(),
+    expectedCustomerId: customerId,
     source: params.source,
   });
 

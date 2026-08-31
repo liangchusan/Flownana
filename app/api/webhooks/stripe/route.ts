@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import { getPriceKeyFromStripePriceId } from "@/lib/plans";
-import { upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { BILLING_READ_OPTIONS, upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
+import { BillingOwnershipError, stripeObjectId } from "@/lib/stripe-billing-policy";
 import { getStripeStateSyncKind } from "@/lib/stripe-event-policy";
 import { grantCreditsForCurrentPeriodIfNeeded } from "@/lib/subscription-credit-grant";
 import { finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
@@ -12,56 +12,19 @@ import { shouldIgnoreStripeTestWebhook } from "@/lib/stripe-production-access";
 export const dynamic = "force-dynamic";
 
 async function resolveUserId(
-  stripe: ReturnType<typeof getStripe>,
   sub: Stripe.Subscription
 ): Promise<string | null> {
   const meta = sub.metadata?.userId;
-  if (meta) return meta;
-  const customerId =
-    typeof sub.customer === "string"
-      ? sub.customer
-      : sub.customer?.id;
+  const customerId = stripeObjectId(sub.customer);
   if (!customerId) return null;
-  const user = await prisma.user.findFirst({
+  const user = meta ? await prisma.user.findUnique({ where: { id: meta } }) : await prisma.user.findFirst({
     where: { stripeCustomerId: customerId },
   });
+  // Email alone is not an ownership binding, especially after deletion and
+  // re-registration. Ignore subscriptions attached to a previous account.
+  // Ownership (including any legacy Checkout lookup) is enforced inside the
+  // shared lock; do not discard an unbound legacy account before that proof.
   return user?.id ?? null;
-}
-
-async function resolveUserIdFromInvoice(
-  stripe: ReturnType<typeof getStripe>,
-  invoice: Stripe.Invoice,
-  sub?: Stripe.Subscription
-): Promise<string | null> {
-  if (sub) {
-    const fromSub = await resolveUserId(stripe, sub);
-    if (fromSub) return fromSub;
-  }
-
-  const customerId =
-    typeof invoice.customer === "string"
-      ? invoice.customer
-      : invoice.customer?.id;
-  if (customerId) {
-    const userByCustomer = await prisma.user.findFirst({
-      where: { stripeCustomerId: customerId },
-    });
-    if (userByCustomer?.id) return userByCustomer.id;
-  }
-
-  const email =
-    invoice.customer_email ||
-    (invoice.customer &&
-    typeof invoice.customer === "object" &&
-    "email" in invoice.customer
-      ? invoice.customer.email
-      : null);
-  if (email) {
-    const userByEmail = await prisma.user.findUnique({ where: { email } });
-    if (userByEmail?.id) return userByEmail.id;
-  }
-
-  return null;
 }
 
 async function getSubscriptionContextFromInvoice(
@@ -78,8 +41,8 @@ async function getSubscriptionContextFromInvoice(
       : invoice.subscription?.id;
   if (!subscriptionId) return null;
 
-  const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  const userId = await resolveUserIdFromInvoice(stripe, invoice, sub);
+  const sub = await stripe.subscriptions.retrieve(subscriptionId, {}, BILLING_READ_OPTIONS);
+  const userId = await resolveUserId(sub);
   const priceId = sub.items.data[0]?.price?.id;
   if (!userId || !priceId) return null;
 
@@ -122,7 +85,7 @@ export async function POST(request: Request) {
 
     if (stateSyncKind === "subscription") {
       const sub = event.data.object as Stripe.Subscription;
-      const userId = await resolveUserId(stripe, sub);
+      const userId = await resolveUserId(sub);
       if (!userId) {
         console.warn("subscription event: could not resolve userId", sub.id);
       } else {
@@ -161,22 +124,11 @@ export async function POST(request: Request) {
         const context = await getSubscriptionContextFromInvoice(stripe, invoice);
         if (!context) break;
 
-        const { sub, userId, priceId } = context;
-        if (sub.status !== "active" && sub.status !== "trialing") break;
-
-        const parsed = getPriceKeyFromStripePriceId(priceId);
-        if (!parsed) break;
-
-        await upsertSubscriptionFromStripe({
-          userId,
-          stripeSubscription: sub,
-          stripePriceId: priceId,
-        });
-
+        const { sub, userId } = context;
         await grantCreditsForCurrentPeriodIfNeeded({
           userId,
           sub,
-          parsed: { plan: parsed.plan, billing: parsed.billing },
+          invoiceId: invoice.id,
           source: "invoice_paid",
         });
         break;
@@ -186,10 +138,20 @@ export async function POST(request: Request) {
         break;
     }
 
-    await prisma.processedStripeEvent.create({
-      data: { id: event.id, type: event.type },
+    await prisma.processedStripeEvent.upsert({
+      where: { id: event.id },
+      create: { id: event.id, type: event.type },
+      update: {},
     });
   } catch (e) {
+    if (e instanceof BillingOwnershipError) {
+      // A verified event from a deleted account cannot become valid on retry.
+      // Never swallow provider/database failures, which must remain retryable.
+      await prisma.processedStripeEvent.upsert({
+        where: { id: event.id }, create: { id: event.id, type: event.type }, update: {},
+      });
+      return NextResponse.json({ received: true, ignored: true });
+    }
     console.error("Webhook handler error:", e);
     return NextResponse.json({ error: "Handler failed" }, { status: 500 });
   }

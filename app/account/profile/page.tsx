@@ -2,9 +2,10 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { AccountProfileClient } from "./profile-client";
 import { authOptions } from "@/lib/auth-options";
+import { sessionAccountWhere } from "@/lib/account-session";
 import { prisma } from "@/lib/prisma";
-import { upsertAppUser } from "@/lib/user-sync";
 import { isMissingProfileSchemaError } from "@/lib/account-profile";
+import { getAccountScope } from "@/lib/account-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -14,17 +15,10 @@ export default async function AccountProfilePage() {
     redirect("/api/auth/signin?callbackUrl=%2Faccount%2Fprofile");
   }
 
-  await upsertAppUser({
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
-
   let user;
   try {
     user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: sessionAccountWhere(session.user),
       select: {
         name: true,
         email: true,
@@ -35,7 +29,7 @@ export default async function AccountProfilePage() {
   } catch (error) {
     if (!isMissingProfileSchemaError(error)) throw error;
     const legacyUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: sessionAccountWhere(session.user),
       select: { name: true, email: true, image: true },
     });
     user = legacyUser ? { ...legacyUser, customAvatarUrl: null } : null;
@@ -44,6 +38,7 @@ export default async function AccountProfilePage() {
 
   return (
     <AccountProfileClient
+      initialAccountScope={getAccountScope(session.user)}
       initialUser={{
         name: user.name || session.user.name || "",
         email: user.email,

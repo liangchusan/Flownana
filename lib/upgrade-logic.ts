@@ -47,6 +47,7 @@ export async function buildUpgradeQuote(params: {
   if (isYearlyTierUpgrade) {
     remainingMonths = countRemainingMonths(
       params.nextCreditAt,
+      new Date(params.currentStripeSubscription.current_period_start * 1000),
       params.currentPeriodEnd
     );
 

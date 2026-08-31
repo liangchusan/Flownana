@@ -1,6 +1,8 @@
 import { head } from "@vercel/blob";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isOwnedBlobUrl } from "@/lib/account-profile";
+import { safeRemoteMediaFetch } from "@/lib/safe-remote-media";
 import { getUploadIdFromBlobUrl, MEDIA_UPLOAD_RULES, type MediaUploadKind } from "@/lib/media-upload-policy";
 import {
   persistImageInputMedia,
@@ -15,6 +17,19 @@ export interface GenerationMediaAsset {
   role: MediaAssetRole;
   type: MediaAssetType;
   position: number;
+}
+
+export async function enforceInputMediaSize(media: StoredMedia, maxBytes: number, kind: MediaUploadKind): Promise<StoredMedia> {
+  // Migration-era owned Provider assets have no byte metadata. Blob head only
+  // understands this store; use the same bounded public-media validator for them.
+  const remote = media.sizeBytes == null && !isOwnedBlobUrl(media.url)
+    ? await safeRemoteMediaFetch({ url: media.url, kind: kind === "audio" ? "music" : kind, maxBytes, timeoutMs: 30_000 }) : null;
+  const verified = media.sizeBytes == null && !remote ? await head(media.url) : null;
+  const sizeBytes = media.sizeBytes ?? remote?.sizeBytes ?? verified?.size;
+  if (typeof sizeBytes !== "number" || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > maxBytes) {
+    throw new Error("Input exceeds the model's file-size limit.");
+  }
+  return { ...media, sizeBytes, contentType: media.contentType ?? remote?.contentType ?? verified?.contentType };
 }
 
 async function resolveOwnedUpload(params: {

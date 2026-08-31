@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type { PlanKey } from "@/lib/plans";
 import { PLAN_CREDITS } from "@/lib/plans";
 
@@ -23,7 +24,7 @@ export async function grantCredits(params: {
   });
 }
 
-export async function getCreditSummary(userId: string): Promise<{
+export async function getCreditSummary(userId: string, client: Prisma.TransactionClient = prisma): Promise<{
   total: number;
   expiringSoon: number;
   expiringInDays: number | null;
@@ -36,11 +37,11 @@ export async function getCreditSummary(userId: string): Promise<{
   };
 
   const [totalResult, soon] = await Promise.all([
-    prisma.creditBatch.aggregate({
+    client.creditBatch.aggregate({
       where: activeWhere,
       _sum: { remaining: true },
     }),
-    prisma.creditBatch.findFirst({
+    client.creditBatch.findFirst({
       where: activeWhere,
       orderBy: { expiresAt: "asc" },
     }),

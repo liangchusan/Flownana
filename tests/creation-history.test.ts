@@ -6,6 +6,7 @@ import {
   getCreationRunRemovalTarget,
   getCreationTimelineKey,
   mergeCreations,
+  reconcileCreationSnapshot,
   getRegenerationInputImage,
   normalizeGenerationParameters,
   shouldShowConversationTimestamp,
@@ -24,6 +25,28 @@ function item(overrides: Partial<CreationHistoryItem>): CreationHistoryItem {
     ...overrides,
   };
 }
+
+test("server history wins over cached success, deleted URLs and hidden state", () => {
+  const old = item({ status: "success", urls: ["one", "two"] });
+  const partial = item({ status: "success", urls: ["two"], parameters: { hiddenFromRecent: true } });
+  assert.deepEqual(reconcileCreationSnapshot([old], [partial]), [partial]);
+  const deleted = item({ status: "deleted", urls: [] });
+  assert.deepEqual(reconcileCreationSnapshot([old], [deleted]), [deleted]);
+});
+
+test("snapshot joins pre-task optimistic output by run and index without dropping concurrent work or older pages", () => {
+  const local = item({ id: "local", optimistic: true, parameters: { runId: "run", outputIndex: 0 } });
+  const saved = item({ id: "saved", taskId: "task", parameters: { runId: "run", outputIndex: 0 } });
+  const sibling = item({ id: "sibling", optimistic: true, parameters: { runId: "run", outputIndex: 1 } });
+  const older = item({ id: "older", createdAt: "2025-01-01T00:00:00.000Z" });
+  assert.deepEqual(reconcileCreationSnapshot([local, sibling, older], [saved], 1), [saved, sibling, older]);
+});
+
+test("complete snapshots remove remotely deleted rows but retain newly submitted local work", () => {
+  const stored = item({ status: "success", urls: ["removed"] });
+  const local = item({ id: "local", optimistic: true, status: "generating" });
+  assert.deepEqual(reconcileCreationSnapshot([stored, local], []), [local]);
+});
 
 test("mergeCreations dedupes optimistic and persisted rows by taskId", () => {
   const optimistic = item({

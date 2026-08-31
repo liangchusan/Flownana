@@ -274,9 +274,9 @@ function explicitDisplay(
     ...preset,
     title: readString(data.errorTitle) || preset.title,
     message: readString(data.error) || readString(data.message) || preset.message,
-    action: readString(data.errorAction) || preset.action,
+    action: data.refundPending === true ? "Please contact support so we can restore the credits." : readString(data.errorAction) || preset.action,
     retryable:
-      typeof data.retryable === "boolean" ? data.retryable : preset.retryable,
+      data.refundPending === true ? false : typeof data.retryable === "boolean" ? data.retryable : preset.retryable,
   };
 }
 
@@ -496,8 +496,8 @@ export function getGenerationErrorPayload(
     error: display.message,
     errorCode: display.code,
     errorTitle: display.title,
-    errorAction: display.action,
-    retryable: display.retryable,
+    errorAction: context.refundPending ? "Please contact support so we can restore the credits." : display.action,
+    retryable: context.refundPending ? false : display.retryable,
     ...(context.creditsRefunded ? { creditsRefunded: true } : {}),
     ...(context.refundPending ? { refundPending: true } : {}),
   };

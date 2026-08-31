@@ -5,17 +5,18 @@ import { SessionBoundary } from "@/components/auth/session-boundary";
 import { CreateFlowSkeleton } from "@/components/layout/create-flow-skeleton";
 import { authOptions } from "@/lib/auth-options";
 import { getCreationHistory } from "@/lib/creations";
+import { getAccountScope } from "@/lib/account-scope";
 
 export default async function AIVideoPage() {
   const session = await getServerSession(authOptions);
   const initialCreations = session?.user?.id
-    ? await getCreationHistory({ userId: session.user.id })
+    ? await getCreationHistory({ userId: session.user.id, accountCreatedAt: session.user.accountCreatedAt })
     : [];
 
   return (
     <SessionBoundary session={session}>
       <Suspense fallback={<CreateFlowSkeleton />}>
-        <CreateContent mode="video" initialCreations={initialCreations} />
+        <CreateContent mode="video" initialCreations={initialCreations} initialAccountScope={getAccountScope(session?.user)} />
       </Suspense>
     </SessionBoundary>
   );

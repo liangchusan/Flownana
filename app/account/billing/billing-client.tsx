@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
+import { AccountScopeBoundary } from "@/components/auth/account-scope-boundary";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
+import { useState } from "react";
 
 export type BillingSummary = {
   subscription: {
@@ -32,6 +36,7 @@ export type UpgradeInfo = {
 };
 
 type BillingClientProps = {
+  initialAccountScope: string | null;
   signedIn: boolean;
   summary: BillingSummary | null;
   error?: string | null;
@@ -40,7 +45,11 @@ type BillingClientProps = {
   isPaymentSyncPending: boolean;
 };
 
-export function BillingClient({
+export function BillingClient(props: BillingClientProps) {
+  return <AccountScopeBoundary scope={props.initialAccountScope}><ScopedBillingClient key={props.initialAccountScope} {...props} /></AccountScopeBoundary>;
+}
+
+function ScopedBillingClient({
   signedIn,
   summary,
   error,
@@ -49,6 +58,8 @@ export function BillingClient({
   isPaymentSyncPending,
 }: BillingClientProps) {
   const { showToast } = useToast();
+  const { capture } = useAccountOperation();
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   const formatMoney = (amountCents: number) =>
     new Intl.NumberFormat("en-US", {
@@ -58,19 +69,19 @@ export function BillingClient({
       maximumFractionDigits: 2,
     }).format(amountCents / 100);
 
-  const openPortal = () => {
-    fetch("/api/stripe/portal", { method: "POST" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.url) window.location.href = d.url;
-        else {
-          showToast({
-            title: "Billing portal unavailable",
-            message: d.error || "Billing portal unavailable",
-            variant: "error",
-          });
-        }
-      });
+  const openPortal = async () => {
+    if (openingPortal) return;
+    setOpeningPortal(true);
+    try {
+      const operation = capture();
+      const response = await fetch("/api/stripe/portal", { method: "POST", headers: operation.headers, signal: operation.signal });
+      const data = await response.json();
+      operation.assertCurrent();
+      if (!response.ok || !data.url) throw new Error(data.error || "Billing portal unavailable");
+      window.location.href = data.url;
+    } catch (error) {
+      if (!isAccountOperationCancelled(error)) showToast({ title: "Billing portal unavailable", message: "Please try again.", variant: "error" });
+    } finally { setOpeningPortal(false); }
   };
 
   if (!signedIn) {

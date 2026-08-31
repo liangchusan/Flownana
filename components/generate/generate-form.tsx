@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, ChevronDown, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
+import { useSession } from "next-auth/react";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled, type CaptureAccountOperation } from "@/lib/account-operation";
+import { uploadAccountMedia } from "@/lib/account-media-upload";
+import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import {
   IMAGE_MODEL_OPTIONS,
   getImageGenerationCredits,
@@ -13,6 +18,7 @@ import {
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
+import { GENERATION_STATUS_UNAVAILABLE, isConfirmedGenerationFailure } from "@/lib/generation-request-state";
 import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import type { GenerationParameters } from "@/lib/creation-history";
@@ -26,16 +32,9 @@ const MODEL_POPUP_CLS =
 const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 interface GenerateFormProps {
+  onGenerationUncertain?: (data: { optimisticId: string; outputIndex?: number }) => void;
+  captureGeneration?: CaptureAccountOperation;
   onGenerate: (
     imageUrl: string,
     taskId?: string,
@@ -84,6 +83,8 @@ interface GenerateFormProps {
 }
 
 export function GenerateForm({
+  onGenerationUncertain,
+  captureGeneration,
   onGenerate,
   isGenerating,
   setIsGenerating,
@@ -105,6 +106,8 @@ export function GenerateForm({
   onInputCapabilityChange,
   onParametersChange,
 }: GenerateFormProps) {
+  const { status } = useSession();
+  const { accountScope, capture } = useAccountOperation();
   const { showToast } = useToast();
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImages, setUploadedImages] = useState<string[]>(
@@ -231,9 +234,16 @@ export function GenerateForm({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
     maxFiles: inputCapabilities.maxImages,
     maxSize: inputCapabilities.maxImageBytes,
-    onDrop: (files) => {
+    onDrop: async (files) => {
       if (files.length === 0) return;
-      Promise.all(files.map(readFileAsDataUrl)).then(updateImages);
+      try {
+        const operation = capture();
+        const blobs = await Promise.all(files.map((file) => uploadAccountMedia(file, "image", operation)));
+        operation.assertCurrent();
+        updateImages(blobs.map((blob) => blob.url));
+      } catch (error) {
+        if (!isAccountOperationCancelled(error)) showToast({ title: "Upload failed", message: "Sign in and try uploading again.", variant: "warning" });
+      }
     },
     onDropRejected: (rejections) => {
       const code = rejections.some((rejection) =>
@@ -254,6 +264,12 @@ export function GenerateForm({
   });
 
   const handleGenerate = async () => {
+    if (status === "loading") return;
+    if (!accountScope) {
+      trackEvent("signup_started", { source: "image_generator" });
+      await signInForCurrentEnvironment();
+      return;
+    }
     if (submissionBlocked || imagesOverLimit) return;
     if (!prompt.trim()) {
       const display = getGenerationErrorDisplay(
@@ -322,6 +338,7 @@ export function GenerateForm({
 
     const generateOne = async (outputIndex: number) => {
       try {
+        const operation = (captureGeneration || capture)();
         const response = await axios.post("/api/generate", {
           prompt: requestPrompt,
           imageUrls: requestImages,
@@ -332,10 +349,16 @@ export function GenerateForm({
           runId: optimisticId,
           outputIndex,
           outputCount,
-        });
-        if (!response.data.success) throw new Error("Generation failed");
+        }, { headers: operation.headers, signal: operation.signal });
+        operation.assertCurrent();
+        if (!response.data.success) throw { response };
         const taskId = response.data.taskId;
         const responsePrompt = response.data.prompt || requestPrompt;
+        if (response.data.pending) {
+          if (taskId) onGenerationTaskCreated?.({ optimisticId, taskId, prompt: responsePrompt, outputIndex });
+          return;
+        }
+        if (!response.data.imageUrl) throw { response };
         trackEvent("generation_success", {
           type: "image",
           model,
@@ -362,6 +385,12 @@ export function GenerateForm({
           outputIndex
         );
       } catch (error: any) {
+        if (isAccountOperationCancelled(error)) return;
+        if (!isConfirmedGenerationFailure(error)) {
+          onGenerationUncertain?.({ optimisticId, outputIndex });
+          showToast({ title: "Status unavailable", message: GENERATION_STATUS_UNAVAILABLE, variant: "warning" });
+          return;
+        }
         const errorDisplay = getGenerationErrorDisplay(
           error.response?.data || error,
           { mediaType: "image", status: error.response?.status }

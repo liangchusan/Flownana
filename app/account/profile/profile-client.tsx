@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/ui/logo";
@@ -23,6 +24,9 @@ import {
   MAX_AVATAR_BYTES,
 } from "@/lib/account-profile";
 import { clearCachedBillingSummary } from "@/lib/billing-summary-client";
+import { AccountScopeBoundary } from "@/components/auth/account-scope-boundary";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
 
 type ProfileUser = {
   name: string;
@@ -86,7 +90,12 @@ function cropAvatar(file: File): Promise<File> {
   });
 }
 
-export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser }) {
+export function AccountProfileClient(props: { initialUser: ProfileUser; initialAccountScope: string | null }) {
+  return <AccountScopeBoundary scope={props.initialAccountScope}><ScopedAccountProfileClient key={props.initialAccountScope} initialUser={props.initialUser} /></AccountScopeBoundary>;
+}
+
+function ScopedAccountProfileClient({ initialUser }: { initialUser: ProfileUser }) {
+  const { capture } = useAccountOperation();
   const { update } = useSession();
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,20 +130,25 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
     setSavingName(true);
     setProfileError(null);
     try {
+      const operation = capture();
       const response = await fetch("/api/account/profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
         body: JSON.stringify({ name: trimmedName }),
       });
       const data = await response.json().catch(() => null);
+      operation.assertCurrent();
       if (!response.ok) {
         throw new Error(data?.error || "Could not update the display name.");
       }
       setName(data.user.name);
       setSavedName(data.user.name);
       await update({ user: { name: data.user.name, image } });
+      operation.assertCurrent();
       showToast({ message: "Your display name has been updated.", variant: "success" });
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       setProfileError(
         error instanceof Error ? error.message : "Could not update the display name."
       );
@@ -152,7 +166,9 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
     setUploadingAvatar(true);
     setProfileError(null);
     try {
+      const operation = capture();
       const cropped = await cropAvatar(file);
+      operation.assertCurrent();
       if (cropped.size > MAX_AVATAR_BYTES) {
         throw new Error("The processed profile photo is larger than 5 MB.");
       }
@@ -160,17 +176,22 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
       formData.append("avatar", cropped);
       const response = await fetch("/api/account/avatar", {
         method: "POST",
+        headers: operation.headers,
+        signal: operation.signal,
         body: formData,
       });
       const data = await response.json().catch(() => null);
+      operation.assertCurrent();
       if (!response.ok) {
         throw new Error(data?.error || "Could not update the profile photo.");
       }
       setImage(data.user.image);
       setHasCustomAvatar(true);
       await update({ user: { name: savedName, image: data.user.image } });
+      operation.assertCurrent();
       showToast({ message: "Your profile photo has been updated.", variant: "success" });
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       setProfileError(
         error instanceof Error ? error.message : "Could not update the profile photo."
       );
@@ -184,16 +205,20 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
     setUploadingAvatar(true);
     setProfileError(null);
     try {
-      const response = await fetch("/api/account/avatar", { method: "DELETE" });
+      const operation = capture();
+      const response = await fetch("/api/account/avatar", { method: "DELETE", headers: operation.headers, signal: operation.signal });
       const data = await response.json().catch(() => null);
+      operation.assertCurrent();
       if (!response.ok) {
         throw new Error(data?.error || "Could not remove the profile photo.");
       }
       setImage(data.user.image);
       setHasCustomAvatar(false);
       await update({ user: { name: savedName, image: data.user.image } });
+      operation.assertCurrent();
       showToast({ message: "Your Google photo or initial is now in use.", variant: "success" });
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       setProfileError(
         error instanceof Error ? error.message : "Could not remove the profile photo."
       );
@@ -207,18 +232,22 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
     setDeleting(true);
     setDeleteError(null);
     try {
+      const operation = capture();
       const response = await fetch("/api/account", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
         body: JSON.stringify({ confirmation: deleteConfirmation }),
       });
       const data = await response.json().catch(() => null);
+      operation.assertCurrent();
       if (!response.ok) {
         throw new Error(data?.error || "Could not delete the account.");
       }
       clearCachedBillingSummary();
       await signOut({ callbackUrl: "/" });
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       setDeleteError(
         error instanceof Error ? error.message : "Could not delete the account."
       );
@@ -405,11 +434,8 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
       </main>
 
       {deleteOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/30 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+        <Modal onClose={() => setDeleteOpen(false)} dismissible={!deleting} aria-labelledby="delete-account-title" className="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/30 p-0 backdrop-blur-sm sm:items-center sm:p-4">
           <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-account-title"
             className="relative w-full rounded-t-ui-xl border border-border bg-background p-5 shadow-float sm:max-w-md sm:rounded-ui-xl sm:p-7"
           >
             <button
@@ -458,7 +484,7 @@ export function AccountProfileClient({ initialUser }: { initialUser: ProfileUser
               </Button>
             </div>
           </section>
-        </div>
+        </Modal>
       )}
     </div>
   );

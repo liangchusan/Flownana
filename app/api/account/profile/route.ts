@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { matchesRequestAccount } from "@/lib/account-scope";
+import { sessionAccountWhere } from "@/lib/account-session";
 import { prisma } from "@/lib/prisma";
-import { upsertAppUser } from "@/lib/user-sync";
 
 export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  if (!session?.user?.id || !matchesRequestAccount(request, session.user)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -30,15 +31,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Account email is unavailable." }, { status: 400 });
   }
 
-  await upsertAppUser({
-    id: session.user.id,
-    email: session.user.email,
-    name: session.user.name,
-    image: session.user.image,
-  });
-
   const user = await prisma.user.update({
-    where: { id: session.user.id },
+    where: sessionAccountWhere(session.user),
     data: { name },
     select: {
       id: true,

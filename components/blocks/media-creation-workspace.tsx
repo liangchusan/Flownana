@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Modal } from "@/components/ui/modal";
 import { PanelRightClose, PanelRightOpen, Trash2, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
@@ -8,7 +9,7 @@ import { CreationStream, type WorkspaceRun } from "@/components/blocks/creation-
 import { AssetsLibrary } from "@/components/blocks/assets-library";
 import { WorkspaceMobileHeader, WorkspaceSidebar, type WorkspaceView } from "@/components/blocks/workspace-sidebar";
 import { useToast } from "@/components/blocks/app-toast-provider";
-import { creationIdentity, getCreationTimelineKey, mergeCreations, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
+import { creationIdentity, getCreationTimelineKey, mergeCreations, reconcileCreationSnapshot, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
 import {
   ComposerAttachments,
   ComposerToolbarLeading,
@@ -22,6 +23,11 @@ import {
   type GenerationInputCapabilities,
 } from "@/lib/generation-input-capabilities";
 import { COMPOSER_TYPE_STORAGE_KEY } from "@/lib/composer-preference";
+import { useSession } from "next-auth/react";
+import { accountRequestHeaders, getAccountScope } from "@/lib/account-scope";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { GENERATION_STATUS_UNAVAILABLE } from "@/lib/generation-request-state";
+import { InputMedia } from "@/components/creation/input-media";
 
 type ComposerType = CreationHistoryItem["type"];
 
@@ -36,15 +42,26 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-export function MediaCreationWorkspace({
+type WorkspaceProps = {
+  initialType: ActiveComposerType;
+  initialCreations?: CreationHistoryItem[];
+  initialAccountScope?: string | null;
+  initialPrompt?: string;
+};
+
+export function MediaCreationWorkspace(props: WorkspaceProps) {
+  const { data: session } = useSession();
+  const accountScope = getAccountScope(session?.user);
+  return <ScopedMediaCreationWorkspace key={accountScope || "anonymous"} {...props} accountScope={accountScope} initialPrompt={accountScope === (props.initialAccountScope ?? null) ? props.initialPrompt : undefined} initialCreations={accountScope && accountScope === props.initialAccountScope ? props.initialCreations : []} />;
+}
+
+function ScopedMediaCreationWorkspace({
   initialType,
   initialCreations = [],
   initialPrompt,
-}: {
-  initialType: ActiveComposerType;
-  initialCreations?: CreationHistoryItem[];
-  initialPrompt?: string;
-}) {
+  accountScope,
+}: WorkspaceProps & { accountScope: string | null }) {
+  const { capture: captureGeneration } = useAccountOperation();
   const { showToast } = useToast();
   const [view, setView] = useState<WorkspaceView>("create");
   const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
@@ -66,6 +83,7 @@ export function MediaCreationWorkspace({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const preservedScrollTopRef = useRef<number | null>(null);
+  const mutationRevision = useRef(0);
   const creationTimelineKey = getCreationTimelineKey(creations);
 
   useLayoutEffect(() => {
@@ -81,13 +99,36 @@ export function MediaCreationWorkspace({
   }, [creationTimelineKey, view]);
 
   useEffect(() => {
-    window.localStorage.setItem(COMPOSER_TYPE_STORAGE_KEY, composerType);
+    try { window.localStorage.setItem(COMPOSER_TYPE_STORAGE_KEY, composerType); } catch { /* Optional preference storage. */ }
   }, [composerType]);
 
-  const activeImageCount = creations.filter((creation) => creation.type === "image" && ["pending", "generating", "processing"].includes(creation.status)).length;
-  const activeVideoCount = creations.filter((creation) => creation.type === "video" && ["pending", "generating", "processing"].includes(creation.status)).length;
+  const activeGenerationCount = creations.filter((creation) => ["pending", "generating", "processing"].includes(creation.status) && !(creation.optimistic && creation.statusUncertain && !creation.taskId)).length;
+
+  useEffect(() => {
+    if (!accountScope) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      const revision = mutationRevision.current;
+      try {
+        const response = await fetch("/api/creations", { headers: accountRequestHeaders(accountScope), signal: controller.signal, cache: "no-store" });
+        const data = await response.json();
+        if (controller.signal.aborted || !response.ok || data.accountScope !== accountScope || !Array.isArray(data.creations)) return;
+        if (revision === mutationRevision.current) setCreations((current) => reconcileCreationSnapshot(current, data.creations));
+        // Refresh/re-opened video tasks have no surviving form poller. The
+        // server's storage lease makes overlapping reads safe.
+        await Promise.allSettled((data.creations as CreationHistoryItem[])
+          .filter((item) => item.type === "video" && item.taskId && ["pending", "generating", "processing"].includes(item.status))
+          .map((item) => fetch(`/api/veo/generate?taskId=${encodeURIComponent(item.taskId!)}`, { headers: accountRequestHeaders(accountScope), signal: controller.signal, cache: "no-store" })));
+      } catch { /* A transport failure is not a terminal generation failure. */ }
+      finally { if (!controller.signal.aborted) timer = setTimeout(refresh, 10_000); }
+    };
+    void refresh();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [accountScope]);
 
   const updateCreation = (identity: string, patch: Partial<CreationHistoryItem>) => {
+    mutationRevision.current += 1;
     if (view === "create" && scrollRef.current) {
       preservedScrollTopRef.current = scrollRef.current.scrollTop;
     }
@@ -140,8 +181,8 @@ export function MediaCreationWorkspace({
       attachments: creation.inputUrls.map((url, index) => ({
         id: `reprompt-${creationIdentity(creation)}-${index}`,
         url,
-        kind: "image" as const,
-        name: `Input image ${index + 1}`,
+        kind: creation.parameters?.inputKinds?.[index] || "image",
+        name: `Input ${creation.parameters?.inputKinds?.[index] || "image"} ${index + 1}`,
         source: "reference" as const,
       })),
       parametersByType: {
@@ -176,8 +217,10 @@ export function MediaCreationWorkspace({
   };
 
   const addOptimisticRun = ({ optimisticId, prompt, parameters, outputCount = 1, type }: { optimisticId: string; prompt: string; parameters: GenerationParameters; outputCount?: number; type: ComposerType }) => {
+    mutationRevision.current += 1;
     const optimistic = Array.from({ length: outputCount }, (_, index): CreationHistoryItem => ({
       id: `${optimisticId}-${index}`,
+      optimistic: true,
       type,
       status: "generating",
       urls: [],
@@ -192,15 +235,23 @@ export function MediaCreationWorkspace({
   };
 
   const updateOptimisticOutput = ({ optimisticId, outputIndex = 0, url, taskId, prompt, parameters, inputUrls, status, error, errorCode }: { optimisticId: string; outputIndex?: number; url?: string; taskId?: string; prompt?: string; parameters?: GenerationParameters; inputUrls?: string[]; status: CreationHistoryItem["status"]; error?: string; errorCode?: string }) => {
+    mutationRevision.current += 1;
     setCreations((current) => current.map((creation) => {
       if (creation.parameters?.runId !== optimisticId || (creation.parameters.outputIndex ?? 0) !== outputIndex) return creation;
+      if (creation.status === "deleted" || (!creation.optimistic && ["success", "failed"].includes(creation.status))) return creation;
       const isSettled = status === "success" || status === "failed";
       const processingDurationMs = parameters?.processingDurationMs ?? creation.parameters?.processingDurationMs ?? (isSettled ? Math.max(0, Date.now() - new Date(creation.createdAt).getTime()) : undefined);
-      return { ...creation, status, urls: url ? [url] : creation.urls, taskId: taskId || creation.taskId, prompt: prompt || creation.prompt, parameters: { ...creation.parameters, ...parameters, ...(processingDurationMs !== undefined ? { processingDurationMs } : {}), runId: optimisticId, outputIndex }, inputUrls: inputUrls || creation.inputUrls, error, errorCode };
+      return { ...creation, statusUncertain: false, status, urls: url ? [url] : creation.urls, taskId: taskId || creation.taskId, prompt: prompt || creation.prompt, parameters: { ...creation.parameters, ...parameters, ...(processingDurationMs !== undefined ? { processingDurationMs } : {}), runId: optimisticId, outputIndex }, inputUrls: inputUrls || creation.inputUrls, error, errorCode };
     }));
   };
 
   const imageAttachments = draft.attachments.filter((attachment) => attachment.kind === "image");
+  const markGenerationUncertain = ({ optimisticId, outputIndex = 0 }: { optimisticId: string; outputIndex?: number }) => {
+    mutationRevision.current += 1;
+    setCreations((current) => current.map((creation) => creation.parameters?.runId === optimisticId &&
+      (creation.parameters.outputIndex ?? 0) === outputIndex && ["pending", "generating", "processing"].includes(creation.status)
+      ? { ...creation, statusUncertain: true, error: GENERATION_STATUS_UNAVAILABLE } : creation));
+  };
   const attachmentIncompatible = draft.attachments.some((attachment, index) => {
     if (attachment.kind === "video") {
       const kindIndex = draft.attachments.slice(0, index + 1).filter((item) => item.kind === "video").length;
@@ -248,10 +299,10 @@ export function MediaCreationWorkspace({
   const composerKey = `${composerType}-${draft.revision}`;
   const composer = (() => {
     if (composerType === "image") {
-      return <GenerateForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.image} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeImageCount} isGenerating={activeImageCount >= 5} setIsGenerating={() => undefined} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, image: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
+      return <GenerateForm key={composerKey} captureGeneration={captureGeneration} onGenerationUncertain={markGenerationUncertain} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.image} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeGenerationCount} isGenerating={activeGenerationCount >= 5} setIsGenerating={() => undefined} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, image: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
     }
     if (composerType === "video") {
-      return <VideoCreationForm key={composerKey} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} inputAttachments={draft.attachments.map(({ url, kind }) => ({ url, kind }))} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeVideoCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputAttachmentsChange={(attachments) => setDraft((current) => ({ ...current, attachments: attachments.map((attachment, index) => ({ ...attachment, id: `input-${index}-${attachment.url.slice(-24)}`, name: `Input ${attachment.kind} ${index + 1}`, source: "reference" })) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
+      return <VideoCreationForm key={composerKey} captureGeneration={captureGeneration} onGenerationUncertain={markGenerationUncertain} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} inputAttachments={draft.attachments.map(({ url, kind }) => ({ url, kind }))} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeGenerationCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputAttachmentsChange={(attachments) => setDraft((current) => ({ ...current, attachments: attachments.map((attachment, index) => ({ ...attachment, id: `input-${index}-${attachment.url.slice(-24)}`, name: `Input ${attachment.kind} ${index + 1}`, source: "reference" })) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
     }
     return null;
   })();
@@ -325,17 +376,29 @@ function filterCompatibleAttachments(
   });
 }
 
+const MOBILE_DETAILS_QUERY = "(max-width: 1023px)";
+function subscribeToDetailsLayout(notify: () => void) {
+  const query = window.matchMedia(MOBILE_DETAILS_QUERY);
+  query.addEventListener("change", notify);
+  return () => query.removeEventListener("change", notify);
+}
+
 function DetailsPanel({ run, onClose }: { run: WorkspaceRun; onClose: () => void }) {
+  const mobile = useSyncExternalStore(subscribeToDetailsLayout,
+    () => window.matchMedia(MOBILE_DETAILS_QUERY).matches, () => false);
   const first = run.creations[0];
   const details: Array<[string, string | number | undefined]> = [
     ["Type", run.type === "music" ? "Audio" : run.type],
     ["Status", run.creations.some((item) => item.status === "failed") ? "Partial / failed" : run.creations.every((item) => item.status === "success") ? "Complete" : "In progress"],
     ["Model", first.parameters?.model], ["Mode", first.parameters?.mode], ["Aspect ratio", first.parameters?.aspectRatio], ["Resolution", first.parameters?.resolution], ["Duration", first.parameters?.duration ? `${first.parameters.duration}s` : undefined], ["Audio", first.parameters?.audio], ["Credits", run.creations.reduce((sum, item) => sum + (item.creditsCost || 0), 0) || undefined],
   ];
-  return (
-    <aside className="fixed inset-0 z-50 flex flex-col bg-background lg:static lg:z-auto lg:w-80 lg:border-l lg:border-border xl:w-96">
+  const contents = (
+    <>
       <div className="flex h-16 items-center justify-between border-b border-border px-5"><div><h2 className="text-sm font-medium text-foreground">Generation details</h2><p className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</p></div><button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="Close details sidebar" title="Close details sidebar"><X className="h-4 w-4 lg:hidden" /><PanelRightClose className="hidden h-5 w-5 lg:block" /></button></div>
-      <div className="flex-1 space-y-6 overflow-y-auto p-5"><section><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Prompt</p><p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{run.prompt}</p></section>{first.inputUrls.length > 0 && <section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Inputs</p><div className="mt-3 flex gap-2">{first.inputUrls.map((url) => <img key={url} src={url} alt="Input asset" className="h-16 w-16 rounded-ui object-cover" />)}</div></section>}<section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Parameters</p><dl className="mt-3 space-y-1">{details.filter((item): item is [string, string | number] => item[1] !== undefined).map(([label, value]) => <div key={label} className="flex items-start justify-between gap-4 rounded-ui px-2 py-2 text-xs odd:bg-surface-soft"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium capitalize text-foreground">{value}</dd></div>)}</dl></section></div>
-    </aside>
+      <div className="flex-1 space-y-6 overflow-y-auto p-5"><section><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Prompt</p><p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{run.prompt}</p></section>{first.inputUrls.length > 0 && <section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Inputs</p><div className="mt-3 flex flex-wrap gap-2">{first.inputUrls.map((url, index) => <InputMedia key={`${url}-${index}`} creationId={first.taskId || first.id} url={url} index={index} kind={first.parameters?.inputKinds?.[index]} />)}</div></section>}<section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Parameters</p><dl className="mt-3 space-y-1">{details.filter((item): item is [string, string | number] => item[1] !== undefined).map(([label, value]) => <div key={label} className="flex items-start justify-between gap-4 rounded-ui px-2 py-2 text-xs odd:bg-surface-soft"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium capitalize text-foreground">{value}</dd></div>)}</dl></section></div>
+    </>
   );
+  return mobile ? <Modal onClose={onClose} aria-label="Generation details" className="flex flex-col bg-background">{contents}</Modal>
+    : <aside aria-label="Generation details" className="flex w-80 flex-col border-l border-border bg-background xl:w-96"
+      onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); onClose(); } }}>{contents}</aside>;
 }

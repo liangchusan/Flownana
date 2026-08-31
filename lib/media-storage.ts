@@ -1,9 +1,11 @@
 import { put } from "@vercel/blob";
+import { randomUUID } from "node:crypto";
 import { safeRemoteMediaFetch } from "@/lib/safe-remote-media";
 
 type MediaKind = "image" | "video" | "music";
 export interface StoredMedia {
   url: string;
+  pathname?: string;
   contentType?: string;
   sizeBytes?: number;
 }
@@ -98,6 +100,7 @@ export async function persistGeneratedMedia(params: {
   userId: string;
   taskId: string;
   kind: MediaKind;
+  beforeUpload?: (pathname: string) => Promise<void>;
 }): Promise<StoredMedia> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error("Generated media storage is not configured.");
@@ -121,19 +124,22 @@ export async function persistGeneratedMedia(params: {
       "generations",
       safePathSegment(params.userId),
       params.kind,
-      `${safePathSegment(params.taskId)}.${extension}`,
+      `${safePathSegment(params.taskId)}-${randomUUID()}.${extension}`,
     ].join("/");
 
+    await params.beforeUpload?.(pathname);
     const blob = await put(pathname, response.body, {
       access: "public",
       addRandomSuffix: false,
-      allowOverwrite: true,
+      allowOverwrite: false,
       contentType,
       multipart: true,
+      abortSignal: AbortSignal.timeout(30_000),
     });
 
     return {
       url: blob.url,
+      pathname,
       contentType,
       sizeBytes: response.sizeBytes,
     };

@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
+import { matchesRequestAccount } from "@/lib/account-scope";
+import { sessionAccountWhere } from "@/lib/account-session";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !matchesRequestAccount(request, session.user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: sessionAccountWhere(session.user),
     });
 
     if (!user?.stripeCustomerId) {

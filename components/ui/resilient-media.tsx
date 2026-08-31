@@ -1,4 +1,5 @@
 "use client";
+import { useAccountOperation } from "@/lib/use-account-operation";
 
 import {
   useCallback,
@@ -38,6 +39,7 @@ export function ResilientMedia({
   const [loadState, setLoadState] = useState<MediaLoadState>("ready");
   const blobRetryCount = useRef(0);
   const providerRefreshAttempted = useRef(false);
+  const { capture } = useAccountOperation();
   const handlingError = useRef(false);
   const retryTimer = useRef<number | null>(null);
   const refreshController = useRef<AbortController | null>(null);
@@ -77,15 +79,18 @@ export function ResilientMedia({
     refreshController.current = controller;
 
     try {
+      const operation = capture();
       const response = await fetch("/api/creations/media-url", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...operation.headers },
         body: JSON.stringify({ creationId, url }),
         signal: controller.signal,
       });
       const data = (await response.json().catch(() => null)) as {
         url?: string;
       } | null;
+      operation.assertCurrent();
+      if (controller.signal.aborted) return;
       if (!response.ok || !data?.url?.trim()) {
         throw new Error("Media refresh failed");
       }
@@ -100,7 +105,7 @@ export function ResilientMedia({
         refreshController.current = null;
       }
     }
-  }, [creationId, url]);
+  }, [capture, creationId, url]);
 
   const retryBlob = useCallback(() => {
     blobRetryCount.current += 1;

@@ -2,6 +2,7 @@
 
 import { ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import type { BillingKey } from "@/lib/plans";
 
 export function UpgradeModal({
@@ -36,11 +37,8 @@ export function UpgradeModal({
   const [amountLine, formulaLine, noteLine] = (chargeLine ?? "").split("\n");
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/30 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <Modal onClose={onClose} aria-labelledby="upgrade-dialog-title" className="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/30 p-0 backdrop-blur-sm sm:items-center sm:p-4">
       <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="upgrade-dialog-title"
         className="relative w-full rounded-t-ui-xl border border-border bg-background p-5 shadow-float sm:max-w-lg sm:rounded-ui-xl sm:p-7"
       >
         <button
@@ -153,6 +151,6 @@ export function UpgradeModal({
           </Button>
         </div>
       </section>
-    </div>
+    </Modal>
   );
 }

@@ -12,7 +12,9 @@ import {
   X,
 } from "lucide-react";
 import { useToast } from "@/components/blocks/app-toast-provider";
-import { upload } from "@vercel/blob/client";
+import { uploadAccountMedia } from "@/lib/account-media-upload";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
 import type {
   ComposerAttachmentKind,
   GenerationInputCapabilities,
@@ -150,6 +152,7 @@ export function ComposerToolbarLeading({
   onAdd: (attachments: ComposerAttachment[]) => void;
 }) {
   const { showToast } = useToast();
+  const { capture } = useAccountOperation();
   const [addOpen, setAddOpen] = useState(false);
   const [assetView, setAssetView] = useState(false);
   const [typeOpen, setTypeOpen] = useState(false);
@@ -218,17 +221,11 @@ export function ComposerToolbarLeading({
       });
     }
     try {
+      const operation = capture();
       const blobs = await Promise.all(
-        accepted.map((file) => {
-          const uploadId = crypto.randomUUID();
-          return upload(`generation-inputs/image/${uploadId}/${file.name}`, file, {
-            access: "public",
-            handleUploadUrl: "/api/creations/upload",
-            clientPayload: JSON.stringify({ kind: "image", sizeBytes: file.size, uploadId }),
-            multipart: file.size > 4 * 1024 * 1024,
-          });
-        })
+        accepted.map((file) => uploadAccountMedia(file, "image", operation))
       );
+      operation.assertCurrent();
       onAdd(
         accepted.map((file, index) => ({
           id: createAttachmentId("upload"),
@@ -238,7 +235,8 @@ export function ComposerToolbarLeading({
           source: "upload" as const,
         }))
       );
-    } catch {
+    } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       showToast({ title: "Upload failed", message: "The images could not be uploaded. Please try again.", variant: "warning" });
       return;
     }
@@ -265,7 +263,9 @@ export function ComposerToolbarLeading({
     }
 
     try {
+      const operation = capture();
       const mediaDuration = await readMediaDuration(file, kind);
+      operation.assertCurrent();
       if (mediaDuration < 2 || mediaDuration > 15) {
         showToast({
           title: `${mediaLabel(kind)} duration is unsupported`,
@@ -274,13 +274,8 @@ export function ComposerToolbarLeading({
         });
         return;
       }
-      const uploadId = crypto.randomUUID();
-      const blob = await upload(`generation-inputs/${kind}/${uploadId}/${file.name}`, file, {
-        access: "public",
-        handleUploadUrl: "/api/creations/upload",
-        clientPayload: JSON.stringify({ kind, sizeBytes: file.size, uploadId }),
-        multipart: file.size > 4 * 1024 * 1024,
-      });
+      const blob = await uploadAccountMedia(file, kind, operation);
+      operation.assertCurrent();
       onAdd([{
         id: createAttachmentId("upload"),
         url: blob.url,
@@ -290,7 +285,8 @@ export function ComposerToolbarLeading({
       }]);
       setAddOpen(false);
       setAssetView(false);
-    } catch {
+    } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       showToast({
         title: "Upload failed",
         message: `The ${kind} file could not be uploaded. Please try again.`,

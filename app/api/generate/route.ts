@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { Prisma } from "@prisma/client";
+import type { Generation } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
-import { prisma } from "@/lib/prisma";
+import { matchesRequestAccount } from "@/lib/account-scope";
 import { getKieApiKey } from "@/lib/kie";
 import {
-  CreditConsumptionConflictError,
-  InsufficientCreditsError,
-  consumeCreditsFIFO,
-  refundConsumedCredits,
-  type CreditConsumptionSnapshot,
-} from "@/lib/credit-consumption";
+  attachGenerationTask, completeGeneration, failGeneration, GenerationRequestError,
+  claimGenerationOutput, recordGenerationOutputPath, finishGenerationOutputAttempt,
+  isActiveGeneration, recoverGenerationObligations, reserveGeneration,
+} from "@/lib/generation-lifecycle";
+import { generationErrorResponse, generationResponse, generationUncertainResponse } from "@/lib/generation-response";
 import {
   IMAGE_MODEL_OPTION_MAP,
   getImageGenerationCredits,
@@ -20,17 +19,14 @@ import {
 import { getImageInputCapabilities } from "@/lib/generation-input-capabilities";
 import {
   ProviderGenerationError,
-  getGenerationErrorDisplay,
   getGenerationErrorHttpStatus,
   getGenerationErrorPayload,
-  withGenerationCreditOutcome,
   type GenerationErrorCode,
 } from "@/lib/generation-errors";
 import { persistGeneratedMedia } from "@/lib/media-storage";
-import type { StoredMedia } from "@/lib/media-storage";
 import {
   persistOrReuseImageInput,
-  syncGenerationMediaAssets,
+  enforceInputMediaSize,
 } from "@/lib/media-assets";
 
 const KIE_API_BASE = "https://api.kie.ai";
@@ -152,6 +148,7 @@ async function createImageTask(params: {
   };
 
   const res = await fetch(`${KIE_API_BASE}/api/v1/jobs/createTask`, {
+    signal: AbortSignal.timeout(30_000),
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -182,7 +179,7 @@ async function createImageTask(params: {
   return json.data.taskId;
 }
 
-async function pollImageResult(taskId: string, modelLabel: string) {
+async function pollImageResult(taskId: string, modelLabel: string, deadline: number) {
   const apiKey = getKieApiKey();
 
   if (!apiKey) {
@@ -191,16 +188,15 @@ async function pollImageResult(taskId: string, modelLabel: string) {
     );
   }
 
-  const maxWaitMs = 300_000; // 最长等待 5 分钟
   const intervalMs = 2_000; // 每 2 秒轮询一次
-  const start = Date.now();
 
-  while (Date.now() - start < maxWaitMs) {
+  while (Date.now() < deadline) {
     const res = await fetch(
       `${KIE_API_BASE}/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(
         taskId
       )}`,
       {
+        signal: AbortSignal.timeout(Math.max(1, Math.min(10_000, deadline - Date.now()))),
         method: "GET",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -284,303 +280,92 @@ async function pollImageResult(taskId: string, modelLabel: string) {
 }
 
 export async function POST(request: NextRequest) {
-  const processingStartedAt = Date.now();
-  let consumedCredits: CreditConsumptionSnapshot = [];
-  let taskId: string | undefined;
-  let userId: string | undefined;
-  let promptForPersistence = "Untitled prompt";
-  let parametersForPersistence: PersistedGenerationParameters | undefined;
-  let inputUrlsForPersistence: string[] = [];
-  let inputMediaForPersistence: StoredMedia[] = [];
+  const deadline = Date.now() + 190_000; // Leave time for safe media storage and settlement.
+  let account: { id: string; accountCreatedAt: string } | undefined;
+  let reserved: Generation | undefined;
+  let reservationAttempted = false;
+  let outputAttemptId: string | null = null;
+  let outputUploadAcknowledged = false;
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return imageErrorResponse("auth_required");
-    }
-    userId = session.user.id;
-
-    const body = await request.json();
-    const {
-      prompt,
-      imageUrl,
-      imageUrls,
-      model,
-      resolution,
-      aspectRatio,
-      runId,
-      outputIndex,
-      outputCount,
-    } = body as {
-      prompt?: string;
-      imageUrl?: string | null;
-      imageUrls?: string[];
-      mode?: "text-to-image" | "image-to-image";
-      model?: string;
-      resolution?: string;
-      aspectRatio?: string;
-      runId?: string;
-      outputIndex?: number;
-      outputCount?: number;
-    };
-
-    if (!prompt) {
-      return imageErrorResponse("prompt_required");
-    }
-    promptForPersistence = prompt;
-
-    const ar = aspectRatio && aspectRatio.trim() !== "" ? aspectRatio : "1:1";
-    const res = (
-      resolution && resolution.trim() !== "" ? resolution : "1K"
-    ).toUpperCase() as ImageResolutionKey;
-    const modelId = IMAGE_MODEL_OPTION_MAP[model as ImageModelOptionId]
-      ? (model as ImageModelOptionId)
-      : DEFAULT_IMAGE_MODEL_ID;
+    if (!session?.user?.id || !matchesRequestAccount(request, session.user)) return imageErrorResponse("auth_required");
+    account = session.user;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return imageErrorResponse("invalid_parameters");
+    const { prompt, imageUrl, imageUrls, model, resolution, aspectRatio, runId, outputIndex, outputCount } = body;
+    if (typeof prompt !== "string" || !prompt.trim()) return imageErrorResponse("prompt_required");
+    if ((model != null && (typeof model !== "string" || !Object.hasOwn(IMAGE_MODEL_OPTION_MAP, model))) ||
+      (resolution != null && typeof resolution !== "string") ||
+      (aspectRatio != null && typeof aspectRatio !== "string")) return imageErrorResponse("invalid_parameters");
+    const modelId = (model ?? DEFAULT_IMAGE_MODEL_ID) as ImageModelOptionId;
     const modelOption = IMAGE_MODEL_OPTION_MAP[modelId];
-    const inputSources = (
-      Array.isArray(imageUrls)
-        ? imageUrls
-        : imageUrl
-          ? [imageUrl]
-          : []
-    ).filter((url): url is string => typeof url === "string" && url.trim().length > 0)
-      .map((url) => url.trim());
-    const inputCapabilities = getImageInputCapabilities(modelId);
-    if (inputSources.length > inputCapabilities.maxImages) {
-      return imageErrorResponse("invalid_parameters");
-    }
-    parametersForPersistence = {
-      model: modelOption.label,
-      resolution: res,
-      aspectRatio: ar,
-      mode: inputSources.length > 0 ? "Image to image" : "Text to image",
-      ...(typeof runId === "string" && runId.trim().length > 0
-        ? { runId: runId.trim().slice(0, 120) }
-        : {}),
-      ...(Number.isInteger(outputIndex) && Number(outputIndex) >= 0
-        ? { outputIndex: Number(outputIndex) }
-        : {}),
-      ...(Number.isInteger(outputCount) && Number(outputCount) >= 1 && Number(outputCount) <= 4
-        ? { outputCount: Number(outputCount) }
-        : {}),
-    };
+    const res = (resolution?.trim() || "1K").toUpperCase() as ImageResolutionKey;
+    const ar = aspectRatio?.trim().toLowerCase() || "1:1";
     const cost = getImageGenerationCredits(modelId, res);
-    if (!cost) {
+    if (!cost || !isValidImageAspectRatio({ modelId, resolution: res, aspectRatio: ar })) {
       return imageErrorResponse("invalid_parameters");
     }
-
-    if (
-      !isValidImageAspectRatio({ modelId, resolution: res, aspectRatio: ar })
-    ) {
+    const sources = imageUrls ?? (imageUrl ? [imageUrl] : []);
+    if (!Array.isArray(sources) || sources.some((source) => typeof source !== "string" || !source.trim())) {
       return imageErrorResponse("invalid_parameters");
     }
-
-    const requestId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const inputMedia = inputSources.length > 0
-      ? await Promise.all(
-          inputSources.map((source, index) =>
-            persistOrReuseImageInput({
-              source,
-              userId: session.user.id,
-              requestId: `${requestId}-${index}`,
-            })
-          )
-        )
-      : undefined;
-    const inputUrls = inputMedia?.map((media) => media.url);
-    inputUrlsForPersistence = inputUrls || [];
-    inputMediaForPersistence = inputMedia || [];
-
-    consumedCredits = await consumeCreditsFIFO(session.user.id, cost);
-
-    taskId = await createImageTask({
-      modelId,
-      prompt,
-      aspectRatio: ar,
-      resolution: res,
-      outputFormat: "png",
-      inputUrls,
-    });
-
-    const providerImageUrl = await pollImageResult(taskId, modelOption.label);
-    const generatedImage = await persistGeneratedMedia({
-      sourceUrl: providerImageUrl,
-      userId: session.user.id,
-      taskId,
-      kind: "image",
-    });
-    const generatedImageUrl = generatedImage.url;
-    parametersForPersistence = {
-      ...parametersForPersistence,
-      processingDurationMs: Date.now() - processingStartedAt,
+    const capabilities = getImageInputCapabilities(modelId);
+    if (sources.length > capabilities.maxImages) return imageErrorResponse("invalid_parameters");
+    const inputMedia = await Promise.all(sources.map(async (source: string, index: number) =>
+      enforceInputMediaSize(await persistOrReuseImageInput({
+        source: source.trim(), userId: account!.id, requestId: `${crypto.randomUUID()}-${index}`,
+      }), capabilities.maxImageBytes, "image")
+    ));
+    const parameters: PersistedGenerationParameters = {
+      model: modelOption.label, resolution: res, aspectRatio: ar,
+      mode: inputMedia.length ? "Image to image" : "Text to image",
+      ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120) } : {}),
+      ...(Number.isInteger(outputIndex) && outputIndex >= 0 && outputIndex < 4 ? { outputIndex } : {}),
+      ...(Number.isInteger(outputCount) && outputCount >= 1 && outputCount <= 4 ? { outputCount } : {}),
     };
-
-    const generation = await prisma.generation.upsert({
-      where: { taskId },
-      update: {
-        type: "image",
-        status: "success",
-        urls: [generatedImageUrl],
-        inputUrls: inputUrlsForPersistence,
-        prompt,
-        error: null,
-        modelOptionId: inputUrls?.length
-          ? modelOption.imageToImageModel
-          : modelOption.textToImageModel,
-        parameters: parametersForPersistence as Prisma.InputJsonValue,
-        creditsCost: cost,
-      },
-      create: {
-        userId,
-        type: "image",
-        status: "success",
-        urls: [generatedImageUrl],
-        inputUrls: inputUrlsForPersistence,
-        prompt,
-        taskId,
-        modelOptionId: inputUrls?.length
-          ? modelOption.imageToImageModel
-          : modelOption.textToImageModel,
-        parameters: parametersForPersistence as Prisma.InputJsonValue,
-        creditsCost: cost,
-      },
+    await recoverGenerationObligations(account);
+    reservationAttempted = true;
+    reserved = await reserveGeneration({
+      account, type: "image", prompt: prompt.trim(), creditsCost: cost, parameters,
+      modelOptionId: inputMedia.length ? modelOption.imageToImageModel : modelOption.textToImageModel,
+      inputs: inputMedia.map((media, position) => ({ media, position, type: "image", role: "input" })),
     });
-    await syncGenerationMediaAssets({
-      generationId: generation.id,
-      userId,
-      assets: [
-        ...inputMediaForPersistence.map((media, position) => ({
-          media,
-          role: "input" as const,
-          type: "image" as const,
-          position,
-        })),
-        { media: generatedImage, role: "output", type: "image", position: 0 },
-      ],
+    if (Date.now() >= deadline) throw new GenerationRequestError("timeout");
+    const taskId = await createImageTask({
+      modelId, prompt: prompt.trim(), aspectRatio: ar, resolution: res, outputFormat: "png",
+      inputUrls: inputMedia.map((media) => media.url),
     });
-
-    return NextResponse.json({
-      success: true,
-      imageUrl: generatedImageUrl,
-      prompt,
-      taskId,
-      creditsCost: cost,
-      parameters: parametersForPersistence,
-      inputUrls: inputUrlsForPersistence,
+    reserved = await attachGenerationTask(account, reserved.id, taskId);
+    if (!isActiveGeneration(reserved.status)) return generationResponse(reserved);
+    const providerImageUrl = await pollImageResult(taskId, modelOption.label, deadline);
+    const claimed = await claimGenerationOutput(account, reserved.id);
+    outputAttemptId = claimed.attemptId;
+    if (!outputAttemptId) return generationResponse(claimed.generation);
+    const output = await persistGeneratedMedia({ sourceUrl: providerImageUrl, userId: account.id, taskId, kind: "image",
+      beforeUpload: (pathname) => recordGenerationOutputPath(account!, reserved!.id, outputAttemptId!, pathname),
     });
-  } catch (error: any) {
+    outputUploadAcknowledged = true;
+    const result = await completeGeneration({ account, id: reserved.id, attemptId: outputAttemptId,
+      output: { media: output, role: "output", type: "image", position: 0 },
+    });
+    return generationResponse(result.generation);
+  } catch (error) {
     console.error("Error generating image:", error);
-    if (parametersForPersistence) {
-      parametersForPersistence = {
-        ...parametersForPersistence,
-        processingDurationMs: Date.now() - processingStartedAt,
-      };
-    }
-    let creditsRefunded = false;
-    let refundPending = false;
-    if (consumedCredits.length > 0) {
+    if (reserved && account) {
       try {
-        await refundConsumedCredits(consumedCredits);
-        creditsRefunded = true;
-      } catch (refundError) {
-        refundPending = true;
-        console.error("Failed to refund image credits:", refundError);
-      }
-    }
-
-    let errorDisplay;
-    if (error instanceof InsufficientCreditsError) {
-      errorDisplay = getGenerationErrorDisplay(
-        {
-          errorCode: "insufficient_credits",
-          error: `This generation needs ${error.required} credits, but you have ${error.available}.`,
-        },
-        { mediaType: "image" }
-      );
-    } else if (error instanceof CreditConsumptionConflictError) {
-      errorDisplay = getGenerationErrorDisplay(
-        { errorCode: "credit_conflict" },
-        { mediaType: "image" }
-      );
-    } else {
-      errorDisplay = getGenerationErrorDisplay(error, {
-        mediaType: "image",
-        source: error instanceof ProviderGenerationError ? "provider" : "app",
-      });
-    }
-    errorDisplay = withGenerationCreditOutcome(errorDisplay, {
-      creditsConsumed: consumedCredits.length > 0,
-      creditsRefunded,
-      refundPending,
-    });
-
-    if (taskId && userId) {
-      try {
-        const generation = await prisma.generation.upsert({
-          where: { taskId },
-          update: {
-            type: "image",
-            status: "failed",
-            error: errorDisplay.message,
-            inputUrls: inputUrlsForPersistence,
-            ...(parametersForPersistence
-              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
-              : {}),
-          },
-          create: {
-            userId,
-            type: "image",
-            status: "failed",
-            urls: [],
-            inputUrls: inputUrlsForPersistence,
-            prompt: promptForPersistence,
-            taskId,
-            error: errorDisplay.message,
-            ...(parametersForPersistence
-              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
-              : {}),
-          },
+        const settled = await failGeneration({ account, id: reserved.id, error,
+          ...(outputAttemptId ? { attemptId: outputAttemptId } : {}),
+          source: error instanceof ProviderGenerationError ? "provider" : "app" });
+        return generationResponse(settled.generation);
+      } catch (settlementError) {
+        console.error("Image failure remains recoverable:", settlementError);
+        return generationUncertainResponse({
+          taskId: reserved.taskId || reserved.id, generationId: reserved.id,
         });
-        await syncGenerationMediaAssets({
-          generationId: generation.id,
-          userId,
-          assets: inputMediaForPersistence.map((media, position) => ({
-            media,
-            role: "input",
-            type: "image",
-            position,
-          })),
-        });
-      } catch (persistErr) {
-        console.error("Failed to persist image generation failure:", persistErr);
       }
     }
-
-    const payload = getGenerationErrorPayload(
-      {
-        errorCode: errorDisplay.code,
-        errorTitle: errorDisplay.title,
-        error: errorDisplay.message,
-        errorAction: errorDisplay.action,
-        retryable: errorDisplay.retryable,
-      },
-      {
-        mediaType: "image",
-        creditsRefunded,
-        refundPending,
-      }
-    );
-    return NextResponse.json(
-      {
-        ...payload,
-        ...(taskId ? { taskId } : {}),
-        ...(error instanceof InsufficientCreditsError
-          ? { required: error.required, available: error.available }
-          : {}),
-      },
-      { status: getGenerationErrorHttpStatus(errorDisplay.code) }
-    );
+    return generationErrorResponse(error, "image", {}, reservationAttempted);
+  } finally {
+    if (account && reserved && outputAttemptId) await finishGenerationOutputAttempt(account, reserved.id, outputAttemptId, outputUploadAcknowledged);
   }
 }

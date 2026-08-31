@@ -19,7 +19,8 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
-import { mergeCreations, type CreationHistoryItem, type CreationStatus } from "@/lib/creation-history";
+import { type CreationHistoryItem, type CreationStatus } from "@/lib/creation-history";
+import { accountRequestHeaders, getAccountScope } from "@/lib/account-scope";
 
 type CreationType = "image" | "video" | "music";
 type ActiveCreationType = Exclude<CreationType, "music">;
@@ -100,7 +101,7 @@ const creationModeOptions = [
   { id: "video" as const, label: "AI Video", icon: Video },
 ];
 
-const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed"];
+const VALID_STATUS: CreationStatus[] = ["pending", "generating", "processing", "success", "failed", "deleted"];
 const LEGACY_STATUS_MAP: Record<string, CreationStatus> = {
   completed: "success",
   done: "success",
@@ -168,17 +169,6 @@ function normalizeCreation(raw: unknown): Creation | null {
   };
 }
 
-function getCreationStorageKeys(session: {
-  user?: { id?: string | null; email?: string | null };
-} | null): string[] {
-  const keys = [
-    session?.user?.id ? `creations_${session.user.id}` : null,
-    session?.user?.email ? `creations_${session.user.email}` : null,
-  ].filter((item): item is string => !!item);
-
-  return Array.from(new Set(keys));
-}
-
 function formatCreationDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -189,11 +179,18 @@ function formatCreationDate(value: string): string {
   }).format(date);
 }
 
-export function CreateContent({
+type HomeProps = { initialRecentCreations?: Creation[]; initialAccountScope?: string | null };
+
+export function CreateContent(props: HomeProps) {
+  const { data: session } = useSession();
+  const accountScope = getAccountScope(session?.user);
+  return <ScopedCreateContent key={accountScope || "anonymous"} {...props} accountScope={accountScope} initialRecentCreations={accountScope && props.initialAccountScope === accountScope ? props.initialRecentCreations : []} />;
+}
+
+function ScopedCreateContent({
   initialRecentCreations = [],
-}: {
-  initialRecentCreations?: Creation[];
-}) {
+  accountScope,
+}: HomeProps & { accountScope: string | null }) {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [creationMode, setCreationMode] = useState<ActiveCreationType>("image");
@@ -242,52 +239,20 @@ export function CreateContent({
 
   // 模块3: 加载用户创作记录
   useEffect(() => {
-    if (sessionStatus === "loading") return;
-
-    if (!session?.user?.id && !session?.user?.email) {
-      setRecentCreations([]);
-      setIsLoadingCreations(false);
-      return;
-    }
-
-    const readLocalCreations = () => {
-      const parsedAll: Creation[] = [];
-      for (const key of getCreationStorageKeys(session)) {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-
-        try {
-          const parsed = JSON.parse(raw);
-          const normalized = Array.isArray(parsed)
-            ? parsed
-                .map((item) => normalizeCreation(item))
-                .filter((item): item is Creation => !!item)
-            : [];
-          parsedAll.push(...normalized);
-        } catch (error) {
-          console.error("Error parsing stored creations:", error);
-        }
-      }
-
-      return mergeCreations(parsedAll, []);
-    };
-
+    if (!accountScope) return;
+    const controller = new AbortController();
     let cancelled = false;
-    const localCreations = readLocalCreations();
-    const seededCreations = mergeCreations(initialRecentCreations, localCreations).slice(0, 8);
-    setRecentCreations(seededCreations);
-    setIsLoadingCreations(seededCreations.length === 0);
-
-    fetch("/api/creations")
+    setIsLoadingCreations(true);
+    fetch("/api/creations", { headers: accountRequestHeaders(accountScope), signal: controller.signal, cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled) return;
+        if (cancelled || data?.accountScope !== accountScope) return;
         const fromApi = Array.isArray(data?.creations)
           ? data.creations
               .map((item: unknown) => normalizeCreation(item))
               .filter((item: Creation | null): item is Creation => !!item)
           : [];
-        setRecentCreations(mergeCreations(fromApi, seededCreations).slice(0, 8));
+        setRecentCreations(fromApi.slice(0, 8));
       })
       .catch((error) => {
         console.error("Error fetching recent creations:", error);
@@ -298,8 +263,9 @@ export function CreateContent({
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [session, sessionStatus, initialRecentCreations]);
+  }, [accountScope]);
 
   const handleStartCreating = () => {
     const trimmed = prompt.trim();

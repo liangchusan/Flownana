@@ -10,6 +10,7 @@ import type {
 } from "@/lib/creation-history";
 
 interface ResultPanelProps {
+  initialAccountScope?: string | null;
   mode: "video" | "image" | "music";
   initialCreations?: CreationHistoryItem[];
   currentGeneration?: PanelGeneration;
@@ -30,6 +31,7 @@ export interface PanelGeneration {
 }
 
 export function ResultPanel({
+  initialAccountScope,
   mode,
   initialCreations = [],
   currentGeneration,
@@ -98,6 +100,7 @@ export function ResultPanel({
           <ExploreTab mode={mode} onGenerateSimilar={onGenerateSimilar} />
         ) : (
           <MyCreationsTab
+            initialAccountScope={initialAccountScope}
             mode={mode}
             initialCreations={initialCreations}
             currentGenerations={generationItems}

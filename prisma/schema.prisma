@@ -23,6 +23,43 @@ model User {
   generations       Generation[]
   mediaAssets       MediaAsset[]
   mediaUploadGrants MediaUploadGrant[]
+  checkoutReservations CheckoutReservation[]
+  upgradeConsumptions UpgradeConsumption[]
+}
+
+model CheckoutReservation {
+  id                    String   @id
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountCreatedAt      DateTime
+  kind                  String
+  priceKey              String
+  stripePriceId         String
+  predecessorId         String?
+  stripeSessionId       String?  @unique
+  stripeSubscriptionId  String?  @unique
+  // Immutable Stripe request bodies; committed before any external creation.
+  sessionParams         Json
+  couponParams          Json?
+  status                String   @default("creating")
+  expiresAt             DateTime
+  closedAt              DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // SQL migration adds unique(userId) WHERE closedAt IS NULL.
+  @@index([userId, createdAt])
+}
+
+model UpgradeConsumption {
+  predecessorId         String   @id
+  successorId           String   @unique
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountCreatedAt      DateTime
+  createdAt             DateTime @default(now())
+
+  @@index([userId])
 }
 
 model MediaUploadGrant {

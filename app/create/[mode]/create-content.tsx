@@ -12,10 +12,18 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { Logo } from "@/components/ui/logo";
 import Link from "next/link";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
+import { getAccountScope } from "@/lib/account-scope";
+import { useAccountOperation } from "@/lib/use-account-operation";
 
 type CreationMode = "video" | "image";
 
-export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
+export function CreateContent(props: { mode: CreationMode }) {
+  const { data: session } = useSession();
+  return <ScopedCreateContent key={getAccountScope(session?.user) || "anonymous"} {...props} />;
+}
+
+function ScopedCreateContent({ mode: modeParam }: { mode: CreationMode }) {
+  const { capture: captureGeneration } = useAccountOperation();
   const { data: session, status } = useSession();
   
   const mode = modeParam as CreationMode | null;
@@ -49,9 +57,9 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
       <CreationSidebar />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-background">
+      <main className="ml-16 min-w-0 flex-1 overflow-y-auto bg-background">
         {/* Top Bar with Logo and User Info - Full width, above sidebar */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background px-8 py-2">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background px-3 py-2 sm:px-8">
           <Link href="/" className="flex-shrink-0">
             <Logo size="md" />
           </Link>
@@ -79,14 +87,15 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
         </div>
 
         {/* Content area with left margin for sidebar */}
-        <div className="ml-16 flex h-[calc(100vh-73px)]">
+        <div className="flex min-h-[calc(100vh-73px)] flex-col lg:h-[calc(100vh-73px)] lg:flex-row">
           {/* Left: Creation Form */}
-          <div className="w-full max-w-lg shrink-0 overflow-y-auto border-r border-border bg-background p-8">
+          <div className="w-full shrink-0 border-b border-border bg-background p-3 sm:p-8 lg:max-w-lg lg:overflow-y-auto lg:border-b-0 lg:border-r">
             <h1 className="mb-8 text-3xl font-bold text-stone-900 md:text-4xl">
               {getTitle()}
             </h1>
             {mode === "video" && (
               <VideoCreationForm
+                captureGeneration={captureGeneration}
                 onGenerate={setGeneratedVideo}
                 isGenerating={isGeneratingVideo}
                 setIsGenerating={setIsGeneratingVideo}
@@ -94,6 +103,7 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
             )}
             {mode === "image" && (
               <GenerateForm
+                captureGeneration={captureGeneration}
                 onGenerate={setGeneratedImage}
                 isGenerating={isGeneratingImage}
                 setIsGenerating={setIsGeneratingImage}
@@ -102,7 +112,7 @@ export function CreateContent({ mode: modeParam }: { mode: CreationMode }) {
           </div>
 
           {/* Right: Preview - Full Screen */}
-          <div className="flex-1 overflow-y-auto bg-background p-8">
+          <div className="min-w-0 flex-1 bg-background p-3 sm:p-8 lg:overflow-y-auto">
             {mode === "video" && (
               <VideoPreview
                 videoUrl={generatedVideo}

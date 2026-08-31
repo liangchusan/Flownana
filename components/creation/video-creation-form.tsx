@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, ChevronDown, Loader2, Send, SlidersHorizontal, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled, type CaptureAccountOperation } from "@/lib/account-operation";
+import { uploadAccountMedia } from "@/lib/account-media-upload";
 import {
   VIDEO_MODEL_OPTIONS,
   formatVideoResolution,
@@ -23,6 +26,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
+import { GENERATION_STATUS_UNAVAILABLE, isConfirmedGenerationFailure, pollGenerationResult } from "@/lib/generation-request-state";
 import type { GenerationParameters } from "@/lib/creation-history";
 import {
   getVideoInputCapabilities,
@@ -34,16 +38,9 @@ const MODEL_POPUP_CLS =
 const OPTIONS_POPUP_CLS =
   "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 interface VideoCreationFormProps {
+  onGenerationUncertain?: (data: { optimisticId: string }) => void;
+  captureGeneration?: CaptureAccountOperation;
   onGenerate: (
     videoUrl: string,
     taskId?: string,
@@ -90,6 +87,8 @@ interface VideoCreationFormProps {
 }
 
 export function VideoCreationForm({
+  onGenerationUncertain,
+  captureGeneration,
   onGenerate,
   onGenerationStart,
   onGenerationTaskCreated,
@@ -115,6 +114,7 @@ export function VideoCreationForm({
 }: VideoCreationFormProps) {
   const { showToast } = useToast();
   const { data: session, status } = useSession();
+  const { capture } = useAccountOperation();
   const defaultOption = VIDEO_MODEL_OPTIONS[0];
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImages, setUploadedImages] = useState<string[]>(
@@ -322,9 +322,16 @@ export function VideoCreationForm({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
     maxFiles: inputCapabilities.maxImages,
     maxSize: inputCapabilities.maxImageBytes,
-    onDrop: (files) => {
+    onDrop: async (files) => {
       if (files.length === 0) return;
-      Promise.all(files.map(readFileAsDataUrl)).then(updateImages);
+      try {
+        const operation = capture();
+        const blobs = await Promise.all(files.map((file) => uploadAccountMedia(file, "image", operation)));
+        operation.assertCurrent();
+        updateImages(blobs.map((blob) => blob.url));
+      } catch (error) {
+        if (!isAccountOperationCancelled(error)) showToast({ title: "Upload failed", message: "Sign in and try uploading again.", variant: "warning" });
+      }
     },
     onDropRejected: (rejections) => {
       const code = rejections.some((rejection) =>
@@ -352,41 +359,32 @@ export function VideoCreationForm({
     creditsCost: number;
     parameters: GenerationParameters;
   }) => {
-    const maxAttempts = 360;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2000 : 8000));
-      const response = await axios.get("/api/veo/generate", {
+    const operation = (captureGeneration || capture)();
+    const data = await pollGenerationResult({
+      wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      assertCurrent: operation.assertCurrent,
+      read: () => axios.get("/api/veo/generate", {
+        headers: operation.headers,
+        signal: operation.signal,
         params: {
           taskId: params.taskId,
           modelOptionId: params.modelOptionId,
         },
-      });
-
-      if (response.data?.pending) {
-        continue;
-      }
-
-      if (response.data?.success && response.data?.videoUrl) {
+      }),
+    });
         trackEvent("generation_success", {
           type: "video",
-          model_option_id: response.data.modelOptionId || params.modelOptionId,
-          credits_cost: response.data.creditsCost || params.creditsCost,
+          model_option_id: data.modelOptionId || params.modelOptionId,
+          credits_cost: data.creditsCost || params.creditsCost,
         });
         onGenerate(
-          response.data.videoUrl,
-          response.data.taskId || params.taskId,
-          response.data.prompt || params.prompt,
+          data.videoUrl,
+          data.taskId || params.taskId,
+          data.prompt || params.prompt,
           params.optimisticId,
-          response.data.parameters || params.parameters,
-          response.data.inputUrls
+          data.parameters || params.parameters,
+          data.inputUrls
         );
-        return;
-      }
-
-      throw new Error(response.data?.error || "Generation failed, please try again");
-    }
-
-    throw new Error("Generation is still processing. Please refresh My Creations later.");
   };
 
   const handleGenerate = async () => {
@@ -470,7 +468,9 @@ export function VideoCreationForm({
       credits_cost: selectedOption.credits,
       aspect_ratio: aspectRatio,
     });
+    let accepted = false;
     try {
+      const operation = (captureGeneration || capture)();
       const response = await axios.post("/api/veo/generate", {
         prompt: requestPrompt,
         inputs: requestInputs.length > 0 ? requestInputs : undefined,
@@ -478,12 +478,14 @@ export function VideoCreationForm({
         aspectRatio: requestAspectRatio,
         generateAudio: showSound ? sound !== "Off" : false,
         runId: optimisticId,
-      });
+      }, { headers: operation.headers, signal: operation.signal });
+      operation.assertCurrent();
       if (response.data.success) {
         const taskId = response.data.taskId;
         const responsePrompt = response.data.prompt || prompt;
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
         if (response.data.pending && taskId) {
+          accepted = true;
           onGenerationTaskCreated?.({
             optimisticId,
             taskId,
@@ -519,24 +521,14 @@ export function VideoCreationForm({
         }
 
         throw new Error("Generation did not return a video URL.");
-      } else {
-        trackEvent("generation_failed", {
-          type: "video",
-          model_option_id: selectedOption.id,
-          error: "unknown",
-        });
-        onGenerationFailure?.({
-          optimisticId,
-          prompt: requestPrompt,
-          error: "Generation failed, please try again",
-        });
-        showToast({
-          title: "Generation failed",
-          message: "Generation failed, please try again",
-          variant: "error",
-        });
-      }
+      } else throw { response };
     } catch (error: any) {
+      if (isAccountOperationCancelled(error)) return;
+      if (!isConfirmedGenerationFailure(error, accepted)) {
+        onGenerationUncertain?.({ optimisticId });
+        showToast({ title: "Status unavailable", message: GENERATION_STATUS_UNAVAILABLE, variant: "warning" });
+        return;
+      }
       const errorDisplay = getGenerationErrorDisplay(
         error.response?.data || error,
         { mediaType: "video", status: error.response?.status }

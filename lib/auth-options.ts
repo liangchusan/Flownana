@@ -7,6 +7,7 @@ import {
   isServerTestAuthEnabled,
 } from "@/lib/test-auth-config";
 import { upsertAppUser } from "@/lib/user-sync";
+import { refreshAccountToken } from "@/lib/account-session";
 
 if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
   process.env.GLOBAL_AGENT_HTTP_PROXY =
@@ -15,10 +16,7 @@ if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
     process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
   require("global-agent/bootstrap");
   if (process.env.NODE_ENV === "development") {
-    console.log("🌐 全局代理已启用:", {
-      HTTP_PROXY: process.env.HTTP_PROXY || "未设置",
-      HTTPS_PROXY: process.env.HTTPS_PROXY || "未设置",
-    });
+    console.log("🌐 全局代理已启用");
   }
 }
 
@@ -93,7 +91,7 @@ if (process.env.NODE_ENV === "development") {
   );
   console.log(
     "- GOOGLE_CLIENT_SECRET:",
-    googleClientSecret ? `✅ 已设置 (${googleClientSecret.substring(0, 10)}...)` : "❌ 未设置"
+    googleClientSecret ? "✅ 已设置" : "❌ 未设置"
   );
   console.log(
     "- 回调 URL:",
@@ -151,57 +149,37 @@ export const authOptions: NextAuthOptions = {
       }
       if (user?.id && user.email) {
         try {
-          await upsertAppUser({
+          const profile = await upsertAppUser({
             id: user.id,
             email: user.email,
             name: user.name,
             image: user.image,
           });
+          user.accountCreatedAt = profile.createdAt.toISOString();
+          return true;
         } catch (error) {
           console.error("Could not sync signed-in user profile:", error);
+          return false;
         }
       }
-      return true;
+      return false;
     },
-    async jwt({ token, user, trigger, session }) {
-      if (user) {
-        token.id = user.id;
-        token.name = user.name;
-        token.email = user.email;
-        try {
-          const profile = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { image: true },
-          });
-          token.picture = profile?.image ?? user.image;
-        } catch {
-          token.picture = user.image;
-        }
-      }
-      const updateName =
-        typeof session?.user?.name === "string"
-          ? session.user.name
-          : typeof (session as { name?: unknown } | undefined)?.name === "string"
-            ? ((session as { name: string }).name)
-            : "";
-      if (trigger === "update" && updateName.trim()) {
-        token.name = updateName.trim();
-      }
-      const updatedImage = (
-        session as { user?: { image?: string | null } } | undefined
-      )?.user;
-      if (
-        trigger === "update" &&
-        updatedImage &&
-        Object.prototype.hasOwnProperty.call(updatedImage, "image")
-      ) {
-        token.picture = updatedImage.image ?? null;
-      }
-      return token;
+    async jwt({ token, user }) {
+      // Never bind an existing JWT to a newly created account, and never trust
+      // client update() payloads as profile or identity data.
+      return refreshAccountToken({
+        token,
+        authenticatedUser: user,
+        findAccount: (id) => prisma.user.findUnique({
+          where: { id },
+          select: { id: true, createdAt: true, name: true, email: true, image: true },
+        }),
+      });
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = (token.id as string) || token.sub || "";
+        session.user.id = token.id as string;
+        session.user.accountCreatedAt = token.accountCreatedAt as string;
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
         session.user.image = token.picture as string | null;

@@ -1,4 +1,5 @@
 "use client";
+import { InputMedia } from "@/components/creation/input-media";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,12 +18,15 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, formatConversationTimestamp, formatProcessingDuration, getCreationRunRemovalTarget, shouldShowConversationTimestamp, type CreationHistoryItem } from "@/lib/creation-history";
 import { getCreationParameters } from "@/lib/creation-details";
 import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { trackEvent } from "@/lib/analytics";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
 
 const ACTIVE_STATUSES = new Set(["pending", "generating", "processing"]);
 
@@ -73,14 +77,8 @@ function MediaViewer({
   url: string;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-dark/95 p-4" role="dialog" aria-modal="true" aria-label="Media preview">
+    <Modal onClose={onClose} className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-dark/95 p-4" aria-label="Media preview">
       <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-white/20" aria-label="Close preview"><X className="h-5 w-5" /></button>
       {creation.type === "image" ? (
         <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Image" className="max-w-xl rounded-ui-xl">
@@ -101,7 +99,7 @@ function MediaViewer({
           </div>
         </div>
       )}
-    </div>
+    </Modal>
   );
 }
 
@@ -270,6 +268,7 @@ function ResultActions({
 }
 
 function RunStatus({ run }: { run: WorkspaceRun }) {
+  const uncertain = run.creations.some((creation) => creation.statusUncertain);
   const isProcessing = run.creations.some((creation) => ACTIVE_STATUSES.has(creation.status));
   const hasFailed = run.creations.some((creation) => creation.status === "failed");
   const [now, setNow] = useState(() => new Date(run.createdAt).getTime());
@@ -288,7 +287,7 @@ function RunStatus({ run }: { run: WorkspaceRun }) {
   const startedAt = new Date(run.createdAt).getTime();
   const liveDuration = Number.isFinite(startedAt) ? Math.max(0, now - startedAt) : undefined;
   const duration = isProcessing ? liveDuration : savedDuration;
-  const label = isProcessing ? "Processing" : hasFailed ? "Failed" : "Processed";
+  const label = uncertain ? "Status unavailable" : isProcessing ? "Processing" : hasFailed ? "Failed" : "Processed";
   const connector = isProcessing ? "" : hasFailed ? " after" : " in";
   const statusClassName = isProcessing
     ? "text-sm font-medium text-muted-foreground"
@@ -299,7 +298,7 @@ function RunStatus({ run }: { run: WorkspaceRun }) {
   return (
     <div className="border-b border-border pb-3">
       <p className={statusClassName}>
-        {label}{duration !== undefined ? `${connector} ${formatProcessingDuration(duration)}` : ""}
+        {label}{!uncertain && duration !== undefined ? `${connector} ${formatProcessingDuration(duration)}` : ""}
       </p>
     </div>
   );
@@ -407,6 +406,8 @@ export function CreationStream({
   onChange: (identity: string, patch: Partial<CreationHistoryItem>) => void;
 }) {
   const { showToast } = useToast();
+  const { capture } = useAccountOperation();
+  const [mutating, setMutating] = useState(false);
   const runs = useMemo(() => groupWorkspaceRuns(creations), [creations]);
   const [viewer, setViewer] = useState<{ creation: CreationHistoryItem; url: string } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ creation: CreationHistoryItem; url: string } | null>(null);
@@ -432,36 +433,49 @@ export function CreationStream({
   }, [openMenu]);
 
   const deleteMedia = async () => {
-    if (!pendingDelete) return;
+    if (!pendingDelete || mutating) return;
     const { creation, url } = pendingDelete;
-    const response = await fetch("/api/creations", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: creation.taskId || creation.id, action: "delete-media", url }),
-    });
-    if (!response.ok) {
-      showToast({ title: "Could not delete media", message: "Please try again.", variant: "error" });
-      return;
-    }
-    const nextUrls = creation.urls.filter((item) => item !== url);
-    onChange(creationIdentity(creation), { urls: nextUrls, status: nextUrls.length ? "success" : "deleted" });
-    setPendingDelete(null);
+    setMutating(true);
+    try {
+      const operation = capture();
+      const response = await fetch("/api/creations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
+        body: JSON.stringify({ id: creation.taskId || creation.id, action: "delete-media", url }),
+      });
+      const data = await response.json();
+      operation.assertCurrent();
+      if (!response.ok || !Array.isArray(data.urls)) throw new Error(data.error || "Please try again.");
+      onChange(creationIdentity(creation), { urls: data.urls, status: data.urls.length ? "success" : "deleted" });
+      setPendingDelete(null);
+      setViewer(null);
+    } catch (error) {
+      if (!isAccountOperationCancelled(error)) showToast({ title: "Could not delete media", message: error instanceof Error ? error.message : "Please try again.", variant: "error" });
+    } finally { setMutating(false); }
   };
-
   const removeRun = async () => {
-    if (!pendingRemove) return;
+    if (!pendingRemove || mutating) return;
+    setMutating(true);
+    try {
+    const operation = capture();
     const target = getCreationRunRemovalTarget(pendingRemove.creations[0]);
     const response = await fetch("/api/creations", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...operation.headers },
+      signal: operation.signal,
       body: JSON.stringify({ ...target, action: "hide-from-recent" }),
     });
+    operation.assertCurrent();
     if (!response.ok) {
       showToast({ title: "Could not remove record", message: "Please try again.", variant: "error" });
       return;
     }
     pendingRemove.creations.forEach((creation) => onChange(creationIdentity(creation), { parameters: { ...creation.parameters, hiddenFromRecent: true } }));
     setPendingRemove(null);
+    } catch (error) {
+      if (!isAccountOperationCancelled(error)) showToast({ title: "Could not remove record", message: "Please try again.", variant: "error" });
+    } finally { setMutating(false); }
   };
 
   if (runs.length === 0) {
@@ -477,13 +491,9 @@ export function CreationStream({
   return (
     <div className="mx-auto w-full max-w-5xl space-y-12 px-4 pb-96 pt-8 sm:px-6 sm:pb-80 lg:px-8 lg:pb-72">
       {runs.map((run, runIndex) => {
-        const requestedCount = Math.max(...run.creations.map((item) => item.parameters?.outputCount || 1));
         const cells = [...run.creations];
         const metadata = getRunMetadata(run);
         const firstCreation = run.creations[0];
-        while (cells.length < requestedCount) {
-          cells.push({ ...run.creations[0], id: `${run.id}-placeholder-${cells.length}`, urls: [], status: "generating", parameters: { ...run.creations[0].parameters, outputIndex: cells.length } });
-        }
         const isFourPortraits =
           run.type === "image" &&
           cells.length === 4 &&
@@ -510,10 +520,8 @@ export function CreationStream({
                 {firstCreation.inputUrls.length > 0 && (
                   <div className="flex flex-wrap justify-end gap-2">
                     {firstCreation.inputUrls.map((url, index) => (
-                      <div key={url} className="relative inline-flex max-h-36 max-w-48 overflow-hidden rounded-ui-lg bg-surface-soft">
-                        <ResilientMedia creationId={firstCreation.taskId || firstCreation.id} url={url} label={`Input ${index + 1}`} className="min-h-0 w-48 rounded-ui-lg py-4">
-                          {({ src, onError, onReady }) => <img src={src} alt={`Original input ${index + 1}`} onError={onError} onLoad={onReady} className="h-auto max-h-36 w-auto max-w-48 object-contain" />}
-                        </ResilientMedia>
+                      <div key={`${url}-${index}`} className="relative inline-flex max-h-36 max-w-48 overflow-hidden rounded-ui-lg bg-surface-soft">
+                        <InputMedia creationId={firstCreation.taskId || firstCreation.id} url={url} index={index} kind={firstCreation.parameters?.inputKinds?.[index]} />
                       </div>
                     ))}
                   </div>
@@ -542,6 +550,9 @@ export function CreationStream({
                         compactPortrait={isFourPortraits}
                       />
                     );
+                  }
+                  if (creation.statusUncertain) {
+                    return <div key={key} role="status" className="max-w-lg rounded-ui-lg bg-surface-soft px-4 py-3"><p className="text-sm font-medium">Status unavailable</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{creation.error}</p></div>;
                   }
                   if (ACTIVE_STATUSES.has(creation.status)) {
                     return <PendingResult key={key} creation={creation} compactPortrait={isFourPortraits} />;
@@ -575,13 +586,13 @@ export function CreationStream({
 
       {viewer && <MediaViewer creation={viewer.creation} url={viewer.url} onClose={() => setViewer(null)} />}
       {(pendingDelete || pendingRemove) && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/25 p-4" role="dialog" aria-modal="true">
+        <Modal onClose={() => { setPendingDelete(null); setPendingRemove(null); }} className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/25 p-4" aria-label={pendingDelete ? "Delete this media?" : "Remove this record from recent?"}>
           <div className="w-full max-w-md rounded-ui-xl border border-border bg-background p-6 shadow-float">
             <h2 className="text-lg font-medium text-foreground">{pendingDelete ? "Delete this media?" : "Remove this record from recent?"}</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{pendingDelete ? "The media will disappear from Create and Assets. A compact deleted placeholder will remain in this record." : "The Prompt and Result record will leave Create. Successful media remains available in Assets."}</p>
             <div className="mt-6 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { setPendingDelete(null); setPendingRemove(null); }}>Cancel</Button><Button type="button" onClick={pendingDelete ? deleteMedia : removeRun} className="bg-destructive text-white hover:bg-destructive/90">Confirm</Button></div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

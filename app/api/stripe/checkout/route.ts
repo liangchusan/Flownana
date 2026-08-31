@@ -1,113 +1,32 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import type Stripe from "stripe";
-import { getStripe } from "@/lib/stripe";
-import {
-  assertStripePriceMatchesPlan,
-  getStripePriceId,
-  isPriceKey,
-} from "@/lib/plans";
-import { upsertAppUser } from "@/lib/user-sync";
-import { prisma } from "@/lib/prisma";
+import { matchesRequestAccount } from "@/lib/account-scope";
+import { isPriceKey } from "@/lib/plans";
 import { canCreateStripeCheckout } from "@/lib/stripe-production-access";
+import { CheckoutConflictError, createReservedCheckout } from "@/lib/checkout-reservation";
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session.user.email) {
+    if (!session?.user?.id || !session.user.email || !matchesRequestAccount(request, session.user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    if (
-      !canCreateStripeCheckout({
-        email: session.user.email,
-        secretKey: process.env.STRIPE_SECRET_KEY,
-        vercelEnv: process.env.VERCEL_ENV,
-        allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS,
-      })
-    ) {
-      return NextResponse.json(
-        { error: "Checkout is unavailable until live payments are enabled." },
-        { status: 503 }
-      );
+    if (!canCreateStripeCheckout({ email: session.user.email, secretKey: process.env.STRIPE_SECRET_KEY,
+      vercelEnv: process.env.VERCEL_ENV, allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS })) {
+      return NextResponse.json({ error: "Checkout is unavailable until live payments are enabled." }, { status: 503 });
     }
-
-    const body = (await request.json()) as { priceKey?: string };
-    const priceKey = body.priceKey;
-    if (!priceKey || !isPriceKey(priceKey)) {
-      return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });
-    }
-
-    await upsertAppUser({
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-      image: session.user.image,
+    const body = await request.json().catch(() => null);
+    if (!isPriceKey(body?.priceKey)) return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });
+    const result = await createReservedCheckout({
+      userId: session.user.id, accountCreatedAt: session.user.accountCreatedAt,
+      kind: "purchase", priceKey: body.priceKey,
+      baseUrl: process.env.NEXTAUTH_URL || new URL(request.url).origin,
     });
-
-    const baseUrl =
-      process.env.NEXTAUTH_URL || new URL(request.url).origin;
-    const priceId = getStripePriceId(priceKey);
-
-    const stripe = getStripe();
-    const stripePrice = await stripe.prices.retrieve(priceId);
-    assertStripePriceMatchesPlan(priceKey, stripePrice);
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: {
-        subscriptions: {
-          where: { status: { in: ["active", "trialing"] } },
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    });
-
-    if (user?.subscriptions?.[0]) {
-      return NextResponse.json(
-        {
-          error:
-            "You already have an active subscription. Use the upgrade flow on pricing page.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
-      mode: "subscription",
-      client_reference_id: session.user.id,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${baseUrl}/account/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/pricing`,
-      metadata: {
-        userId: session.user.id,
-        priceKey,
-      },
-      subscription_data: {
-        metadata: {
-          userId: session.user.id,
-          priceKey,
-        },
-      },
-    };
-
-    if (user?.stripeCustomerId) {
-      sessionParams.customer = user.stripeCustomerId;
-    } else {
-      sessionParams.customer_email = session.user.email;
-    }
-
-    const checkoutSession = await stripe.checkout.sessions.create(
-      sessionParams
-    );
-
-    return NextResponse.json({ url: checkoutSession.url });
-  } catch (e: unknown) {
-    console.error("Stripe checkout error:", e);
-    const message =
-      e instanceof Error ? e.message : "Failed to create checkout session";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Stripe purchase checkout failed:", error);
+    return NextResponse.json({ error: error instanceof CheckoutConflictError ? error.message : "Checkout could not be confirmed. Please check Billing and try again." },
+      { status: error instanceof CheckoutConflictError ? 409 : 503 });
   }
 }

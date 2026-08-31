@@ -4,6 +4,7 @@ import { getBillingSummary } from "@/lib/billing-summary";
 import { PLAN_DISPLAY } from "@/lib/plans";
 import { finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
 import { BillingClient, type UpgradeInfo } from "./billing-client";
+import { getAccountScope } from "@/lib/account-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function BillingPage({
   if (!session?.user?.id) {
     return (
       <BillingClient
+        initialAccountScope={null}
         signedIn={false}
         summary={null}
         isNewCheckout={isNewCheckout}
@@ -57,6 +59,7 @@ export default async function BillingPage({
         const completion = await finalizeCheckoutSession({
           sessionId,
           expectedUserId: session.user.id,
+          expectedAccountCreatedAt: session.user.accountCreatedAt,
           source: "checkout_return_verified",
         });
         isNewCheckout = !completion.isUpgrade;
@@ -77,9 +80,10 @@ export default async function BillingPage({
   }
 
   try {
-    const summary = await getBillingSummary(session.user.id);
+    const summary = await getBillingSummary(session.user.id, session.user.accountCreatedAt);
     return (
       <BillingClient
+        initialAccountScope={getAccountScope(session.user)}
         signedIn
         summary={summary}
         isNewCheckout={isNewCheckout}
@@ -90,6 +94,7 @@ export default async function BillingPage({
   } catch {
     return (
       <BillingClient
+        initialAccountScope={getAccountScope(session.user)}
         signedIn
         summary={null}
         error="Could not load billing data"

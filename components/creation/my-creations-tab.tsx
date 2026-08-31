@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { getAccountScope } from "@/lib/account-scope";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
 import {
   AlertTriangle,
   Clock3,
@@ -25,6 +28,7 @@ import {
   creationIdentity,
   getRegenerationInputImage,
   mergeCreations,
+  reconcileCreationSnapshot,
   normalizeGenerationParameters,
   type CreationHistoryItem,
   type CreationStatus,
@@ -143,70 +147,15 @@ function normalizeCreation(raw: unknown): Creation | null {
   };
 }
 
-function shouldPersistCreation(creation: Creation) {
-  if (
-    creation.type === "image" &&
-    (creation.status === "pending" ||
-      creation.status === "generating" ||
-      creation.status === "processing")
-  ) {
-    return false;
-  }
-
-  return true;
-}
 
 interface MyCreationsTabProps {
+  initialAccountScope?: string | null;
   mode: "video" | "image" | "music";
   initialCreations?: Creation[];
   currentGeneration?: PanelGeneration;
   currentGenerations?: PanelGeneration[];
 }
 
-function getCreationStorageKeys(session: {
-  user?: { id?: string | null; email?: string | null };
-} | null): string[] {
-  const keys = [
-    session?.user?.id ? `creations_${session.user.id}` : null,
-    session?.user?.email ? `creations_${session.user.email}` : null,
-  ].filter((item): item is string => !!item);
-
-  return Array.from(new Set(keys));
-}
-
-function removeStoredCreation(
-  storageKeys: string[],
-  id: string,
-  targetIdentity: string
-) {
-  for (const key of storageKeys) {
-    const stored = localStorage.getItem(key);
-    if (!stored) continue;
-
-    try {
-      const parsed = JSON.parse(stored);
-      if (!Array.isArray(parsed)) continue;
-
-      const next = parsed.filter((item) => {
-        const creation = normalizeCreation(item);
-        if (!creation) return true;
-        return (
-          creation.id !== id &&
-          creation.taskId !== id &&
-          creationIdentity(creation) !== targetIdentity
-        );
-      });
-
-      if (next.length > 0) {
-        localStorage.setItem(key, JSON.stringify(next));
-      } else {
-        localStorage.removeItem(key);
-      }
-    } catch (error) {
-      console.error("Error removing stored creation:", error);
-    }
-  }
-}
 
 function isUserFixableGenerationError(code: GenerationErrorCode) {
   return [
@@ -354,13 +303,21 @@ function isVercelBlobUrl(url: string) {
   }
 }
 
-export function MyCreationsTab({
+export function MyCreationsTab(props: MyCreationsTabProps) {
+  const { data: session } = useSession();
+  const scope = getAccountScope(session?.user);
+  const owned = !!scope && scope === props.initialAccountScope;
+  return <ScopedMyCreationsTab key={`${scope || "anonymous"}:${props.mode}`} {...props} initialCreations={owned ? props.initialCreations : []} currentGeneration={owned ? props.currentGeneration : undefined} currentGenerations={owned ? props.currentGenerations : undefined} />;
+}
+
+function ScopedMyCreationsTab({
   mode,
   initialCreations = [],
   currentGeneration,
   currentGenerations,
 }: MyCreationsTabProps) {
   const { data: session, status } = useSession();
+  const { accountScope, capture } = useAccountOperation();
   const { showToast } = useToast();
   const router = useRouter();
   const [creations, setCreations] = useState<Creation[]>(initialCreations);
@@ -397,54 +354,22 @@ export function MyCreationsTab({
     ? creations.find((c) => c.id === pendingDeleteId || c.taskId === pendingDeleteId)
     : null;
 
-  // 优先从后端拉取历史，并兼容迁移老 localStorage 数据
+  // Old id/email caches have no account epoch and are not trusted.
   useEffect(() => {
-    if (!session?.user?.id) return;
-
-    const storageKeys = getCreationStorageKeys(session);
-
-    const readLocal = () => {
-      const parsedAll: Creation[] = [];
-      for (const key of storageKeys) {
-        const stored = localStorage.getItem(key);
-        if (!stored) continue;
-        try {
-          const parsed = JSON.parse(stored);
-          const normalized = Array.isArray(parsed)
-            ? parsed
-                .map((item) => normalizeCreation(item))
-                .filter((item): item is Creation => !!item)
-                .filter(shouldPersistCreation)
-            : [];
-          parsedAll.push(...normalized);
-        } catch (error) {
-          console.error("Error parsing stored creations:", error);
-        }
-      }
-      return mergeCreations(parsedAll, []);
-    };
-
-    const localCreations = readLocal();
-    const seededCreations = mergeCreations(initialCreations, localCreations);
-    if (seededCreations.length > 0) {
-      setCreations(seededCreations);
-    }
-
-    fetch(`/api/creations?type=${mode}`)
-      .then((res) => (res.ok ? res.json() : null))
+    if (!accountScope) return;
+    const operation = capture();
+    let cancelled = false;
+    fetch(`/api/creations?type=${mode}`, { headers: operation.headers, signal: operation.signal, cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
       .then((data) => {
-        const fromApi = Array.isArray(data?.creations)
-          ? data.creations
-              .map((item: unknown) => normalizeCreation(item))
-              .filter((item: Creation | null): item is Creation => !!item)
-          : [];
-        const merged = mergeCreations(fromApi, seededCreations);
-        setCreations(merged);
+        operation.assertCurrent();
+        if (cancelled || data?.accountScope !== accountScope || !Array.isArray(data.creations)) return;
+        const rows = data.creations.map((item: unknown) => normalizeCreation(item)).filter((item: Creation | null): item is Creation => !!item);
+        setCreations((current) => reconcileCreationSnapshot(current, rows));
       })
-      .catch((error) => {
-        console.error("Error fetching creations:", error);
-      });
-  }, [mode, session, initialCreations]);
+      .catch(() => { /* Keep the verified seed on transport failure. */ });
+    return () => { cancelled = true; };
+  }, [accountScope, capture, mode]);
 
   // 处理新的生成任务
   useEffect(() => {
@@ -515,25 +440,6 @@ export function MyCreationsTab({
     session?.user?.id,
   ]);
 
-  // 保存到 localStorage
-  useEffect(() => {
-    if (!session?.user?.id) {
-      return;
-    }
-
-    const storageKey = `creations_${session.user.id}`;
-    const normalizedCreations = mergeCreations(
-      creations.filter(shouldPersistCreation),
-      []
-    );
-
-    if (normalizedCreations.length > 0) {
-      localStorage.setItem(storageKey, JSON.stringify(normalizedCreations));
-      return;
-    }
-
-    localStorage.removeItem(storageKey);
-  }, [creations, session]);
 
   useEffect(() => {
     if (mode !== "video" || pollingTaskKey.length === 0) {
@@ -542,14 +448,17 @@ export function MyCreationsTab({
 
     let cancelled = false;
     const taskIds = pollingTaskKey.split(",").filter(Boolean);
+    const operation = capture();
 
     const pollTasks = async () => {
       for (const taskId of taskIds) {
         try {
           const res = await fetch(
-            `/api/veo/generate?taskId=${encodeURIComponent(taskId)}`
+            `/api/veo/generate?taskId=${encodeURIComponent(taskId)}`,
+            { headers: operation.headers, signal: operation.signal }
           );
           const data = await res.json().catch(() => null);
+          operation.assertCurrent();
           if (cancelled || data?.pending) {
             continue;
           }
@@ -580,7 +489,7 @@ export function MyCreationsTab({
             continue;
           }
 
-          if (!res.ok || data?.success === false) {
+          if (data?.status === "failed") {
             setCreations((prev) =>
               mergeCreations(
                 prev.map((creation) =>
@@ -608,36 +517,21 @@ export function MyCreationsTab({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [mode, pollingTaskKey]);
+  }, [capture, mode, pollingTaskKey]);
 
-  const deleteCreation = (id: string) => {
-    const target = creations.find((c) => c.id === id || c.taskId === id);
-    const targetIdentity = target ? creationIdentity(target) : id;
-    const deleteId = targetIdentity || id;
-
-    setCreations((prev) =>
-      prev.filter((c) => c.id !== id && c.taskId !== id && creationIdentity(c) !== targetIdentity)
-    );
-    removeStoredCreation(getCreationStorageKeys(session), id, targetIdentity);
-    setFailedMedia((prev) => {
-      if (!prev.has(id) && !prev.has(targetIdentity)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      next.delete(targetIdentity);
-      return next;
-    });
-    setResolvedMediaUrls((prev) => {
-      if (!prev[id] && !prev[targetIdentity]) return prev;
-      const next = { ...prev };
-      delete next[id];
-      delete next[targetIdentity];
-      return next;
-    });
-    fetch(`/api/creations?id=${encodeURIComponent(deleteId)}`, {
-      method: "DELETE",
-    }).catch((error) => {
-      console.error("Error deleting creation:", error);
-    });
+  const deleteCreation = async (id: string) => {
+    const target = creations.find((item) => item.id === id || item.taskId === id);
+    const deleteId = target ? creationIdentity(target) : id;
+    try {
+      const operation = capture();
+      const response = await fetch(`/api/creations?id=${encodeURIComponent(deleteId)}`, { method: "DELETE", headers: operation.headers, signal: operation.signal });
+      operation.assertCurrent();
+      if (!response.ok) throw new Error("Deletion failed");
+      setCreations((current) => current.filter((item) => creationIdentity(item) !== deleteId));
+      setSelectedPreview(null);
+    } catch (error) {
+      if (!isAccountOperationCancelled(error)) showToast({ title: "Could not delete creation", message: "Please try again.", variant: "error" });
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -729,9 +623,11 @@ export function MyCreationsTab({
 
     setRefreshingMedia((prev) => new Set(prev).add(key));
     try {
+      const operation = capture();
       const res = await fetch("/api/creations/media-url", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
         body: JSON.stringify({
           creationId: creation.id,
           url: originalUrl,
@@ -740,6 +636,7 @@ export function MyCreationsTab({
       const data = (await res.json().catch(() => null)) as {
         url?: string;
       } | null;
+      operation.assertCurrent();
 
       const refreshedUrl = data?.url;
       if (!res.ok || typeof refreshedUrl !== "string" || refreshedUrl.trim().length === 0) {
@@ -751,6 +648,7 @@ export function MyCreationsTab({
         [key]: refreshedUrl,
       }));
     } catch (error) {
+      if (isAccountOperationCancelled(error)) return;
       console.error("Error refreshing media URL:", error);
       setFailedMedia((prev) => new Set(prev).add(key));
     } finally {

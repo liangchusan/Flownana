@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { Prisma } from "@prisma/client";
-import { del } from "@vercel/blob";
+import { Prisma, type Generation } from "@prisma/client";
 import { authOptions } from "@/lib/auth-options";
-import { prisma } from "@/lib/prisma";
+import { matchesRequestAccount } from "@/lib/account-scope";
 import { getKieApiKey } from "@/lib/kie";
 import {
-  CreditConsumptionConflictError,
-  InsufficientCreditsError,
-  consumeCreditsFIFO,
-  refundConsumedCredits,
-  refundConsumedCreditsWithClient,
-  type CreditConsumptionSnapshot,
-} from "@/lib/credit-consumption";
+  attachGenerationTask, completeGeneration, failGeneration, isActiveGeneration,
+  claimGenerationOutput, recordGenerationOutputPath, finishGenerationOutputAttempt,
+  recoverGenerationObligations, reserveGeneration, withGenerationAccount, VIDEO_TASK_TIMEOUT_MS,
+  type GenerationAccount,
+} from "@/lib/generation-lifecycle";
+import { generationErrorResponse, generationResponse, generationUncertainResponse } from "@/lib/generation-response";
+import { getVideoPollingTarget } from "@/lib/video-polling-target";
 import {
   VIDEO_MODEL_OPTION_MAP,
   VIDEO_MODEL_OPTIONS,
+  DEFAULT_VIDEO_ASPECT_RATIOS,
   formatVideoResolution,
   getVideoModelName,
   type VideoModelOption,
@@ -29,17 +29,14 @@ import {
 import { parseKieVideoResult, type KieVideoResultData } from "@/lib/kie-video-result";
 import {
   ProviderGenerationError,
-  getGenerationErrorDisplay,
   getGenerationErrorHttpStatus,
   getGenerationErrorPayload,
-  withGenerationCreditOutcome,
   type GenerationErrorCode,
 } from "@/lib/generation-errors";
 import { persistGeneratedMedia } from "@/lib/media-storage";
-import type { StoredMedia } from "@/lib/media-storage";
 import {
   persistOrReuseMediaInput,
-  syncGenerationMediaAssets,
+  enforceInputMediaSize,
 } from "@/lib/media-assets";
 import {
   buildVolcengineVideoTaskBody,
@@ -49,7 +46,7 @@ import type { VideoReferenceInput } from "@/lib/video-reference-input";
 
 const KIE_API_BASE = "https://api.kie.ai";
 const VOLCENGINE_API_BASE = "https://ark.cn-beijing.volces.com/api/v3";
-const VIDEO_TASK_TIMEOUT_MS = 45 * 60 * 1000;
+export const maxDuration = 300;
 
 function videoErrorResponse(
   code: GenerationErrorCode,
@@ -119,33 +116,13 @@ const FAMILY_ENDPOINTS: Record<
   },
 };
 
-const VOLCENGINE_SEEDANCE_MODEL = "doubao-seedance-2-0-mini-260615";
-
-function getPersistedVideoOption(
-  option: VideoModelOption,
-  parameters: unknown
-): VideoModelOption {
-  if (option.family !== "seedance") return option;
-  const provider =
-    parameters && typeof parameters === "object" && !Array.isArray(parameters)
-      ? (parameters as { provider?: unknown }).provider
-      : undefined;
-  if (provider === "kie") return option;
-
-  // Seedance tasks saved before the KIE switch were created through Volcengine.
-  return {
-    ...option,
-    provider: "volcengine",
-    providerModel: VOLCENGINE_SEEDANCE_MODEL,
-  };
-}
-
 function resolveVideoOption(params: {
   modelOptionId?: string;
   model?: string;
 }): VideoModelOption | null {
   if (params.modelOptionId) {
-    const byId = VIDEO_MODEL_OPTION_MAP[params.modelOptionId as VideoModelOptionId];
+    const byId = Object.hasOwn(VIDEO_MODEL_OPTION_MAP, params.modelOptionId)
+      ? VIDEO_MODEL_OPTION_MAP[params.modelOptionId as VideoModelOptionId] : null;
     if (byId) return byId;
     return null;
   }
@@ -170,6 +147,7 @@ async function createVideoTask(params: {
     const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
     if (!apiKey) throw new Error("VOLCENGINE_ARK_API_KEY environment variable is not configured.");
     const res = await fetch(`${VOLCENGINE_API_BASE}/contents/generations/tasks`, {
+      signal: AbortSignal.timeout(30_000),
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(buildVolcengineVideoTaskBody({
@@ -235,6 +213,7 @@ async function createVideoTask(params: {
   }
 
   const res = await fetch(`${KIE_API_BASE}${endpoint}`, {
+    signal: AbortSignal.timeout(30_000),
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -265,32 +244,13 @@ async function createVideoTask(params: {
   return json.data.taskId;
 }
 
-function normalizeCreditConsumptionSnapshot(
-  value: unknown
-): CreditConsumptionSnapshot {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const candidate = item as { batchId?: unknown; amount?: unknown };
-      if (typeof candidate.batchId !== "string") return null;
-      if (typeof candidate.amount !== "number" || candidate.amount <= 0) {
-        return null;
-      }
-      return {
-        batchId: candidate.batchId,
-        amount: candidate.amount,
-      };
-    })
-    .filter((item): item is CreditConsumptionSnapshot[number] => !!item);
-}
-
-async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
+async function getVideoResultOnce(taskId: string, option: Pick<VideoModelOption, "provider" | "family">) {
   if (option.provider === "volcengine") {
     const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
     if (!apiKey) throw new Error("VOLCENGINE_ARK_API_KEY environment variable is not configured.");
     try {
       const res = await fetch(`${VOLCENGINE_API_BASE}/contents/generations/tasks/${encodeURIComponent(taskId)}`, {
+        signal: AbortSignal.timeout(10_000),
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!res.ok) {
@@ -319,6 +279,7 @@ async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
   let res: Response;
   try {
     res = await fetch(detailUrl, {
+      signal: AbortSignal.timeout(10_000),
       method: "GET",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -358,637 +319,140 @@ async function getVideoResultOnce(taskId: string, option: VideoModelOption) {
   return parseKieVideoResult(json.data);
 }
 
-function withProcessingDuration(parameters: unknown, createdAt: Date) {
-  const current =
-    parameters && typeof parameters === "object" && !Array.isArray(parameters)
-      ? (parameters as Record<string, unknown>)
-      : {};
-  const savedDuration = current.processingDurationMs;
-  if (
-    typeof savedDuration === "number" &&
-    Number.isFinite(savedDuration) &&
-    savedDuration >= 0
-  ) {
-    return current;
-  }
-  return {
-    ...current,
-    processingDurationMs: Math.max(0, Date.now() - createdAt.getTime()),
-  };
-}
-
-async function failVideoGeneration(params: {
-  generation: {
-    id: string;
-    prompt: string;
-    taskId: string | null;
-    creditConsumption: unknown;
-    createdAt: Date;
-    parameters: unknown;
-  };
-  error: unknown;
-  source: "app" | "provider";
-}) {
-  let consumedCredits = normalizeCreditConsumptionSnapshot(params.generation.creditConsumption);
-  let creditsRefunded = false;
-  let refundPending = false;
-  let settledParameters = withProcessingDuration(params.generation.parameters, params.generation.createdAt);
-  let display = withGenerationCreditOutcome(
-    getGenerationErrorDisplay(params.error, { mediaType: "video", source: params.source }),
-    { creditsConsumed: consumedCredits.length > 0, creditsRefunded, refundPending }
-  );
-
-  try {
-    const outcome = await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<Array<{
-        status: string;
-        urls: string[];
-        prompt: string;
-        taskId: string | null;
-        creditsCost: number | null;
-        modelOptionId: string | null;
-        parameters: Prisma.JsonValue | null;
-        inputUrls: string[];
-        creditConsumption: Prisma.JsonValue | null;
-        createdAt: Date;
-      }>>`SELECT "status", "urls", "prompt", "taskId", "creditsCost", "modelOptionId", "parameters", "inputUrls", "creditConsumption", "createdAt"
-          FROM "Generation" WHERE "id" = ${params.generation.id} FOR UPDATE`;
-      const locked = rows[0];
-      if (!locked) throw new Error("Generation not found while settling failure.");
-      if (locked.status === "success") return { kind: "success" as const, locked };
-
-      consumedCredits = normalizeCreditConsumptionSnapshot(locked.creditConsumption);
-      if (consumedCredits.length > 0) {
-        await refundConsumedCreditsWithClient(tx, consumedCredits);
-        creditsRefunded = true;
-      }
-      settledParameters = withProcessingDuration(locked.parameters, locked.createdAt);
-      display = withGenerationCreditOutcome(
-        getGenerationErrorDisplay(params.error, { mediaType: "video", source: params.source }),
-        { creditsConsumed: consumedCredits.length > 0, creditsRefunded, refundPending: false }
-      );
-      await tx.generation.update({
-        where: { id: params.generation.id },
-        data: {
-          status: "failed",
-          error: display.message,
-          parameters: settledParameters as Prisma.InputJsonValue,
-          creditConsumption: Prisma.JsonNull,
-        },
-      });
-      return { kind: "failed" as const };
-    });
-    if (outcome.kind === "success") {
-      return NextResponse.json({
-        success: true,
-        pending: false,
-        status: "success",
-        videoUrl: outcome.locked.urls[0],
-        prompt: outcome.locked.prompt,
-        taskId: outcome.locked.taskId,
-        creditsCost: outcome.locked.creditsCost,
-        modelOptionId: outcome.locked.modelOptionId,
-        parameters: outcome.locked.parameters,
-        inputUrls: outcome.locked.inputUrls,
-      });
-    }
-  } catch (refundError) {
-    creditsRefunded = false;
-    refundPending = consumedCredits.length > 0;
-    console.error("Failed to atomically settle async video failure:", refundError);
-    display = withGenerationCreditOutcome(
-      getGenerationErrorDisplay(params.error, { mediaType: "video", source: params.source }),
-      { creditsConsumed: consumedCredits.length > 0, creditsRefunded: false, refundPending }
-    );
-    const updated = await prisma.generation.updateMany({
-      where: { id: params.generation.id, status: { not: "success" } },
-      data: {
-        status: "failed",
-        error: display.message,
-        parameters: settledParameters as Prisma.InputJsonValue,
-      },
-    });
-    if (updated.count === 0) {
-      const winner = await prisma.generation.findUnique({ where: { id: params.generation.id } });
-      if (winner?.status === "success") {
-        return NextResponse.json({
-          success: true,
-          pending: false,
-          status: "success",
-          videoUrl: winner.urls[0],
-          prompt: winner.prompt,
-          taskId: winner.taskId,
-          creditsCost: winner.creditsCost,
-          modelOptionId: winner.modelOptionId,
-          parameters: winner.parameters,
-          inputUrls: winner.inputUrls,
-        });
-      }
-    }
-  }
-
-  const payload = getGenerationErrorPayload(
-    {
-      errorCode: display.code,
-      errorTitle: display.title,
-      error: display.message,
-      errorAction: display.action,
-      retryable: display.retryable,
-    },
-    {
-      mediaType: "video",
-      creditsRefunded,
-      refundPending,
-    }
-  );
-
-  return NextResponse.json(
-    {
-      success: false,
-      pending: false,
-      status: "failed",
-      ...payload,
-      prompt: params.generation.prompt,
-      taskId: params.generation.taskId,
-      parameters: settledParameters,
-    },
-    { status: getGenerationErrorHttpStatus(display.code) }
-  );
-}
-
-async function settleVideoTask(params: {
-  userId: string;
-  taskId: string;
-  option: VideoModelOption;
-}) {
-  const generation = await prisma.generation.findFirst({
-    where: {
-      taskId: params.taskId,
-      userId: params.userId,
-      type: "video",
-    },
-  });
-
-  if (!generation) {
-    return videoErrorResponse("task_not_found");
-  }
-
-  if (generation.status === "success") {
-    return NextResponse.json({
-      success: true,
-      pending: false,
-      status: generation.status,
-      videoUrl: generation.urls[0],
-      prompt: generation.prompt,
-      taskId: generation.taskId,
-      creditsCost: generation.creditsCost,
-      modelOptionId: generation.modelOptionId,
-      parameters: generation.parameters,
-      inputUrls: generation.inputUrls,
-    });
-  }
-
+async function settleVideoTask(account: GenerationAccount, identifier: string) {
+  const generation = await withGenerationAccount(account, (tx) => tx.generation.findFirst({
+    where: { userId: account.id, type: "video", OR: [{ taskId: identifier }, { id: identifier }] },
+  }));
+  if (!generation) return videoErrorResponse("task_not_found");
   if (generation.status === "failed") {
-    return failVideoGeneration({
-      generation,
-      error: generation.error || "Generation failed.",
-      source: "app",
-    });
+    const settled = await failGeneration({ account, id: generation.id, error: generation.error || { errorCode: "generation_failed" } });
+    return generationResponse(settled.generation);
   }
-
-  const result = await getVideoResultOnce(params.taskId, params.option);
+  if (!isActiveGeneration(generation.status)) return generationResponse(generation);
+  const fail = async (error: unknown, source: "app" | "provider" = "app", attemptId?: string) =>
+    generationResponse((await failGeneration({ account, id: generation.id, error, source, attemptId })).generation);
+  const target = getVideoPollingTarget(generation.modelOptionId, generation.parameters);
+  if (!generation.taskId || !target) {
+    return Date.now() - generation.createdAt.getTime() >= VIDEO_TASK_TIMEOUT_MS
+      ? fail({ errorCode: "timeout" }) : generationResponse(generation);
+  }
+  const result = await getVideoResultOnce(generation.taskId, target);
   if (result.state === "pending") {
-    if (Date.now() - generation.createdAt.getTime() >= VIDEO_TASK_TIMEOUT_MS) {
-      return failVideoGeneration({
-        generation,
-        error: { errorCode: "timeout" },
-        source: "app",
-      });
-    }
-    return NextResponse.json({
-      success: true,
-      pending: true,
-      status: generation.status,
-      prompt: generation.prompt,
-      taskId: generation.taskId,
-      creditsCost: generation.creditsCost,
-      modelOptionId: generation.modelOptionId,
-      parameters: generation.parameters,
-      inputUrls: generation.inputUrls,
-    });
+    return Date.now() - generation.createdAt.getTime() >= VIDEO_TASK_TIMEOUT_MS
+      ? fail({ errorCode: "timeout" }) : generationResponse(generation);
   }
-
-  if (result.state === "failed") {
-    return failVideoGeneration({
-      generation,
-      error: result.error,
-      source: "provider",
-    });
-  }
-
-  let generatedVideo: StoredMedia;
+  if (result.state === "failed") return fail(result.error, "provider");
+  const claimed = await claimGenerationOutput(account, generation.id);
+  const attemptId = claimed.attemptId;
+  if (!attemptId) return generationResponse(claimed.generation);
+  let outputUploadAcknowledged = false;
   try {
-    generatedVideo = await persistGeneratedMedia({
-      sourceUrl: result.url,
-      userId: params.userId,
-      taskId: params.taskId,
-      kind: "video",
+    const output = await persistGeneratedMedia({
+      sourceUrl: result.url, userId: account.id, taskId: generation.taskId, kind: "video",
+      beforeUpload: (pathname) => recordGenerationOutputPath(account, generation.id, attemptId, pathname),
     });
+    outputUploadAcknowledged = true;
+    const settled = await completeGeneration({ account, id: generation.id, attemptId,
+      output: { media: output, role: "output", type: "video", position: 0 },
+    });
+    return generationResponse(settled.generation);
   } catch (error) {
-    console.error("Failed to persist or register completed video:", error);
-    return failVideoGeneration({
-      generation,
-      error: { errorCode: "media_processing_failed" },
-      source: "app",
-    });
+    console.error("Video persistence/settlement failed:", error);
+    return await fail({ errorCode: "media_processing_failed" }, "app", attemptId);
+  } finally {
+    await finishGenerationOutputAttempt(account, generation.id, attemptId, outputUploadAcknowledged);
   }
-  const settledParameters = withProcessingDuration(
-    generation.parameters,
-    generation.createdAt
-  );
-  const settlement = await prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<Array<{ status: string }>>`
-      SELECT "status" FROM "Generation" WHERE "id" = ${generation.id} FOR UPDATE`;
-    if (!rows[0]) throw new Error("Generation not found while settling success.");
-    if (rows[0].status !== "generating") return rows[0].status;
-    await syncGenerationMediaAssets({
-      generationId: generation.id,
-      userId: params.userId,
-      assets: [{ media: generatedVideo, role: "output", type: "video", position: 0 }],
-      tx,
-    });
-    await tx.generation.update({
-      where: { id: generation.id },
-      data: {
-        status: "success",
-        urls: [generatedVideo.url],
-        error: null,
-        parameters: settledParameters as Prisma.InputJsonValue,
-        creditConsumption: Prisma.JsonNull,
-      },
-    });
-    return "success";
-  });
-  if (settlement === "failed") {
-    try {
-      await del(generatedVideo.url);
-    } catch (cleanupError) {
-      console.error("Failed to remove an unclaimed generated video:", cleanupError);
-    }
-    const winner = await prisma.generation.findUnique({ where: { id: generation.id } });
-    if (winner?.status === "failed") {
-      return failVideoGeneration({ generation: winner, error: winner.error || "Generation failed.", source: "app" });
-    }
-  }
-
-  return NextResponse.json({
-    success: true,
-    pending: false,
-    status: "success",
-    videoUrl: generatedVideo.url,
-    prompt: generation.prompt,
-    taskId: generation.taskId,
-    creditsCost: generation.creditsCost,
-    modelOptionId: generation.modelOptionId,
-    parameters: settledParameters,
-    inputUrls: generation.inputUrls,
-  });
 }
 
 export async function GET(request: NextRequest) {
   const taskId = request.nextUrl.searchParams.get("taskId");
-  if (taskId) {
+  if (!taskId) return NextResponse.json({ success: true, options: VIDEO_MODEL_OPTIONS });
+  try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return videoErrorResponse("auth_required");
-    }
-
-    const modelOptionId = request.nextUrl.searchParams.get("modelOptionId");
-    const generation = await prisma.generation.findFirst({
-      where: {
-        taskId,
-        userId: session.user.id,
-        type: "video",
-      },
-      select: {
-        modelOptionId: true,
-        parameters: true,
-      },
-    });
-    const option = resolveVideoOption({
-      modelOptionId: modelOptionId || generation?.modelOptionId || undefined,
-    });
-    if (!option) {
-      return videoErrorResponse("invalid_parameters");
-    }
-
-    return settleVideoTask({
-      userId: session.user.id,
-      taskId,
-      option: getPersistedVideoOption(option, generation?.parameters),
-    });
+    if (!session?.user?.id || !matchesRequestAccount(request, session.user)) return videoErrorResponse("auth_required");
+    // Never let a query parameter choose the endpoint for an already-paid task.
+    return await settleVideoTask(session.user, taskId);
+  } catch (error) {
+    console.error("Video status could not be confirmed:", error);
+    return generationUncertainResponse({ taskId });
   }
-
-  return NextResponse.json({
-    success: true,
-    options: VIDEO_MODEL_OPTIONS,
-  });
 }
 
 export async function POST(request: NextRequest) {
-  const processingStartedAt = Date.now();
-  let consumedCredits: CreditConsumptionSnapshot = [];
-  let taskId: string | undefined;
-  let userId: string | undefined;
-  let promptForPersistence = "Untitled prompt";
-  let parametersForPersistence: Record<string, string | number | string[]> | undefined;
-  let inputUrlsForPersistence: string[] = [];
-  let inputMediaForPersistence: StoredMedia[] = [];
-  let inputKindsForPersistence: VideoReferenceInput["kind"][] = [];
+  let account: { id: string; accountCreatedAt: string } | undefined;
+  let reserved: Generation | undefined;
+  let reservationAttempted = false;
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return videoErrorResponse("auth_required");
-    }
-    userId = session.user.id;
-
-    const body = await request.json();
-    const {
-      prompt,
-      imageUrls,
-      inputs,
-      modelOptionId,
-      model,
-      aspectRatio,
-      watermark,
-      runId,
-      generateAudio,
-    } = body as {
-      prompt?: string;
-      imageUrls?: string[];
-      inputs?: VideoReferenceInput[];
-      modelOptionId?: string;
-      model?: string;
-      aspectRatio?: string;
-      watermark?: string;
-      runId?: string;
-      generateAudio?: boolean;
-    };
-
-    if (!prompt) {
-      return videoErrorResponse("prompt_required");
-    }
-    promptForPersistence = prompt;
-
+    if (!session?.user?.id || !matchesRequestAccount(request, session.user)) return videoErrorResponse("auth_required");
+    account = session.user;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return videoErrorResponse("invalid_parameters");
+    const { prompt, imageUrls, inputs, modelOptionId, model, aspectRatio, watermark, runId, generateAudio } = body;
+    if (typeof prompt !== "string" || !prompt.trim()) return videoErrorResponse("prompt_required");
+    if ((modelOptionId != null && typeof modelOptionId !== "string") ||
+      (model != null && typeof model !== "string") ||
+      (aspectRatio != null && typeof aspectRatio !== "string") ||
+      (generateAudio != null && typeof generateAudio !== "boolean") ||
+      (watermark != null && typeof watermark !== "string")) return videoErrorResponse("invalid_parameters");
     const option = resolveVideoOption({ modelOptionId, model });
-    if (!option) {
+    if (!option) return videoErrorResponse("invalid_parameters");
+    const ratio = aspectRatio || option.aspectRatios?.[0] || "Auto";
+    if (!(option.aspectRatios || DEFAULT_VIDEO_ASPECT_RATIOS).includes(ratio)) return videoErrorResponse("invalid_parameters");
+    if (inputs != null && (!Array.isArray(inputs) || inputs.some((input) =>
+      !input || typeof input.url !== "string" || !input.url.trim() || !["image", "video", "audio"].includes(input.kind)
+    ))) return videoErrorResponse("invalid_parameters");
+    if (imageUrls != null && (!Array.isArray(imageUrls) || imageUrls.some((url) => typeof url !== "string" || !url.trim()))) {
       return videoErrorResponse("invalid_parameters");
     }
-
-    const requestedInputs: VideoReferenceInput[] = Array.isArray(inputs)
-      ? inputs.filter((input): input is VideoReferenceInput =>
-          !!input && typeof input.url === "string" && ["image", "video", "audio"].includes(input.kind)
-        )
-      : Array.isArray(imageUrls)
-        ? imageUrls.filter((url): url is string => typeof url === "string" && !!url.trim()).map((url) => ({ url, kind: "image" }))
-        : [];
-    const inputCapabilities = getVideoInputCapabilities(getVideoModelName(option));
-    const counts = requestedInputs.reduce((value, input) => ({ ...value, [input.kind]: value[input.kind] + 1 }), { image: 0, video: 0, audio: 0 });
-    if (counts.image > inputCapabilities.maxImages || counts.video > inputCapabilities.maxVideos || counts.audio > inputCapabilities.maxAudios) {
-      return videoErrorResponse("invalid_parameters");
-    }
-
-    if (option.family === "wan" && counts.video > 0 && option.duration > 15) {
-      return videoErrorResponse("invalid_parameters");
-    }
-
-    if (option.requiresImageInput && counts.image === 0) {
-      return videoErrorResponse("input_image_required");
-    }
-
-    const requestId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const normalizedInputMedia =
-      requestedInputs.length > 0
-        ? await Promise.all(
-            requestedInputs.map((input, index) =>
-              persistOrReuseMediaInput({
-                source: input.url,
-                userId: session.user.id,
-                requestId: `${requestId}-${index}`,
-                kind: input.kind,
-              })
-            )
-          )
-        : undefined;
-    const normalizedInputs = normalizedInputMedia?.map((media, index) => ({ ...requestedInputs[index], url: media.url })) || [];
+    const requestedInputs: VideoReferenceInput[] = inputs ??
+      (imageUrls || []).map((url: string) => ({ url, kind: "image" as const }));
+    const capabilities = getVideoInputCapabilities(getVideoModelName(option));
+    const counts = requestedInputs.reduce((sum, input) => ({ ...sum, [input.kind]: sum[input.kind] + 1 }),
+      { image: 0, video: 0, audio: 0 });
+    if (counts.image > capabilities.maxImages || counts.video > capabilities.maxVideos || counts.audio > capabilities.maxAudios ||
+      (option.family === "wan" && counts.video > 0 && option.duration > 15)) return videoErrorResponse("invalid_parameters");
+    if (option.requiresImageInput && !counts.image) return videoErrorResponse("input_image_required");
+    const inputMedia = await Promise.all(requestedInputs.map(async (input, index) =>
+      enforceInputMediaSize(await persistOrReuseMediaInput({
+        source: input.url.trim(), userId: account!.id, requestId: `${crypto.randomUUID()}-${index}`, kind: input.kind,
+      }), input.kind === "image" ? capabilities.maxImageBytes : input.kind === "video" ? capabilities.maxVideoBytes : capabilities.maxAudioBytes, input.kind)
+    ));
+    const normalizedInputs = requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }));
     const normalizedImageUrls = normalizedInputs.filter((input) => input.kind === "image").map((input) => input.url);
-    inputUrlsForPersistence = normalizedInputs.map((input) => input.url);
-    inputMediaForPersistence = normalizedInputMedia || [];
-    inputKindsForPersistence = normalizedInputs.map((input) => input.kind);
-
-    parametersForPersistence = {
-      model: getVideoModelName(option),
-      provider: option.provider,
-      resolution: formatVideoResolution(option.resolution),
-      aspectRatio: aspectRatio || "Auto",
-      duration: option.duration,
+    const parameters: Prisma.InputJsonObject = {
+      model: getVideoModelName(option), provider: option.provider,
+      resolution: formatVideoResolution(option.resolution), aspectRatio: ratio, duration: option.duration,
       audio: option.hasAudio && generateAudio !== false ? "On" : "Off",
-      inputKinds: inputKindsForPersistence,
-      mode:
-        normalizedInputs.some((input) => input.kind !== "image") ||
-        normalizedImageUrls.length > 2
-          ? "Multimodal reference to video"
-          : normalizedImageUrls.length === 2
-          ? "First and last frame to video"
-          : normalizedImageUrls.length === 1
-            ? "Image to video"
-            : "Text to video",
-      ...(typeof runId === "string" && runId.trim()
-        ? { runId: runId.trim().slice(0, 120), outputIndex: 0, outputCount: 1 }
-        : {}),
+      inputKinds: normalizedInputs.map((input) => input.kind),
+      mode: counts.video || counts.audio || counts.image > 2 ? "Multimodal reference to video"
+        : counts.image === 2 ? "First and last frame to video" : counts.image === 1 ? "Image to video" : "Text to video",
+      ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120), outputIndex: 0, outputCount: 1 } : {}),
     };
-
-    consumedCredits = await consumeCreditsFIFO(session.user.id, option.credits);
-
-    taskId = await createVideoTask({
-      prompt,
-      imageUrls: normalizedImageUrls,
-      inputs: normalizedInputs,
-      aspectRatio,
-      generateAudio,
-      watermark,
-      option,
+    await recoverGenerationObligations(account);
+    reservationAttempted = true;
+    reserved = await reserveGeneration({ account, type: "video", prompt: prompt.trim(), modelOptionId: option.id,
+      creditsCost: option.credits, parameters,
+      inputs: inputMedia.map((media, position) => ({ media, position, role: "input",
+        type: requestedInputs[position].kind === "audio" ? "music" : requestedInputs[position].kind as "image" | "video" })),
     });
-
-    const generation = await prisma.generation.upsert({
-      where: { taskId },
-      update: {
-        type: "video",
-        status: "generating",
-        urls: [],
-        inputUrls: inputUrlsForPersistence,
-        prompt,
-        error: null,
-        modelOptionId: option.id,
-        parameters: parametersForPersistence as Prisma.InputJsonValue,
-        creditsCost: option.credits,
-        creditConsumption: consumedCredits as Prisma.InputJsonValue,
-      },
-      create: {
-        userId,
-        type: "video",
-        status: "generating",
-        urls: [],
-        inputUrls: inputUrlsForPersistence,
-        prompt,
-        taskId,
-        modelOptionId: option.id,
-        parameters: parametersForPersistence as Prisma.InputJsonValue,
-        creditsCost: option.credits,
-        creditConsumption: consumedCredits as Prisma.InputJsonValue,
-      },
-    });
-    await syncGenerationMediaAssets({
-      generationId: generation.id,
-      userId,
-      assets: inputMediaForPersistence.map((media, position) => ({
-        media,
-        role: "input",
-        type: normalizedInputs[position]?.kind === "audio" ? "music" : (normalizedInputs[position]?.kind || "image"),
-        position,
-      })),
-    });
-
-    return NextResponse.json({
-      success: true,
-      pending: true,
-      status: "generating",
-      prompt,
-      taskId,
-      creditsCost: option.credits,
-      modelOptionId: option.id,
-      parameters: parametersForPersistence,
-      inputUrls: inputUrlsForPersistence,
-    });
-  } catch (error: any) {
+    const taskId = await createVideoTask({ prompt: prompt.trim(), imageUrls: normalizedImageUrls,
+      inputs: normalizedInputs, aspectRatio: ratio, generateAudio, watermark, option });
+    reserved = await attachGenerationTask(account, reserved.id, taskId);
+    return generationResponse(reserved);
+  } catch (error) {
     console.error("Error generating video:", error);
-    if (parametersForPersistence) {
-      parametersForPersistence = {
-        ...parametersForPersistence,
-        processingDurationMs: Date.now() - processingStartedAt,
-      };
-    }
-    let creditsRefunded = false;
-    let refundPending = false;
-    if (consumedCredits.length > 0) {
+    if (reserved && account) {
       try {
-        await refundConsumedCredits(consumedCredits);
-        creditsRefunded = true;
-      } catch (refundError) {
-        refundPending = true;
-        console.error("Failed to refund video credits:", refundError);
-      }
-    }
-
-    let errorDisplay;
-    if (error instanceof InsufficientCreditsError) {
-      errorDisplay = getGenerationErrorDisplay(
-        {
-          errorCode: "insufficient_credits",
-          error: `This generation needs ${error.required} credits, but you have ${error.available}.`,
-        },
-        { mediaType: "video" }
-      );
-    } else if (error instanceof CreditConsumptionConflictError) {
-      errorDisplay = getGenerationErrorDisplay(
-        { errorCode: "credit_conflict" },
-        { mediaType: "video" }
-      );
-    } else {
-      errorDisplay = getGenerationErrorDisplay(error, {
-        mediaType: "video",
-        source: error instanceof ProviderGenerationError ? "provider" : "app",
-      });
-    }
-    errorDisplay = withGenerationCreditOutcome(errorDisplay, {
-      creditsConsumed: consumedCredits.length > 0,
-      creditsRefunded,
-      refundPending,
-    });
-
-    if (taskId && userId) {
-      try {
-        const generation = await prisma.generation.upsert({
-          where: { taskId },
-          update: {
-            type: "video",
-            status: "failed",
-            error: errorDisplay.message,
-            inputUrls: inputUrlsForPersistence,
-            creditConsumption: refundPending
-              ? (consumedCredits as Prisma.InputJsonValue)
-              : Prisma.JsonNull,
-            ...(parametersForPersistence
-              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
-              : {}),
-          },
-          create: {
-            userId,
-            type: "video",
-            status: "failed",
-            urls: [],
-            inputUrls: inputUrlsForPersistence,
-            prompt: promptForPersistence,
-            taskId,
-            error: errorDisplay.message,
-            creditConsumption: refundPending
-              ? (consumedCredits as Prisma.InputJsonValue)
-              : Prisma.JsonNull,
-            ...(parametersForPersistence
-              ? { parameters: parametersForPersistence as Prisma.InputJsonValue }
-              : {}),
-          },
+        return generationResponse((await failGeneration({ account, id: reserved.id, error,
+          source: error instanceof ProviderGenerationError ? "provider" : "app" })).generation);
+      } catch (settlementError) {
+        console.error("Video failure remains recoverable:", settlementError);
+        return generationUncertainResponse({
+          taskId: reserved.taskId || reserved.id, generationId: reserved.id,
         });
-        await syncGenerationMediaAssets({
-          generationId: generation.id,
-          userId,
-          assets: inputMediaForPersistence.map((media, position) => ({
-            media,
-            role: "input",
-            type: inputKindsForPersistence[position] === "audio" ? "music" : (inputKindsForPersistence[position] || "image"),
-            position,
-          })),
-        });
-      } catch (persistErr) {
-        console.error("Failed to persist video generation failure:", persistErr);
       }
     }
-    const payload = getGenerationErrorPayload(
-      {
-        errorCode: errorDisplay.code,
-        errorTitle: errorDisplay.title,
-        error: errorDisplay.message,
-        errorAction: errorDisplay.action,
-        retryable: errorDisplay.retryable,
-      },
-      {
-        mediaType: "video",
-        creditsRefunded,
-        refundPending,
-      }
-    );
-
-    return NextResponse.json(
-      {
-        ...payload,
-        ...(error instanceof InsufficientCreditsError
-          ? { required: error.required, available: error.available }
-          : {}),
-      },
-      { status: getGenerationErrorHttpStatus(errorDisplay.code) }
-    );
+    return generationErrorResponse(error, "video", {}, reservationAttempted);
   }
 }

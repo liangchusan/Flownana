@@ -10,6 +10,7 @@ import {
   Video,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import type { CreationHistoryItem } from "@/lib/creation-history";
 import { getCreationParameters } from "@/lib/creation-details";
 
@@ -58,31 +59,18 @@ export function CreationPreviewDialog({
   );
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
-
     if (creation.type === "video") {
       videoRef.current?.play().catch(() => undefined);
     }
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [creation.type, onClose]);
+  }, [creation.type]);
 
   const title = creation.prompt.trim() || `Untitled ${creation.type}`;
   const createdAt = formatCreatedAt(creation.createdAt);
 
   return (
-    <div
+    <Modal onClose={onClose}
       className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-stone-950 text-stone-100"
-      role="dialog"
-      aria-modal="true"
       aria-label={`${creation.type} preview`}
     >
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-3 sm:px-5">
@@ -210,6 +198,6 @@ export function CreationPreviewDialog({
           </div>
         </aside>
       </div>
-    </div>
+    </Modal>
   );
 }

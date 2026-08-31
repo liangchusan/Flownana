@@ -3,6 +3,7 @@ import { head } from "@vercel/blob";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth-options";
+import { matchesRequestAccount } from "@/lib/account-scope";
 import { prisma } from "@/lib/prisma";
 import {
   MEDIA_UPLOAD_BYTES_PER_DAY,
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
         const session = await getServerSession(authOptions);
-        if (!session?.user?.id) throw new Error("Authentication required.");
+        if (!session?.user?.id || !matchesRequestAccount(request, session.user)) throw new Error("Authentication required.");
         const payload = parseMediaUploadPayload(clientPayload);
         if (!pathname.startsWith(`generation-inputs/${payload.kind}/${payload.uploadId}/`)) throw new Error("Invalid upload request.");
         await reserveUpload(session.user.id, payload);

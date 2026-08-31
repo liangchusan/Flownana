@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
+import { getAccountScope } from "@/lib/account-scope";
 import { CreditCard, LogOut, UserRound } from "lucide-react";
 import {
   clearCachedBillingSummary,
@@ -68,14 +69,20 @@ function AccountAvatar({
 }
 
 export function UserMenu({
-  user,
   align = "right",
   compact = false,
   variant = "default",
 }: UserMenuProps) {
+  const { data: session } = useSession();
+  const accountScope = getAccountScope(session?.user);
+  if (!accountScope) return null;
+  return <ScopedUserMenu key={accountScope} user={session!.user!} align={align} compact={compact} variant={variant} accountScope={accountScope} />;
+}
+
+function ScopedUserMenu({ user, align, compact, variant, accountScope }: UserMenuProps & { accountScope: string | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [summary, setSummary] = useState<ClientBillingSummary | null>(() =>
-    getCachedBillingSummary()
+    getCachedBillingSummary(accountScope)
   );
   const [summaryLoading, setSummaryLoading] = useState(!summary);
   const [mounted, setMounted] = useState(false);
@@ -87,8 +94,8 @@ export function UserMenu({
 
   useEffect(() => {
     let active = true;
-    setSummaryLoading(!getCachedBillingSummary());
-    fetchBillingSummary()
+    setSummaryLoading(!getCachedBillingSummary(accountScope));
+    fetchBillingSummary(accountScope)
       .then((data) => {
         if (active) setSummary(data);
       })
@@ -98,7 +105,7 @@ export function UserMenu({
     return () => {
       active = false;
     };
-  }, []);
+  }, [accountScope, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -129,10 +136,10 @@ export function UserMenu({
   const displayName = user.name?.trim() || "Account";
   const planLabel = summary?.subscription?.planType
     ? PLAN_LABELS[summary.subscription.planType] || "Member"
-    : "Free";
+    : summary ? "Free" : "Plan unavailable";
   const creditsLabel = summaryLoading
     ? "Loading credits"
-    : `${(summary?.credits.current ?? 0).toLocaleString()} credits`;
+    : summary ? `${summary.credits.current.toLocaleString()} credits` : "Credits unavailable";
 
   const menuContents = (
     <>

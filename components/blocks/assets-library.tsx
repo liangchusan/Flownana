@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react";
 import { AtSign, Download, Image as ImageIcon, Music, Search, Trash2, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, type CreationHistoryItem } from "@/lib/creation-history";
 import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { trackEvent } from "@/lib/analytics";
+import { useAccountOperation } from "@/lib/use-account-operation";
+import { isAccountOperationCancelled } from "@/lib/account-operation";
 
 type AssetFilter = "all" | CreationHistoryItem["type"];
 
@@ -28,6 +31,8 @@ export function AssetsLibrary({
   onChange: (identity: string, patch: Partial<CreationHistoryItem>) => void;
 }) {
   const { showToast } = useToast();
+  const { capture } = useAccountOperation();
+  const [mutating, setMutating] = useState(false);
   const [filter, setFilter] = useState<AssetFilter>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
@@ -63,22 +68,27 @@ export function AssetsLibrary({
   };
 
   const deleteAsset = async () => {
-    if (!pendingDelete) return;
-    const response = await fetch("/api/creations", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: pendingDelete.creation.taskId || pendingDelete.creation.id, action: "delete-media", url: pendingDelete.url }),
-    });
-    if (!response.ok) {
-      showToast({ title: "Could not delete media", message: "Please try again.", variant: "error" });
-      return;
-    }
-    const nextUrls = pendingDelete.creation.urls.filter((url) => url !== pendingDelete.url);
-    onChange(creationIdentity(pendingDelete.creation), { urls: nextUrls, status: nextUrls.length ? "success" : "deleted" });
-    setPendingDelete(null);
-    setPreview(null);
+    if (!pendingDelete || mutating) return;
+    const { creation, url } = pendingDelete;
+    setMutating(true);
+    try {
+      const operation = capture();
+      const response = await fetch("/api/creations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...operation.headers },
+        signal: operation.signal,
+        body: JSON.stringify({ id: creation.taskId || creation.id, action: "delete-media", url }),
+      });
+      const data = await response.json();
+      operation.assertCurrent();
+      if (!response.ok || !Array.isArray(data.urls)) throw new Error(data.error || "Please try again.");
+      onChange(creationIdentity(creation), { urls: data.urls, status: data.urls.length ? "success" : "deleted" });
+      setPendingDelete(null);
+      setPreview(null);
+    } catch (error) {
+      if (!isAccountOperationCancelled(error)) showToast({ title: "Could not delete media", message: error instanceof Error ? error.message : "Please try again.", variant: "error" });
+    } finally { setMutating(false); }
   };
-
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
       <div className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
@@ -111,8 +121,8 @@ export function AssetsLibrary({
         </div>
       )}
 
-      {preview && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-dark/95 p-4" role="dialog" aria-modal="true"><button type="button" onClick={() => setPreview(null)} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white"><X className="h-5 w-5" /></button>{preview.creation.type === "image" ? <ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Image" className="max-w-xl rounded-ui-xl">{({ src, onError, onReady }) => <img src={src} alt={preview.creation.prompt} onError={onError} onLoad={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}</ResilientMedia> : preview.creation.type === "video" ? <ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Video" className="max-w-xl rounded-ui-xl">{({ src, onError, onReady }) => <video src={src} controls autoPlay playsInline onError={onError} onLoadedData={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}</ResilientMedia> : <div className="w-full max-w-xl rounded-ui-xl bg-surface-elevated p-8 text-center text-white"><Music className="mx-auto h-12 w-12 text-stone-400" /><p className="mt-4 text-sm text-stone-300">{preview.creation.prompt}</p><div className="relative mt-6 overflow-hidden rounded-ui-lg"><ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Audio" className="min-h-32 rounded-ui-lg">{({ src, onError, onReady }) => <audio src={src} controls autoPlay onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div></div>}</div>}
-      {pendingDelete && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/25 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-ui-xl border border-border bg-background p-6 shadow-float"><h2 className="text-lg font-medium text-foreground">Delete this asset?</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">It will disappear from Assets and become a deleted placeholder in its Create record.</p><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button><Button onClick={deleteAsset} className="bg-destructive text-white hover:bg-destructive/90">Delete</Button></div></div></div>}
+      {preview && <Modal onClose={() => setPreview(null)} aria-label="Media preview" className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-dark/95 p-4" ><button type="button" aria-label="Close preview" onClick={() => setPreview(null)} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white"><X className="h-5 w-5" /></button>{preview.creation.type === "image" ? <ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Image" className="max-w-xl rounded-ui-xl">{({ src, onError, onReady }) => <img src={src} alt={preview.creation.prompt} onError={onError} onLoad={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}</ResilientMedia> : preview.creation.type === "video" ? <ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Video" className="max-w-xl rounded-ui-xl">{({ src, onError, onReady }) => <video src={src} controls autoPlay playsInline onError={onError} onLoadedData={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}</ResilientMedia> : <div className="w-full max-w-xl rounded-ui-xl bg-surface-elevated p-8 text-center text-white"><Music className="mx-auto h-12 w-12 text-stone-400" /><p className="mt-4 text-sm text-stone-300">{preview.creation.prompt}</p><div className="relative mt-6 overflow-hidden rounded-ui-lg"><ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Audio" className="min-h-32 rounded-ui-lg">{({ src, onError, onReady }) => <audio src={src} controls autoPlay onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div></div>}</Modal>}
+      {pendingDelete && <Modal onClose={() => setPendingDelete(null)} aria-label="Delete this asset?" className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/25 p-4" ><div className="w-full max-w-md rounded-ui-xl border border-border bg-background p-6 shadow-float"><h2 className="text-lg font-medium text-foreground">Delete this asset?</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">It will disappear from Assets and become a deleted placeholder in its Create record.</p><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button><Button onClick={deleteAsset} className="bg-destructive text-white hover:bg-destructive/90">Delete</Button></div></div></Modal>}
     </div>
   );
 }
