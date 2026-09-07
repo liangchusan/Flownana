@@ -3,7 +3,9 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { BILLING_READ_OPTIONS, upsertSubscriptionFromStripe } from "@/lib/subscription-sync";
-import { BillingOwnershipError, stripeObjectId } from "@/lib/stripe-billing-policy";
+import {
+  BillingOwnershipError, stripeInvoiceSubscriptionId, stripeObjectId,
+} from "@/lib/stripe-billing-policy";
 import { getStripeStateSyncKind } from "@/lib/stripe-event-policy";
 import { grantCreditsForCurrentPeriodIfNeeded } from "@/lib/subscription-credit-grant";
 import { finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
@@ -35,10 +37,7 @@ async function getSubscriptionContextFromInvoice(
   userId: string;
   priceId: string;
 } | null> {
-  const subscriptionId =
-    typeof invoice.subscription === "string"
-      ? invoice.subscription
-      : invoice.subscription?.id;
+  const subscriptionId = stripeInvoiceSubscriptionId(invoice);
   if (!subscriptionId) return null;
 
   const sub = await stripe.subscriptions.retrieve(subscriptionId, {}, BILLING_READ_OPTIONS);

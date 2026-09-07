@@ -283,6 +283,12 @@
   付款时才创建的 Subscription 时间；旧账号的未支付 Session 不能跨到新注册。
   现有历史 Customer 绑定保持兼容；暂时查不到原始 Session 时允许 Webhook 重试。
 - 月付积分通过 `invoice.paid` 发放。
+- 2026-09-07 本地修复 Stripe `2026-01-28.clover` Invoice 结构兼容：Webhook
+  从旧的 `invoice.subscription` 或新的
+  `invoice.parent.subscription_details.subscription` 解析订阅；付费周期校验也同时
+  支持旧 Line Item 字段和新的 `parent.subscription_item_details` / `pricing`
+  字段，仍严格匹配 Subscription、Customer、订阅项、Price、数量、非 Proration
+  和周期。旧结构继续兼容；修复尚未部署。
 - 年付第 2–12 月由 `/api/cron/monthly-credits` 每日 08:00 UTC 检查；Catch-up
   会补发所有逾期月份，并在一个事务内写入去重记录、积分批次和 `nextCreditAt`。
 - 本地修复：年付发放和升级抵扣共用原始周期起点的 UTC 月份锚点，最多十一批
@@ -383,6 +389,13 @@
   升级同步，但周期性 Invoice 测试仍依赖生产 Webhook。
 
 ### Production
+
+- 2026-09-07 `liangchusan@gmail.com` 的 Starter 月付订阅在 Stripe 成功续费至
+  2026-10-07，但新版 Invoice Webhook 结构未被旧代码识别，导致新周期 200 积分
+  漏发。已通过现有 User 锁、付费 Invoice 校验和 Subscription Period 去重事务
+  补发一批 200 积分，重复调用确认未二次发放；本地订阅周期已同步。此前 200
+  积分已使用 90，剩余 110 按发放后 30 天规则于 2026-09-06 到期，不属于异常
+  扣减。修复代码部署前，其他新版周期 Invoice 仍有同类漏发风险。
 
 - 账户与 Pricing 功能代码在 2026-08-28 通过 Ready 生产部署
   `dpl_3kqAdSfZEqZrrVgKrnnf5piWzGRG` 上线，对应 Git 提交 `e176e77`；后续仅文档

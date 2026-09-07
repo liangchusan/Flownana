@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type Stripe from "stripe";
-import { getSubscriptionOwnershipError, isPaidInvoiceForSubscriptionPeriod } from "../lib/stripe-billing-policy.ts";
+import {
+  getSubscriptionOwnershipError, isPaidInvoiceForSubscriptionPeriod, stripeInvoiceSubscriptionId,
+} from "../lib/stripe-billing-policy.ts";
 
 const user = { id: "user", createdAt: new Date("2026-01-01T00:00:00.100Z"), stripeCustomerId: "cus_current" };
 const sub = {
@@ -33,6 +35,33 @@ test("only a paid invoice with the exact subscription, item, price and period au
   ]) assert.equal(isPaidInvoiceForSubscriptionPeriod({ ...invoice,
     lines: { ...invoice.lines, data: [{ ...invoice.lines.data[0], ...change }] },
   } as Stripe.Invoice, sub), false);
+});
+
+test("modern invoice parents authorize the same subscription period without weakening validation", () => {
+  const { subscription: _legacySubscription, ...invoiceWithoutSubscription } = structuredClone(invoice);
+  const modern = { ...invoiceWithoutSubscription,
+    parent: { type: "subscription_details", subscription_details: { subscription: sub.id } },
+  } as unknown as Stripe.Invoice & Record<string, unknown>;
+  modern.lines.data[0] = {
+    quantity: 1,
+    period: { start: 1000, end: 2000 },
+    parent: { type: "subscription_item_details", subscription_item_details: {
+      proration: false, subscription: sub.id, subscription_item: "si_current",
+    } },
+    pricing: { price_details: { price: "price_current" } },
+  } as unknown as Stripe.InvoiceLineItem;
+
+  assert.equal(stripeInvoiceSubscriptionId(modern), sub.id);
+  assert.equal(isPaidInvoiceForSubscriptionPeriod(modern, sub), true);
+  for (const parent of [
+    { type: "subscription_details", subscription_details: { subscription: "sub_other" } },
+    { type: "quote_details", subscription_details: { subscription: sub.id } },
+  ]) assert.equal(isPaidInvoiceForSubscriptionPeriod({ ...modern, parent } as Stripe.Invoice, sub), false);
+  assert.equal(isPaidInvoiceForSubscriptionPeriod({ ...modern, lines: { ...modern.lines, data: [{
+    ...modern.lines.data[0], parent: { type: "subscription_item_details", subscription_item_details: {
+      proration: true, subscription: sub.id, subscription_item: "si_current",
+    } },
+  } as unknown as Stripe.InvoiceLineItem] } } as Stripe.Invoice, sub), false);
 });
 
 test("ownership preserves legacy customer bindings but rejects old account epochs and other customers", () => {

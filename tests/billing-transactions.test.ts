@@ -98,11 +98,19 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
     const sync = load<SyncModule>("lib/subscription-sync.ts");
     const finalizer = load<FinalizeModule>("lib/stripe-checkout-finalization.ts");
     const webhook = load<WebhookModule>("app/api/webhooks/stripe/route.ts");
-    const deliverInvoice = () => webhook.POST(new Request("http://localhost/api/webhooks/stripe", {
+    const deliverInvoice = (modern = false) => {
+      const storedInvoice = structuredClone(invoices.get(`in_${sub.id}`)!);
+      const { subscription: _legacySubscription, ...invoiceWithoutSubscription } = storedInvoice;
+      const eventInvoice = modern ? {
+        ...invoiceWithoutSubscription,
+        parent: { type: "subscription_details", subscription_details: { subscription: sub.id } },
+      } : storedInvoice;
+      return webhook.POST(new Request("http://localhost/api/webhooks/stripe", {
       method: "POST", headers: { "stripe-signature": "fixture-signature" },
       body: JSON.stringify({ id: `evt_${prefix}`, type: "invoice.paid", livemode: true,
-        data: { object: invoices.get(`in_${sub.id}`) } }),
-    }));
+        data: { object: eventInvoice } }),
+      }));
+    };
     const grant = () => grants.grantCreditsForCurrentPeriodIfNeeded({
       userId: user.id, sub, invoiceId: `in_${sub.id}`, source: "isolated_test",
       expectedAccountCreatedAt: user.createdAt.toISOString(),
@@ -174,6 +182,16 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
       const replay = await f.deliverInvoice();
       assert.equal(replay.status, 200);
       assert.equal((await replay.json()).duplicate, true);
+    } finally { await f.cleanup(); }
+  });
+
+  await t.test("modern invoice webhook parent grants credits", async () => {
+    const f = await fixture();
+    try {
+      const response = await f.deliverInvoice(true);
+      assert.equal(response.status, 200);
+      assert.equal(await f.count(), 1);
+      assert.equal((await f.record()).currentPeriodStart.toISOString(), "2026-01-31T00:00:00.000Z");
     } finally { await f.cleanup(); }
   });
 
