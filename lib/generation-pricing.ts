@@ -284,7 +284,7 @@ export const VIDEO_MODEL_OPTION_MAP: Record<VideoModelOptionId, VideoModelOption
   }, {} as Record<VideoModelOptionId, VideoModelOption>);
 
 export type ImageResolutionKey = "1K" | "2K" | "4K";
-export type ImageModelOptionId = "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro";
+export type ImageModelOptionId = "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro";
 
 export type ImageModelOption = {
   id: ImageModelOptionId;
@@ -293,6 +293,14 @@ export type ImageModelOption = {
   imageToImageModel: string;
   credits: Partial<Record<ImageResolutionKey, number>>;
   resolutions?: ImageResolutionKey[];
+  // An empty resolution list means the provider has no resolution control.
+  flatCredits?: number;
+  imageToImagePricing?: {
+    kieCredits: Partial<Record<ImageResolutionKey, number>>;
+    extraInputKieCredits: number;
+    freeInputs: number;
+    maxInputs: number;
+  };
 };
 
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
@@ -329,6 +337,31 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
       "2K": Math.round(12 * 0.3),
     },
   },
+  {
+    id: "grok-imagine-image-2-0",
+    label: "Grok Imagine Image 2.0",
+    textToImageModel: "grok-imagine-image-2-0/text-to-image",
+    imageToImageModel: "grok-imagine-image-2-0/image-edit",
+    // Kie pricing page: both modes cost 4 credits/image (verified 2026-09-05).
+    flatCredits: Math.round(4 * 0.3),
+    resolutions: [],
+    credits: {},
+  },
+  {
+    id: "seedream-5-pro",
+    label: "Seedream 5.0 Pro",
+    textToImageModel: "seedream/5-pro-text-to-image",
+    imageToImageModel: "seedream/5-pro-image-to-image",
+    resolutions: ["1K", "2K"],
+    // Kie pricing page verified 2026-09-07: text/edit 7/14, first input free.
+    imageToImagePricing: {
+      kieCredits: { "1K": 7, "2K": 14 },
+      extraInputKieCredits: 0.5,
+      freeInputs: 1,
+      maxInputs: 10,
+    },
+    credits: { "1K": Math.round(7 * 0.3), "2K": Math.round(14 * 0.3) },
+  },
 ];
 
 export const IMAGE_MODEL_OPTION_MAP: Record<ImageModelOptionId, ImageModelOption> =
@@ -345,10 +378,18 @@ export const IMAGE_RESOLUTION_CREDITS: Record<ImageResolutionKey, number> = {
 
 export function getImageGenerationCredits(
   modelId: string | undefined,
-  resolution: ImageResolutionKey
+  resolution: ImageResolutionKey,
+  inputCount = 0
 ) {
   const option =
     IMAGE_MODEL_OPTION_MAP[modelId as ImageModelOptionId] ||
     IMAGE_MODEL_OPTION_MAP["gpt-image-2"];
-  return option.credits[resolution];
+  if (!Number.isInteger(inputCount) || inputCount < 0) return undefined;
+  if (inputCount > 0 && option.imageToImagePricing) {
+    const pricing = option.imageToImagePricing;
+    const base = pricing.kieCredits[resolution];
+    if (base === undefined || inputCount > pricing.maxInputs) return undefined;
+    return Math.round((base + Math.max(0, inputCount - pricing.freeInputs) * pricing.extraInputKieCredits) * 0.3);
+  }
+  return option.resolutions?.length === 0 ? option.flatCredits : option.credits[resolution];
 }

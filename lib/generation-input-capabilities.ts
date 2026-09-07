@@ -1,9 +1,11 @@
 import type { ImageModelOptionId } from "./generation-pricing";
+import { getImageInputTypes } from "./image-model-capabilities.ts";
 
 export type ComposerAttachmentKind = "image" | "video" | "audio";
 
 export interface GenerationInputCapabilities {
   maxImages: number;
+  imageContentTypes?: string[];
   maxImageBytes: number;
   imageRequired: boolean;
   imageRoles: string[];
@@ -26,6 +28,7 @@ export function getImageInputCapabilities(
   if (modelId === "qwen-image-3-pro") {
     return {
       maxImages: 3,
+      imageContentTypes: getImageInputTypes(modelId),
       maxImageBytes: QWEN_MAX_IMAGE_BYTES,
       imageRequired: false,
       imageRoles: ["Reference 1", "Reference 2", "Reference 3"],
@@ -39,10 +42,11 @@ export function getImageInputCapabilities(
   }
 
   return {
-    maxImages: 1,
+    maxImages: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : 1,
+    imageContentTypes: getImageInputTypes(modelId),
     maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
     imageRequired: false,
-    imageRoles: ["Reference image"],
+    imageRoles: Array.from({ length: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : 1 }, (_, i) => `Reference ${i + 1}`),
     acceptsVideo: false,
     acceptsAudio: false,
     maxVideos: 0,
@@ -143,4 +147,10 @@ export function hasTooManyImageInputs(
   imageCount: number
 ) {
   return imageCount > capabilities.maxImages;
+}
+
+// Unknown legacy metadata is verified by the server before charging.
+export function isCompatibleImageMetadata(capabilities: GenerationInputCapabilities, media: { contentType?: string; sizeBytes?: number }) {
+  return (media.sizeBytes == null || media.sizeBytes <= capabilities.maxImageBytes) &&
+    (!media.contentType || !capabilities.imageContentTypes || capabilities.imageContentTypes.includes(media.contentType.toLowerCase()));
 }

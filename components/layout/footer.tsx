@@ -24,12 +24,12 @@ export function Footer() {
             <h3 className="text-white font-semibold mb-4">Products</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/ai-video" className="transition-all duration-300 hover:text-white">
+                <Link href="/video" className="transition-all duration-300 hover:text-white">
                   AI Video
                 </Link>
               </li>
               <li>
-                <Link href="/ai-image" className="transition-all duration-300 hover:text-white">
+                <Link href="/image" className="transition-all duration-300 hover:text-white">
                   AI Image
                 </Link>
               </li>
@@ -70,4 +70,3 @@ export function Footer() {
     </footer>
   );
 }
-

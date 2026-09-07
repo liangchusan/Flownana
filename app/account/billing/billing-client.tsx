@@ -126,7 +126,7 @@ function ScopedBillingClient({
                 </p>
               </div>
             </div>
-            <Link href="/ai-image" className="mt-4 inline-flex">
+            <Link href="/image" className="mt-4 inline-flex">
               <Button className="rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]">
                 Start Creating →
               </Button>
@@ -154,7 +154,7 @@ function ScopedBillingClient({
                 </p>
               </div>
             </div>
-            <Link href="/ai-image" className="mt-4 inline-flex">
+            <Link href="/image" className="mt-4 inline-flex">
               <Button className="rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98]">
                 Start Creating →
               </Button>

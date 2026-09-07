@@ -17,6 +17,7 @@ import {
   type ImageModelOptionId,
   type ImageResolutionKey,
 } from "@/lib/generation-pricing";
+import { getImageAspectRatios, getImagePromptMinLength, IMAGE_PROMPT_MAX_LENGTH } from "@/lib/image-model-capabilities";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
 import { GENERATION_STATUS_UNAVAILABLE, isConfirmedGenerationFailure } from "@/lib/generation-request-state";
 import { trackEvent } from "@/lib/analytics";
@@ -142,26 +143,16 @@ export function GenerateForm({
     ? activeGenerationCount + outputCount > maxConcurrentGenerations
     : isGenerating;
   const ratioOptions = useMemo(
-    () =>
-      ["auto", "9:16", "16:9", "1:1", "3:4", "4:3"].filter((ratio) => {
-        if (model === "qwen-image-3-pro" && ratio === "auto") {
-          return false;
-        }
-        if (model === "gpt-image-2" && ratio === "auto") {
-          return resolution === "1K";
-        }
-        if (model === "gpt-image-2" && resolution === "4K" && ratio === "1:1") {
-          return false;
-        }
-        return true;
-      }),
-    [model, resolution]
+    () => getImageAspectRatios(model, resolution, uploadedImages.length),
+    [model, resolution, uploadedImages.length]
   );
   const resolutionOptions = useMemo(() => {
     const option = imageModels.find((m) => m.id === model);
     return option?.resolutions ?? (["1K", "2K", "4K"] as ImageResolutionKey[]);
   }, [imageModels, model]);
-  const creditsCost = getImageGenerationCredits(model, resolution);
+  const hasResolution = resolutionOptions.length > 0;
+  const creditsCost = getImageGenerationCredits(model, resolution, uploadedImages.length);
+  const needsReferenceForPricing = !!imageModels.find(m => m.id === model)?.imageToImagePricing && uploadedImages.length === 0;
   const currentModelLabel = imageModels.find((m) => m.id === model)?.label ?? model;
   const inputCapabilities = useMemo(() => getImageInputCapabilities(model), [model]);
   const imagesOverLimit = uploadedImages.length > inputCapabilities.maxImages;
@@ -202,11 +193,11 @@ export function GenerateForm({
   useEffect(() => {
     parametersChangeRef.current?.({
       model: currentModelLabel,
-      resolution,
+      ...(hasResolution ? { resolution } : {}),
       aspectRatio,
       outputCount,
     });
-  }, [aspectRatio, currentModelLabel, outputCount, resolution]);
+  }, [aspectRatio, currentModelLabel, outputCount, resolution, hasResolution]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -270,7 +261,7 @@ export function GenerateForm({
       await signInForCurrentEnvironment();
       return;
     }
-    if (submissionBlocked || imagesOverLimit) return;
+    if (submissionBlocked || imagesOverLimit || !creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || !ratioOptions.includes(aspectRatio) || (hasResolution && !resolutionOptions.includes(resolution))) return;
     if (!prompt.trim()) {
       const display = getGenerationErrorDisplay(
         { errorCode: "prompt_required" },
@@ -308,7 +299,7 @@ export function GenerateForm({
     const mode = requestImages.length > 0 ? "image-to-image" : "text-to-image";
     const optimisticParameters: GenerationParameters = {
       model: currentModelLabel,
-      resolution,
+      ...(hasResolution ? { resolution } : {}),
       aspectRatio,
       mode: requestImages.length > 0 ? "Image to image" : "Text to image",
       runId: optimisticId,
@@ -327,7 +318,7 @@ export function GenerateForm({
     trackEvent("generation_started", {
       type: "image",
       model,
-      resolution,
+      ...(hasResolution ? { resolution } : {}),
       aspect_ratio: aspectRatio,
       credits_cost: creditsCost,
       mode,
@@ -344,7 +335,7 @@ export function GenerateForm({
           imageUrls: requestImages,
           mode,
           model,
-          resolution,
+          ...(hasResolution ? { resolution } : {}),
           aspectRatio,
           runId: optimisticId,
           outputIndex,
@@ -362,7 +353,7 @@ export function GenerateForm({
         trackEvent("generation_success", {
           type: "image",
           model,
-          resolution,
+          ...(hasResolution ? { resolution } : {}),
           aspect_ratio: aspectRatio,
           credits_cost: response.data.creditsCost || creditsCost,
         });
@@ -451,7 +442,8 @@ export function GenerateForm({
           onChange={(event) => updatePrompt(event.target.value)}
           placeholder="Describe the image you want to create..."
           className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
-          maxLength={5000}
+          minLength={getImagePromptMinLength(model)}
+          maxLength={IMAGE_PROMPT_MAX_LENGTH}
         />
         <div className="flex min-h-12 flex-wrap items-center gap-1 border-t border-border pt-2">
           {toolbarLeading}
@@ -464,12 +456,12 @@ export function GenerateForm({
           <div className="relative w-40 sm:w-48">
             <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
               <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{aspectRatio} · {resolution} · {outputCount}</span>
+              <span className="truncate">{aspectRatio}{hasResolution ? ` · ${resolution}` : ""} · {outputCount}</span>
             </button>
             {renderOptionsPopup()}
           </div>
-          <Button type="button" onClick={handleGenerate} disabled={generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
-            <span>{(creditsCost ?? 0) * outputCount} credits</span><Send className="h-4 w-4" />
+          <Button type="button" onClick={handleGenerate} disabled={!creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
+            <span>{creditsCost ? `${creditsCost * outputCount} credits` : needsReferenceForPricing ? "Add a reference image" : "Temporarily unavailable"}</span><Send className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -496,7 +488,7 @@ export function GenerateForm({
           }`}
         >
           <Check className={`h-3.5 w-3.5 shrink-0 ${model === m.id ? "text-stone-500" : "text-transparent"}`} />
-          {m.label}
+          <span>{m.label}{Object.keys(m.credits).length === 0 && !m.flatCredits && <span className="block text-xs text-muted-foreground">{m.imageToImagePricing ? "Image to image" : "Temporarily unavailable"}</span>}</span>
         </button>
       ))}
     </div>
@@ -519,14 +511,14 @@ export function GenerateForm({
             ))}
           </div>
         </div>
-        <div className="py-3">
+        {hasResolution && <div className="py-3">
           <p className="mb-2 text-xs font-medium text-stone-400">Resolution</p>
           <div className="flex flex-wrap gap-1.5">
             {resolutionOptions.map((r) => (
               <button key={r} type="button" onClick={() => setResolution(r)} className={chipCls(resolution === r)}>{r}</button>
             ))}
           </div>
-        </div>
+        </div>}
         <div className="pt-3">
           <p className="mb-2 text-xs font-medium text-stone-400">Results</p>
           <div className="flex flex-wrap gap-1.5">
@@ -586,7 +578,8 @@ export function GenerateForm({
           onChange={(e) => updatePrompt(e.target.value)}
           placeholder="Describe the image you want to generate or edit..."
           className="h-36 resize-none rounded-ui-xl px-4 py-3"
-          maxLength={5000}
+          minLength={getImagePromptMinLength(model)}
+          maxLength={IMAGE_PROMPT_MAX_LENGTH}
         />
       </div>
 
@@ -601,7 +594,7 @@ export function GenerateForm({
           </div>
           <div className="relative flex-1">
             <button ref={optionsTriggerRef} type="button" onClick={openOptions} className={triggerCls}>
-              <span className="truncate">{aspectRatio} | {resolution}</span>
+              <span className="truncate">{aspectRatio}{hasResolution ? ` | ${resolution}` : ""}</span>
               <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
             </button>
             {renderOptionsPopup()}
@@ -610,7 +603,7 @@ export function GenerateForm({
 
         <Button
           onClick={handleGenerate}
-          disabled={generationLimitReached || !prompt.trim() || imagesOverLimit}
+          disabled={!creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || imagesOverLimit}
           className="w-full"
           size="lg"
         >
@@ -618,7 +611,7 @@ export function GenerateForm({
         </Button>
 
         <p className="text-xs text-stone-600">
-          This generation will cost {creditsCost} credits.
+          {creditsCost ? `This generation will cost ${creditsCost * outputCount} credits.` : needsReferenceForPricing ? "Add a reference image to use this model." : "This model is temporarily unavailable."}
         </p>
       </div>
     </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
-import { PanelRightClose, PanelRightOpen, Trash2, X } from "lucide-react";
+import { PanelRight, Trash2, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
 import { VideoCreationForm } from "@/components/creation/video-creation-form";
 import { CreationStream, type WorkspaceRun } from "@/components/blocks/creation-stream";
@@ -19,6 +20,7 @@ import {
 } from "@/components/blocks/composer-input-controls";
 import {
   getImageInputCapabilities,
+  isCompatibleImageMetadata,
   getVideoInputCapabilities,
   type GenerationInputCapabilities,
 } from "@/lib/generation-input-capabilities";
@@ -28,6 +30,11 @@ import { accountRequestHeaders, getAccountScope } from "@/lib/account-scope";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { GENERATION_STATUS_UNAVAILABLE } from "@/lib/generation-request-state";
 import { InputMedia } from "@/components/creation/input-media";
+import {
+  WORKSPACE_PATHS,
+  getWorkspaceDestination,
+  type WorkspaceCreationDestination,
+} from "@/lib/workspace-navigation";
 
 type ComposerType = CreationHistoryItem["type"];
 
@@ -42,8 +49,21 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function updateWorkspaceUrl(
+  destination: WorkspaceCreationDestination | "assets",
+  method: "pushState" | "replaceState"
+) {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.pathname = WORKSPACE_PATHS[destination];
+  nextUrl.search = "";
+  nextUrl.hash = "";
+  if (`${window.location.pathname}${window.location.search}${window.location.hash}` === `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`) return;
+  window.history[method](window.history.state, "", nextUrl);
+}
+
 type WorkspaceProps = {
   initialType: ActiveComposerType;
+  initialView?: WorkspaceView;
   initialCreations?: CreationHistoryItem[];
   initialAccountScope?: string | null;
   initialPrompt?: string;
@@ -57,13 +77,15 @@ export function MediaCreationWorkspace(props: WorkspaceProps) {
 
 function ScopedMediaCreationWorkspace({
   initialType,
+  initialView = "create",
   initialCreations = [],
   initialPrompt,
   accountScope,
 }: WorkspaceProps & { accountScope: string | null }) {
   const { capture: captureGeneration } = useAccountOperation();
   const { showToast } = useToast();
-  const [view, setView] = useState<WorkspaceView>("create");
+  const pathname = usePathname();
+  const [view, setView] = useState<WorkspaceView>(initialView);
   const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
   const [creations, setCreations] = useState<CreationHistoryItem[]>(initialCreations);
   const [draft, setDraft] = useState<DraftSeed>({
@@ -102,6 +124,26 @@ function ScopedMediaCreationWorkspace({
     try { window.localStorage.setItem(COMPOSER_TYPE_STORAGE_KEY, composerType); } catch { /* Optional preference storage. */ }
   }, [composerType]);
 
+  useEffect(() => {
+    const destination = getWorkspaceDestination(pathname);
+    if (destination === "assets") {
+      setView("assets");
+      setDetailsRun(null);
+      setDetailsOpen(false);
+      return;
+    }
+    if (destination !== "image" && destination !== "video") return;
+    setView("create");
+    setComposerType(destination);
+    setInputCapabilities(
+      destination === "image"
+        ? getImageInputCapabilities("gpt-image-2")
+        : getVideoInputCapabilities("MiniMax H3")
+    );
+    setDetailsRun(null);
+    setDetailsOpen(false);
+  }, [pathname]);
+
   const activeGenerationCount = creations.filter((creation) => ["pending", "generating", "processing"].includes(creation.status) && !(creation.optimistic && creation.statusUncertain && !creation.taskId)).length;
 
   useEffect(() => {
@@ -135,38 +177,41 @@ function ScopedMediaCreationWorkspace({
     setCreations((current) => current.map((creation) => creationIdentity(creation) === identity ? { ...creation, ...patch } : creation));
   };
 
-  const resetDraft = () => setDraft((current) => ({
-    ...current,
-    prompt: "",
-    attachments: [],
-    revision: current.revision + 1,
-  }));
-
-  const handleNewCreate = () => {
-    setView("create");
-    setDetailsRun(null);
-    setDetailsOpen(false);
-    resetDraft();
-  };
-
   const openDetails = (run: WorkspaceRun) => {
     setDetailsRun(run);
     setDetailsOpen(true);
   };
 
-  const setType = (nextType: ActiveComposerType) => {
+  const applyComposerType = (nextType: ActiveComposerType, warnAboutAttachments = true) => {
     setComposerType(nextType);
     setInputCapabilities(
       nextType === "image"
         ? getImageInputCapabilities("gpt-image-2")
         : getVideoInputCapabilities("MiniMax H3")
     );
-    const nextUrl = new URL(window.location.href);
-    nextUrl.pathname = nextType === "image" ? "/ai-image" : "/ai-video";
-    window.history.replaceState(window.history.state, "", nextUrl);
-    if (draft.attachments.some((attachment) => attachment.kind !== "image")) {
+    if (warnAboutAttachments && draft.attachments.some((attachment) => attachment.kind !== "image")) {
       showToast({ title: "Some inputs need attention", message: "Remove inputs marked as unsupported or switch to a compatible model before creating.", variant: "warning" });
     }
+  };
+
+  const navigateWorkspace = (destination: WorkspaceCreationDestination | "assets") => {
+    setDetailsRun(null);
+    setDetailsOpen(false);
+    if (destination === "assets") {
+      if (view === "assets") return;
+      setView("assets");
+    } else {
+      if (view === "create" && composerType === destination) return;
+      setView("create");
+      applyComposerType(destination);
+    }
+    updateWorkspaceUrl(destination, "pushState");
+  };
+
+  const setType = (nextType: ActiveComposerType) => {
+    setView("create");
+    applyComposerType(nextType);
+    updateWorkspaceUrl(nextType, "replaceState");
   };
 
   const restoreCreation = (creation: CreationHistoryItem) => {
@@ -175,7 +220,8 @@ function ScopedMediaCreationWorkspace({
       return;
     }
     setView("create");
-    setComposerType(creation.type);
+    applyComposerType(creation.type, false);
+    updateWorkspaceUrl(creation.type, "replaceState");
     setDraft((current) => ({
       prompt: creation.prompt,
       attachments: creation.inputUrls.map((url, index) => ({
@@ -195,6 +241,7 @@ function ScopedMediaCreationWorkspace({
 
   const referenceAsset = (creation: CreationHistoryItem, url: string) => {
     setView("create");
+    updateWorkspaceUrl(composerType, "pushState");
     const kind = creation.type === "music" ? "audio" : creation.type;
     setDraft((current) => current.attachments.some((attachment) => attachment.url === url)
       ? current
@@ -264,7 +311,7 @@ function ScopedMediaCreationWorkspace({
     const imageIndex = draft.attachments
       .slice(0, index + 1)
       .filter((item) => item.kind === "image").length - 1;
-    return imageIndex >= inputCapabilities.maxImages;
+    return imageIndex >= inputCapabilities.maxImages || !isCompatibleImageMetadata(inputCapabilities, attachment);
   });
   const assetOptions = useMemo<ComposerAssetOption[]>(() => {
     const seen = new Set<string>();
@@ -306,10 +353,11 @@ function ScopedMediaCreationWorkspace({
     }
     return null;
   })();
+  const activeSection = view === "assets" ? "assets" : composerType;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <WorkspaceSidebar view={view} onViewChange={(nextView) => { setView(nextView); setDetailsRun(null); setDetailsOpen(false); }} onNewCreate={handleNewCreate} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
+      <WorkspaceSidebar activeSection={activeSection} onWorkspaceNavigate={navigateWorkspace} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceMobileHeader onOpen={() => setMobileSidebarOpen(true)} />
         {view === "assets" ? <div className="min-h-0 flex-1 overflow-y-auto"><AssetsLibrary creations={creations} onReference={referenceAsset} onChange={updateCreation} /></div> : (
@@ -319,12 +367,12 @@ function ScopedMediaCreationWorkspace({
                   <button
                     type="button"
                     onClick={() => detailsRun && setDetailsOpen(true)}
-                    disabled={!detailsRun}
-                    className="absolute right-4 top-3 z-20 hidden h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent lg:flex"
+                    aria-disabled={!detailsRun}
+                    className={`absolute right-3 top-3 z-20 hidden h-8 w-8 items-center justify-center rounded-md bg-transparent text-stone-500 transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-400/50 lg:flex ${detailsRun ? "hover:bg-stone-100/80 hover:text-stone-700" : "cursor-default"}`}
                     aria-label="Open details sidebar"
                     title={detailsRun ? "Open details sidebar" : "Select Details on a result first"}
                   >
-                    <PanelRightOpen className="h-5 w-5" />
+                    <PanelRight className="h-4 w-4" strokeWidth={1.5} />
                   </button>
               )}
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} /></div>
@@ -372,7 +420,7 @@ function filterCompatibleAttachments(
     if (attachment.kind === "video") return ++videoCount <= capabilities.maxVideos;
     if (attachment.kind === "audio") return ++audioCount <= capabilities.maxAudios;
     imageCount += 1;
-    return imageCount <= capabilities.maxImages;
+    return imageCount <= capabilities.maxImages && isCompatibleImageMetadata(capabilities, attachment);
   });
 }
 
@@ -394,7 +442,7 @@ function DetailsPanel({ run, onClose }: { run: WorkspaceRun; onClose: () => void
   ];
   const contents = (
     <>
-      <div className="flex h-16 items-center justify-between border-b border-border px-5"><div><h2 className="text-sm font-medium text-foreground">Generation details</h2><p className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</p></div><button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground" aria-label="Close details sidebar" title="Close details sidebar"><X className="h-4 w-4 lg:hidden" /><PanelRightClose className="hidden h-5 w-5 lg:block" /></button></div>
+      <div className="relative flex h-16 items-center border-b border-border px-5 pr-14"><div><h2 className="text-sm font-medium text-foreground">Generation details</h2><p className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</p></div><button type="button" onClick={onClose} className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md bg-transparent text-stone-500 transition-all duration-300 hover:bg-stone-100/80 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-400/50" aria-label="Close details sidebar" title="Close details sidebar"><X className="h-4 w-4 lg:hidden" /><PanelRight className="hidden h-4 w-4 lg:block" strokeWidth={1.5} /></button></div>
       <div className="flex-1 space-y-6 overflow-y-auto p-5"><section><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Prompt</p><p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">{run.prompt}</p></section>{first.inputUrls.length > 0 && <section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Inputs</p><div className="mt-3 flex flex-wrap gap-2">{first.inputUrls.map((url, index) => <InputMedia key={`${url}-${index}`} creationId={first.taskId || first.id} url={url} index={index} kind={first.parameters?.inputKinds?.[index]} />)}</div></section>}<section className="border-t border-border pt-5"><p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Parameters</p><dl className="mt-3 space-y-1">{details.filter((item): item is [string, string | number] => item[1] !== undefined).map(([label, value]) => <div key={label} className="flex items-start justify-between gap-4 rounded-ui px-2 py-2 text-xs odd:bg-surface-soft"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-medium capitalize text-foreground">{value}</dd></div>)}</dl></section></div>
     </>
   );

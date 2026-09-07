@@ -46,3 +46,11 @@ test("image generation credits are priced by model", () => {
 test("unknown image model falls back to GPT Image 2 pricing", () => {
   assert.equal(getImageGenerationCredits("unknown-model", "2K"), 3);
 });
+
+test("Seedream image pricing includes additional inputs before rounding each output", () => {
+  assert.deepEqual(Array.from({ length: 10 }, (_, i) => getImageGenerationCredits("seedream-5-pro", "1K", i + 1)), [2, 2, 2, 3, 3, 3, 3, 3, 3, 3]);
+  assert.deepEqual(Array.from({ length: 10 }, (_, i) => getImageGenerationCredits("seedream-5-pro", "2K", i + 1)), [4, 4, 5, 5, 5, 5, 5, 5, 5, 6]);
+  for (const count of [-1, 1.5, 11]) assert.equal(getImageGenerationCredits("seedream-5-pro", "1K", count), undefined);
+  assert.equal(getImageGenerationCredits("seedream-5-pro", "4K", 1), undefined);
+  assert.equal(getImageGenerationCredits("seedream-5-pro", "2K", 10)! * 4, 24);
+});

@@ -1,6 +1,8 @@
 # Flownana 工程记忆
 
-最近复核：2026-08-31（本轮本地风险检查、修复与回归已完成；未提交、推送或部署）
+最近复核：2026-09-07（用户已批准将当前全部导航、界面和图片模型改动提交、
+推送及发布；181 项测试中 177 通过、4 项隔离数据库测试跳过；Lint、Design Check
+和生产构建通过。生产发布结果待完成后记录。）
 
 本文档记录当前代码实现、基础设施、部署状态和工程风险，不承担产品需求定义。
 
@@ -41,9 +43,38 @@
 
 根 `Providers` 是唯一 NextAuth `SessionProvider`；页面级 `SessionBoundary`
 不再创建嵌套 Provider（NextAuth v4 的全局刷新回调会导致多个 Provider 不同步）。
-`/home`、`/ai-image` 和 `/ai-video` 预加载的历史带独立服务端账号 scope，
-只有浏览器账号 id + 注册时间匹配时才能显示。`/generate` 进入共用创作工作台，
-`/ai-music` 重定向到 `/ai-image`。
+`/home`、`/image`、`/video` 和 `/assets` 预加载的历史带独立服务端账号 scope，
+只有浏览器账号 id + 注册时间匹配时才能显示。`/generate` 根据上次选择进入
+`/image` 或 `/video`，`/ai-music` 重定向到 `/image`。
+
+- 2026-09-01 已批准新的导航与规范路由：Home `/home`、Image `/image`、Video
+  `/video`、Assets `/assets`；旧 `/ai-image`、`/ai-video` 保留永久重定向，
+  `/generate` 和 `/ai-music` 改用新地址。统一侧栏移除 New Create 和通用 Create
+  导航，并同步轻量左右折叠按钮、无底部分割线及居中的无箭头 Upgrade。当前代码
+  已实现：Home 和创作工作台共用新侧栏，Image/Video/Assets 使用真实规范地址；
+  工作台通过 Next.js 支持的原生 History API 在这三页之间保持同一挂载实例，保留
+  Prompt、附件、参数和活跃请求，浏览器前进/后退同步恢复 Composer 和选中状态。
+  桌面端与 390 px 移动端已完成本地浏览器检查且无横向溢出。旧地址重定向已用本地
+  HTTP 响应验证。测试登录态进一步验证 Upgrade 居中且无尾部箭头、折叠态只显示
+  图标、用户套餐和积分、账户菜单、Pricing 弹窗、草稿保留，以及右侧 Details
+  展开/收起按钮；移动端抽屉显示完整 Upgrade 和用户信息。使用独立 localhost
+  端口重新登录后没有 JWT 解密错误；Home 对 React 开发严格模式主动取消的历史
+  请求不再误记为控制台错误。2026-09-01 已通过 Vercel 部署
+  `dpl_DyQirtc88k8GfCK7fwXBzu1XoZSZ` 发布到 `https://www.flownana.com`，状态
+  READY；`npm run smoke:prod` 全部通过，线上 `/home`、`/image`、`/video`、
+  `/assets` 返回 200，旧图片、视频和音乐入口返回 308 并指向规范地址。发布时
+  首次无 scope 调用短暂返回 `Not authorized`，确认账号和项目访问正常后显式使用
+  `--scope liangchusans-projects` 重试成功。生产错误日志扫描未发现错误。
+  2026-09-02 根据 Codex 参考截图再次修正左右栏按钮：不再使用带方向箭头的
+  `PanelLeftOpen/Close` 和 `PanelRightOpen/Close`，统一为 16 px、1.5 px 线宽的
+  `PanelLeft`/`PanelRight` 分栏轮廓；默认无边框、无填充，使用安静的 Stone 中性
+  前景，Hover 才出现轻表面。右上控制在尚未选择 Details 时也保持正常可见，避免
+  视觉上像未实现。测试登录态在 1440 x 900 下复核了左栏展开/收起和右栏展开，
+  390 x 844 下无横向溢出；对照报告为 `design-qa.md`。2026-09-02 已通过 Vercel
+  部署 `dpl_F29WVwLTUapzQ4VSj5dss3BZxCqq` 重新发布生产并进入 READY，别名为
+  `https://www.flownana.com`；`npm run smoke:prod` 全部通过。本机 Node 25 下的
+  Vercel CLI 部署后错误日志查询触发 CLI 用户加载异常，切换 Node 24 后仍复现，
+  因而本次未取得独立的部署后错误日志扫描结果。
 
 ## 创建与历史实现
 
@@ -101,6 +132,21 @@
   并限制 MIME、文件签名、连接/总时限和实际读取字节数。
 
 ## 图片 Provider 实现
+
+- 2026-09-07：用户批准的五图片模型本地接入及价格核查完成，未部署。
+  Kie Pricing 隐藏内置浏览器读取成功，后续浏览器工作保持后台，不切换用户 Chrome。
+  GPT Kie 成本 6/10/16，Nano 8/12/18，Qwen Pro 6.4/12（每参考图额外 0.5）；
+  三个旧模型平台积分不变。Grok 文生图/Image Edit 均 4 Kie 积分，每输出收 1。
+  Seedream 文生图/图生图基础成本均 1K 7、2K 14；文生图收 2/4，图生图首张
+  参考图免费，其余每张加 0.5 Kie 积分，总成本乘 0.3 后对每输出取整。
+  五模型请求字段集中在 `lib/kie-image-request.ts`，共享比例/Prompt/MIME 规则
+  在 `lib/image-model-capabilities.ts`。Grok 无分辨率选项；Seedream basic/high
+  对应 1K/2K，最多十张参考图、Prompt 3–5000 字符。
+  共享附件保留 MIME/大小用于兼容检查，旧素材缺失元数据时服务端补查。
+  前后端按实际参考图数计费，忽略客户端传入价格。GPT 保守比例限制不变。
+  真实出图、账单成本及桌面/移动视觉验收仍未完成；没有调用付费生成。
+  最终验证：181 项测试，177 通过/4 跳过；Lint 0 错误/24 警告、Design Check、
+  生产构建通过。详细价格证据、验证及风险见 `docs/IMAGE-MODEL-AUDIT.md`。
 
 - GPT Image 2：`gpt-image-2-text-to-image`、`gpt-image-2-image-to-image`。
 - Nano Banana 2：`nano-banana-2`。

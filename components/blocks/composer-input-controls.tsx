@@ -15,6 +15,7 @@ import { useToast } from "@/components/blocks/app-toast-provider";
 import { uploadAccountMedia } from "@/lib/account-media-upload";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { isAccountOperationCancelled } from "@/lib/account-operation";
+import { isCompatibleImageMetadata } from "@/lib/generation-input-capabilities";
 import type {
   ComposerAttachmentKind,
   GenerationInputCapabilities,
@@ -28,6 +29,8 @@ export interface ComposerAttachment {
   kind: ComposerAttachmentKind;
   name: string;
   source: "upload" | "asset" | "reference";
+  contentType?: string;
+  sizeBytes?: number;
 }
 
 export interface ComposerAssetOption {
@@ -87,7 +90,7 @@ export function ComposerAttachments({
         const currentImageIndex = attachment.kind === "image" ? imageIndex++ : -1;
         const compatible =
           attachment.kind === "image"
-            ? currentImageIndex < capabilities.maxImages
+            ? currentImageIndex < capabilities.maxImages && isCompatibleImageMetadata(capabilities, attachment)
             : attachment.kind === "video"
               ? videoIndex++ < capabilities.maxVideos
               : audioIndex++ < capabilities.maxAudios;
@@ -195,6 +198,10 @@ export function ComposerToolbarLeading({
   const handleImages = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const candidates = Array.from(files);
+    if (candidates.some(file => !isCompatibleImageMetadata(capabilities, { contentType: file.type }))) {
+      showToast({ title: "Unsupported image format", message: "Choose an image format supported by this model.", variant: "warning" });
+      return;
+    }
     const tooLarge = candidates.find((file) => file.size > capabilities.maxImageBytes);
     if (tooLarge) {
       showToast({
@@ -232,6 +239,8 @@ export function ComposerToolbarLeading({
           url: blobs[index].url,
           kind: "image" as const,
           name: file.name,
+          contentType: file.type,
+          sizeBytes: file.size,
           source: "upload" as const,
         }))
       );

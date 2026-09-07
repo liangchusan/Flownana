@@ -187,7 +187,7 @@ export default function Home() {
               </p>
 
               <Link
-                href="/ai-image"
+                href="/image"
                 onClick={() => {
                   trackEvent("hero_cta_click", { source: "home_hero" });
                   trackEvent("ai_image_entry_click", { source: "home_hero" });
@@ -245,7 +245,7 @@ export default function Home() {
 
           <div className="grid gap-8 md:grid-cols-2">
             {/* AI Video */}
-            <Link href="/ai-video" className="group">
+            <Link href="/video" className="group">
               <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-stone-600 to-stone-800 shadow-sm transition-all duration-300 hover:-translate-y-px hover:shadow-md">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
                 <div className="absolute inset-0 flex flex-col justify-between p-8 text-white">
@@ -281,7 +281,7 @@ export default function Home() {
 
             {/* AI Image */}
             <Link
-              href="/ai-image"
+              href="/image"
               className="group"
               onClick={() => trackEvent("ai_image_entry_click", { source: "home_feature_card" })}
             >
@@ -330,7 +330,7 @@ export default function Home() {
           </p>
           <div className="flex justify-center">
             <Link
-              href="/ai-image"
+              href="/image"
               onClick={() => {
                 trackEvent("hero_cta_click", { source: "home_final_cta" });
                 trackEvent("ai_image_entry_click", { source: "home_final_cta" });

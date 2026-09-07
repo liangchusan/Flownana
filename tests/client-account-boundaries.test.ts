@@ -30,17 +30,16 @@ test("actual workspace and home entrypoints never relabel an old RSC seed as a n
   }
 });
 
-test("pricing and legacy creation roots reset private state only when the account epoch changes", () => {
+test("pricing resets private state only when the account epoch changes", () => {
   let user: typeof a & { name?: string } = a;
   const load = createSourceLoader({ "next-auth/react": { useSession: () => ({ data: { user }, status: "authenticated" }) } });
-  for (const component of [load<any>("components/pricing/pricing-plans.tsx").PricingPlans, load<any>("app/create/[mode]/create-content.tsx").CreateContent]) {
-    user = a;
-    const first = component({ mode: "image" });
-    user = { ...a, name: "Updated profile name" };
-    assert.equal(component({ mode: "image" }).key, first.key);
-    user = b;
-    assert.notEqual(component({ mode: "image" }).key, first.key);
-  }
+  const component = load<any>("components/pricing/pricing-plans.tsx").PricingPlans;
+  user = a;
+  const first = component({ mode: "image" });
+  user = { ...a, name: "Updated profile name" };
+  assert.equal(component({ mode: "image" }).key, first.key);
+  user = b;
+  assert.notEqual(component({ mode: "image" }).key, first.key);
 });
 
 test("profile and billing seed boundary conceals another account but retains the same account during session refresh", () => {
@@ -76,6 +75,7 @@ test("both workspace composers use the workspace operation owner, not their disp
   const load = createSourceLoader({
     react: { ...React, useState: (initial: any) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (value: any) => ({ current: value }), useEffect: () => {}, useLayoutEffect: () => {}, useMemo: (fn: any) => fn() },
     "next-auth/react": { useSession: () => ({ data: { user: a }, status: "authenticated" }) },
+    "next/navigation": { usePathname: () => "/image" },
     "@/lib/use-account-operation": { useAccountOperation: () => ({ accountScope: getAccountScope(a), capture }) },
     "@/components/blocks/app-toast-provider": { useToast: () => ({ showToast: () => {} }) },
   });

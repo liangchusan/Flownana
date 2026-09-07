@@ -31,14 +31,14 @@ export function Header({ showBackground = false }: HeaderProps) {
 
         {/* Navigation - Left aligned after logo */}
         <nav className="hidden md:flex items-center space-x-8 ml-8">
-          <Link 
-            href="/ai-video" 
+          <Link
+            href="/video"
             className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
           >
             AI Video
           </Link>
-          <Link 
-            href="/ai-image" 
+          <Link
+            href="/image"
             onClick={() => trackEvent("ai_image_entry_click", { source: "header" })}
             className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
           >

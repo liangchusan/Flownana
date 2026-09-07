@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreationSidebar } from "@/components/layout/creation-sidebar";
+import { WorkspaceMobileHeader, WorkspaceSidebar } from "@/components/blocks/workspace-sidebar";
 import {
   Video,
   Image as ImageIcon,
@@ -201,6 +201,8 @@ function ScopedCreateContent({
   const bannerScrollRef = useRef<HTMLDivElement | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [videoFallbackMap, setVideoFallbackMap] = useState<Record<string, boolean>>({});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const selectedMode = creationModeOptions.find((option) => option.id === creationMode) ?? creationModeOptions[0];
   const SelectedModeIcon = selectedMode.icon;
 
@@ -255,6 +257,7 @@ function ScopedCreateContent({
         setRecentCreations(fromApi.slice(0, 8));
       })
       .catch((error) => {
+        if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) return;
         console.error("Error fetching recent creations:", error);
       })
       .finally(() => {
@@ -271,20 +274,22 @@ function ScopedCreateContent({
     const trimmed = prompt.trim();
     const encoded = trimmed ? `?prompt=${encodeURIComponent(trimmed)}` : "";
     if (creationMode === "image") {
-      router.push(`/ai-image${encoded}`);
+      router.push(`/image${encoded}`);
       return;
     }
     if (creationMode === "video") {
-      router.push(`/ai-video${encoded}`);
+      router.push(`/video${encoded}`);
       return;
     }
   };
 
   return (
-    <div className="h-screen overflow-hidden">
-      <CreationSidebar />
-      <main className="ml-[60px] h-screen overflow-y-auto bg-background">
-        <div className="min-h-screen bg-gradient-to-b from-background via-surface-soft/30 to-background">
+    <div className="flex h-screen overflow-hidden bg-background">
+      <WorkspaceSidebar activeSection="home" collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <WorkspaceMobileHeader onOpen={() => setMobileSidebarOpen(true)} />
+        <main className="min-h-0 flex-1 overflow-y-auto bg-background">
+          <div className="min-h-screen bg-gradient-to-b from-background via-surface-soft/30 to-background">
           {/* ---------- 模块1: 顶部大 Banner 卡片（图片/视频，横向滑动） ---------- */}
           <section className="border-b border-stone-100/70">
             <div className="mx-auto w-full max-w-[1680px] px-4 py-5 md:px-8 md:py-6 xl:px-10">
@@ -476,7 +481,7 @@ function ScopedCreateContent({
                 </h2>
                 {session && recentCreations.length > 0 && (
                   <Link
-                    href="/ai-image"
+                    href="/image"
                     className="text-sm font-medium text-stone-500 transition-all duration-300 hover:text-stone-900"
                   >
                     Open studio
@@ -507,10 +512,10 @@ function ScopedCreateContent({
                         key={c.id}
                         href={
                           c.type === "image"
-                            ? "/ai-image"
+                            ? "/image"
                             : c.type === "video"
-                              ? "/ai-video"
-                              : "/ai-image"
+                              ? "/video"
+                              : "/image"
                         }
                         className="group overflow-hidden rounded-xl border border-stone-200/50 bg-white shadow-sm transition-all duration-300 hover:border-stone-300 hover:shadow-md"
                       >
@@ -573,12 +578,12 @@ function ScopedCreateContent({
                     <p className="mb-2 text-sm text-stone-500">No creations yet</p>
                     <p className="mb-4 text-xs text-stone-400">Start with a prompt above or open a studio.</p>
                     <div className="flex flex-wrap justify-center gap-2">
-                      <Link href="/ai-image">
+                      <Link href="/image">
                         <Button variant="outline" size="sm" className="rounded-xl">
                           AI Image
                         </Button>
                       </Link>
-                      <Link href="/ai-video">
+                      <Link href="/video">
                         <Button variant="outline" size="sm" className="rounded-xl">
                           AI Video
                         </Button>
@@ -602,8 +607,9 @@ function ScopedCreateContent({
               )}
             </div>
           </section>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

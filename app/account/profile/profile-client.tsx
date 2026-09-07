@@ -263,7 +263,7 @@ function ScopedAccountProfileClient({ initialUser }: { initialUser: ProfileUser 
             <Logo size="md" showText />
           </Link>
           <Link
-            href="/ai-image"
+            href="/image"
             className="inline-flex h-10 items-center gap-2 rounded-ui px-3 text-sm text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             <ArrowLeft className="h-4 w-4" />

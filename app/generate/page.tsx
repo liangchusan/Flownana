@@ -15,7 +15,7 @@ export default function GeneratePage() {
     const preferredType = parseComposerPreference(
       window.localStorage.getItem(COMPOSER_TYPE_STORAGE_KEY)
     );
-    router.replace(preferredType === "image" ? "/ai-image" : "/ai-video");
+    router.replace(preferredType === "image" ? "/image" : "/video");
   }, [router]);
 
   return (

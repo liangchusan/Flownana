@@ -1,7 +1,4 @@
-import { Suspense } from "react";
-import { redirect } from "next/navigation";
-import { CreateContent } from "./create-content";
-import { CreateFlowSkeleton } from "@/components/layout/create-flow-skeleton";
+import { permanentRedirect } from "next/navigation";
 
 export default async function CreateModePage(
   props: {
@@ -9,17 +6,6 @@ export default async function CreateModePage(
   }
 ) {
   const params = await props.params;
-  if (params.mode === "voice") {
-    redirect("/ai-image");
-  }
-
-  if (params.mode !== "video" && params.mode !== "image") {
-    redirect("/ai-image");
-  }
-
-  return (
-    <Suspense fallback={<CreateFlowSkeleton />}>
-      <CreateContent mode={params.mode} />
-    </Suspense>
-  );
+  if (params.mode === "video") permanentRedirect("/video");
+  permanentRedirect("/image");
 }

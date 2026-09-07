@@ -22,9 +22,10 @@ export interface GenerationMediaAsset {
 export async function enforceInputMediaSize(media: StoredMedia, maxBytes: number, kind: MediaUploadKind): Promise<StoredMedia> {
   // Migration-era owned Provider assets have no byte metadata. Blob head only
   // understands this store; use the same bounded public-media validator for them.
-  const remote = media.sizeBytes == null && !isOwnedBlobUrl(media.url)
+  const needsMetadata = media.sizeBytes == null || !media.contentType;
+  const remote = needsMetadata && !isOwnedBlobUrl(media.url)
     ? await safeRemoteMediaFetch({ url: media.url, kind: kind === "audio" ? "music" : kind, maxBytes, timeoutMs: 30_000 }) : null;
-  const verified = media.sizeBytes == null && !remote ? await head(media.url) : null;
+  const verified = needsMetadata && !remote ? await head(media.url) : null;
   const sizeBytes = media.sizeBytes ?? remote?.sizeBytes ?? verified?.size;
   if (typeof sizeBytes !== "number" || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > maxBytes) {
     throw new Error("Input exceeds the model's file-size limit.");

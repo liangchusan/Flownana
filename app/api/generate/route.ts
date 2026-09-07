@@ -29,18 +29,12 @@ import {
   enforceInputMediaSize,
 } from "@/lib/media-assets";
 
+import { buildKieImageRequest } from "@/lib/kie-image-request";
+import { getImageAspectRatios, getImagePromptMinLength, IMAGE_PROMPT_MAX_LENGTH, isSupportedImageInputType } from "@/lib/image-model-capabilities";
+
 const KIE_API_BASE = "https://api.kie.ai";
 const DEFAULT_IMAGE_MODEL_ID: ImageModelOptionId = "gpt-image-2";
 type PersistedGenerationParameters = Record<string, string | number>;
-const IMAGE_ASPECT_RATIOS = new Set([
-  "auto",
-  "9:16",
-  "16:9",
-  "1:1",
-  "3:4",
-  "4:3",
-]);
-
 export const maxDuration = 300;
 
 function imageErrorResponse(
@@ -69,37 +63,11 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isValidImageAspectRatio(params: {
-  modelId: ImageModelOptionId;
-  resolution: ImageResolutionKey;
-  aspectRatio: string;
-}) {
-  if (!IMAGE_ASPECT_RATIOS.has(params.aspectRatio)) {
-    return false;
-  }
-
-  if (params.modelId === "gpt-image-2") {
-    if (params.aspectRatio === "auto") {
-      return params.resolution === "1K";
-    }
-    if (params.resolution === "4K" && params.aspectRatio === "1:1") {
-      return false;
-    }
-  }
-
-  if (params.modelId === "qwen-image-3-pro" && params.aspectRatio === "auto") {
-    return false;
-  }
-
-  return true;
-}
-
 async function createImageTask(params: {
   modelId: ImageModelOptionId;
   prompt: string;
-  aspectRatio?: string;
-  resolution?: string;
-  outputFormat?: "png" | "jpg" | "jpeg";
+  aspectRatio: string;
+  resolution?: ImageResolutionKey;
   inputUrls?: string[];
 }) {
   const apiKey = getKieApiKey();
@@ -110,42 +78,8 @@ async function createImageTask(params: {
     );
   }
 
-  const fmt =
-    params.outputFormat === "jpeg" || params.outputFormat === "jpg"
-      ? "jpg"
-      : "png";
-
-  const input: Record<string, unknown> = {
-    prompt: params.prompt,
-    output_format: fmt,
-  };
-
-  if (params.modelId === "qwen-image-3-pro") {
-    input.image_size = params.aspectRatio?.trim() || "1:1";
-    input.resolution = params.resolution?.trim() || "1K";
-  } else {
-    input.aspect_ratio = params.aspectRatio?.trim() || "1:1";
-    input.resolution = params.resolution?.trim() || "1K";
-  }
-
-  if (params.inputUrls?.length) {
-    if (params.modelId === "nano-banana-2") {
-      input.image_input = params.inputUrls;
-    } else if (params.modelId === "qwen-image-3-pro") {
-      input.image_urls = params.inputUrls;
-    } else {
-      input.input_urls = params.inputUrls;
-    }
-  }
-
   const modelOption = IMAGE_MODEL_OPTION_MAP[params.modelId];
-  const providerModel = params.inputUrls?.length
-    ? modelOption.imageToImageModel
-    : modelOption.textToImageModel;
-  const body = {
-    model: providerModel,
-    input,
-  };
+  const body = buildKieImageRequest(params);
 
   const res = await fetch(`${KIE_API_BASE}/api/v1/jobs/createTask`, {
     signal: AbortSignal.timeout(30_000),
@@ -294,30 +228,37 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== "object" || Array.isArray(body)) return imageErrorResponse("invalid_parameters");
     const { prompt, imageUrl, imageUrls, model, resolution, aspectRatio, runId, outputIndex, outputCount } = body;
     if (typeof prompt !== "string" || !prompt.trim()) return imageErrorResponse("prompt_required");
+    if (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH) return imageErrorResponse("invalid_parameters");
     if ((model != null && (typeof model !== "string" || !Object.hasOwn(IMAGE_MODEL_OPTION_MAP, model))) ||
       (resolution != null && typeof resolution !== "string") ||
       (aspectRatio != null && typeof aspectRatio !== "string")) return imageErrorResponse("invalid_parameters");
     const modelId = (model ?? DEFAULT_IMAGE_MODEL_ID) as ImageModelOptionId;
+    if (prompt.trim().length < getImagePromptMinLength(modelId)) return imageErrorResponse("invalid_parameters");
     const modelOption = IMAGE_MODEL_OPTION_MAP[modelId];
+    const hasResolution = modelOption.resolutions?.length !== 0;
+    if (!hasResolution && resolution != null) return imageErrorResponse("invalid_parameters");
     const res = (resolution?.trim() || "1K").toUpperCase() as ImageResolutionKey;
     const ar = aspectRatio?.trim().toLowerCase() || "1:1";
-    const cost = getImageGenerationCredits(modelId, res);
-    if (!cost || !isValidImageAspectRatio({ modelId, resolution: res, aspectRatio: ar })) {
+    if (hasResolution && !(modelOption.resolutions ?? ["1K", "2K", "4K"]).includes(res)) {
       return imageErrorResponse("invalid_parameters");
     }
     const sources = imageUrls ?? (imageUrl ? [imageUrl] : []);
     if (!Array.isArray(sources) || sources.some((source) => typeof source !== "string" || !source.trim())) {
       return imageErrorResponse("invalid_parameters");
     }
+    if (!getImageAspectRatios(modelId, res, sources.length).includes(ar)) return imageErrorResponse("invalid_parameters");
     const capabilities = getImageInputCapabilities(modelId);
     if (sources.length > capabilities.maxImages) return imageErrorResponse("invalid_parameters");
+    const cost = getImageGenerationCredits(modelId, res, sources.length);
+    if (!cost) return imageErrorResponse("provider_unavailable");
     const inputMedia = await Promise.all(sources.map(async (source: string, index: number) =>
       enforceInputMediaSize(await persistOrReuseImageInput({
         source: source.trim(), userId: account!.id, requestId: `${crypto.randomUUID()}-${index}`,
       }), capabilities.maxImageBytes, "image")
     ));
+    if (inputMedia.some(media => !isSupportedImageInputType(modelId, media.contentType))) return imageErrorResponse("unsupported_file_type");
     const parameters: PersistedGenerationParameters = {
-      model: modelOption.label, resolution: res, aspectRatio: ar,
+      model: modelOption.label, ...(hasResolution ? { resolution: res } : {}), aspectRatio: ar,
       mode: inputMedia.length ? "Image to image" : "Text to image",
       ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120) } : {}),
       ...(Number.isInteger(outputIndex) && outputIndex >= 0 && outputIndex < 4 ? { outputIndex } : {}),
@@ -332,7 +273,7 @@ export async function POST(request: NextRequest) {
     });
     if (Date.now() >= deadline) throw new GenerationRequestError("timeout");
     const taskId = await createImageTask({
-      modelId, prompt: prompt.trim(), aspectRatio: ar, resolution: res, outputFormat: "png",
+      modelId, prompt: prompt.trim(), aspectRatio: ar, resolution: hasResolution ? res : undefined,
       inputUrls: inputMedia.map((media) => media.url),
     });
     reserved = await attachGenerationTask(account, reserved.id, taskId);

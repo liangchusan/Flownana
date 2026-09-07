@@ -567,10 +567,10 @@ function ScopedMyCreationsTab({
 
     const basePath =
       creation.type === "image"
-        ? "/ai-image"
+        ? "/image"
         : creation.type === "video"
-          ? "/ai-video"
-          : "/ai-image";
+          ? "/video"
+          : "/image";
 
     const query = params.toString();
     router.push(query ? `${basePath}?${query}` : basePath);
