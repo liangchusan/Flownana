@@ -1,7 +1,7 @@
 # Flownana 工程记忆
 
-最近复核：2026-09-07（全部导航、界面和图片模型改动已提交并推送为 `8509b39`；
-生产部署 `dpl_21zGdRKAMrCSk2q4NyRGE3YpWQx6` 为 READY，正式域名
+最近复核：2026-09-07（Stripe 新版 Invoice 续费积分兼容修复已提交并推送为
+`d7fbf48`；生产部署 `dpl_75iem2zqw2u6GynTQLf8B1fLCCwo` 为 READY，正式域名
 `https://www.flownana.com` 已绑定，`npm run smoke:prod` 全部通过。）
 
 本文档记录当前代码实现、基础设施、部署状态和工程风险，不承担产品需求定义。
@@ -283,12 +283,12 @@
   付款时才创建的 Subscription 时间；旧账号的未支付 Session 不能跨到新注册。
   现有历史 Customer 绑定保持兼容；暂时查不到原始 Session 时允许 Webhook 重试。
 - 月付积分通过 `invoice.paid` 发放。
-- 2026-09-07 本地修复 Stripe `2026-01-28.clover` Invoice 结构兼容：Webhook
+- 2026-09-07 修复 Stripe `2026-01-28.clover` Invoice 结构兼容：Webhook
   从旧的 `invoice.subscription` 或新的
   `invoice.parent.subscription_details.subscription` 解析订阅；付费周期校验也同时
   支持旧 Line Item 字段和新的 `parent.subscription_item_details` / `pricing`
   字段，仍严格匹配 Subscription、Customer、订阅项、Price、数量、非 Proration
-  和周期。旧结构继续兼容；修复尚未部署。
+  和周期。旧结构继续兼容；修复已部署。
 - 年付第 2–12 月由 `/api/cron/monthly-credits` 每日 08:00 UTC 检查；Catch-up
   会补发所有逾期月份，并在一个事务内写入去重记录、积分批次和 `nextCreditAt`。
 - 本地修复：年付发放和升级抵扣共用原始周期起点的 UTC 月份锚点，最多十一批
@@ -395,7 +395,9 @@
   漏发。已通过现有 User 锁、付费 Invoice 校验和 Subscription Period 去重事务
   补发一批 200 积分，重复调用确认未二次发放；本地订阅周期已同步。此前 200
   积分已使用 90，剩余 110 按发放后 30 天规则于 2026-09-06 到期，不属于异常
-  扣减。修复代码部署前，其他新版周期 Invoice 仍有同类漏发风险。
+  扣减。兼容修复已通过提交 `d7fbf48` 和 Ready 生产部署
+  `dpl_75iem2zqw2u6GynTQLf8B1fLCCwo` 发布；正式域名已绑定，完整生产冒烟通过，
+  新部署错误日志扫描为空。
 
 - 账户与 Pricing 功能代码在 2026-08-28 通过 Ready 生产部署
   `dpl_3kqAdSfZEqZrrVgKrnnf5piWzGRG` 上线，对应 Git 提交 `e176e77`；后续仅文档
