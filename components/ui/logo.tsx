@@ -3,13 +3,13 @@ import Image from "next/image";
 interface LogoProps {
   className?: string;
   showText?: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: "compact" | "sm" | "md" | "lg";
   textColor?: string;
 }
 
 export function Logo({ className = "", showText = true, size = "md", textColor }: LogoProps) {
-  const logoSizes = { sm: "w-32", md: "w-36", lg: "w-48" };
-  const markSizes = { sm: "h-6 w-6", md: "h-8 w-8", lg: "h-12 w-12" };
+  const logoSizes = { compact: "w-24", sm: "w-32", md: "w-36", lg: "w-48" };
+  const markSizes = { compact: "h-6 w-6", sm: "h-6 w-6", md: "h-8 w-8", lg: "h-12 w-12" };
   const lightText = textColor === "text-white";
 
   return (

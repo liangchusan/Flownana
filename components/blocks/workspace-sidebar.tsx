@@ -45,7 +45,7 @@ export function WorkspaceMobileHeader({ onOpen }: { onOpen: () => void }) {
       <button type="button" onClick={onOpen} className="flex h-11 w-11 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" aria-label="Open navigation">
         <Menu className="h-5 w-5" />
       </button>
-      <Link href={WORKSPACE_PATHS.home} aria-label="Flownana home"><Logo size="md" showText /></Link>
+      <Link href={WORKSPACE_PATHS.home} aria-label="Flownana home"><Logo size="compact" showText /></Link>
       <div className="h-11 w-11" />
     </header>
   );
@@ -60,15 +60,15 @@ export function WorkspaceSidebar({
   onMobileOpenChange,
 }: WorkspaceSidebarProps) {
   const { data: session, status } = useSession();
-  const widthClass = collapsed ? "lg:w-16" : "lg:w-60";
+  const widthClass = collapsed ? "lg:w-16" : "lg:w-[260px]";
 
   return (
     <>
       {mobileOpen && <button type="button" className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-[1px] lg:hidden" onClick={() => onMobileOpenChange(false)} aria-label="Close navigation" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-60 -translate-x-full flex-col border-r border-border bg-surface-soft transition-all duration-300 lg:static lg:translate-x-0 ${widthClass} ${mobileOpen ? "translate-x-0" : ""}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[260px] -translate-x-full flex-col border-r border-border bg-surface-soft transition-all duration-300 lg:static lg:translate-x-0 ${widthClass} ${mobileOpen ? "translate-x-0" : ""}`}>
         <div className="relative flex h-16 items-center px-3">
           <Link href={WORKSPACE_PATHS.home} className={`min-w-0 ${collapsed ? "lg:hidden" : ""}`} aria-label="Flownana home">
-            <Logo size="md" showText={!collapsed} />
+            <Logo size="compact" showText={!collapsed} />
           </Link>
           <button
             type="button"
