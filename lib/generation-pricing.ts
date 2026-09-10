@@ -284,7 +284,7 @@ export const VIDEO_MODEL_OPTION_MAP: Record<VideoModelOptionId, VideoModelOption
   }, {} as Record<VideoModelOptionId, VideoModelOption>);
 
 export type ImageResolutionKey = "1K" | "2K" | "4K";
-export type ImageModelOptionId = "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro";
+export type ImageModelOptionId = "gpt-image-2-5-flare" | "gpt-image-2-5-sunburst" | "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro";
 
 export type ImageModelOption = {
   id: ImageModelOptionId;
@@ -361,6 +361,22 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
       maxInputs: 10,
     },
     credits: { "1K": Math.round(7 * 0.3), "2K": Math.round(14 * 0.3) },
+  },
+  {
+    id: "gpt-image-2-5-flare",
+    label: "GPT-Image-2.5 Flare",
+    textToImageModel: "gpt-image-2-5-flare-text-to-image",
+    imageToImageModel: "gpt-image-2-5-flare-image-to-image",
+    resolutions: ["1K", "2K", "4K"],
+    credits: { "1K": 2, "2K": 3, "4K": 5 },
+  },
+  {
+    id: "gpt-image-2-5-sunburst",
+    label: "GPT-Image-2.5 Sunburst",
+    textToImageModel: "gpt-image-2-5-sunburst-text-to-image",
+    imageToImageModel: "gpt-image-2-5-sunburst-image-to-image",
+    resolutions: ["1K", "2K", "4K"],
+    credits: { "1K": 2, "2K": 3, "4K": 5 },
   },
 ];
 

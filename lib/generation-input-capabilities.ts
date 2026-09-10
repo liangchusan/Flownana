@@ -42,11 +42,11 @@ export function getImageInputCapabilities(
   }
 
   return {
-    maxImages: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : 1,
+    maxImages: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1,
     imageContentTypes: getImageInputTypes(modelId),
     maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
     imageRequired: false,
-    imageRoles: Array.from({ length: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : 1 }, (_, i) => `Reference ${i + 1}`),
+    imageRoles: Array.from({ length: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1 }, (_, i) => `Reference ${i + 1}`),
     acceptsVideo: false,
     acceptsAudio: false,
     maxVideos: 0,

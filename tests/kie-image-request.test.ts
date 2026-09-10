@@ -8,7 +8,7 @@ const load = createSourceLoader({});
 const { buildKieImageRequest: build } = load<typeof import("../lib/kie-image-request")>("lib/kie-image-request.ts");
 const { IMAGE_MODEL_OPTIONS, getImageGenerationCredits } = load<typeof import("../lib/generation-pricing")>("lib/generation-pricing.ts");
 
-test("all five image models send mode-specific provider fields and preserve ordered references", () => {
+test("all image models send mode-specific provider fields and preserve ordered references", () => {
   const inputUrls = ["https://example.test/first.png", "https://example.test/second.png"];
   for (const model of IMAGE_MODEL_OPTIONS) {
     for (const editing of [false, true]) {
@@ -19,7 +19,7 @@ test("all five image models send mode-specific provider fields and preserve orde
       else if (model.id === "seedream-5-pro") Object.assign(expected, { aspect_ratio: "16:9", quality: "high", output_format: "png", nsfw_checker: true });
       else if (model.id === "grok-imagine-image-2-0") Object.assign(expected, { aspect_ratio: "16:9" });
       else Object.assign(expected, { aspect_ratio: "16:9", resolution: "2K", ...(model.id === "nano-banana-2" ? { output_format: "png" } : {}) });
-      if (editing) expected[model.id === "gpt-image-2" ? "input_urls" : model.id === "nano-banana-2" ? "image_input" : "image_urls"] = inputUrls;
+      if (editing) expected[model.id.startsWith("gpt-image-") ? "input_urls" : model.id === "nano-banana-2" ? "image_input" : "image_urls"] = inputUrls;
       assert.deepEqual(request.input, expected, `${model.id}: ${editing}`);
     }
   }
@@ -56,5 +56,21 @@ test("model input formats and known metadata reject incompatible images", () => 
 test("Grok verified flat price applies to text and all supported reference counts", () => {
   for (let count = 0; count <= 5; count++) {
     assert.equal(getImageGenerationCredits("grok-imagine-image-2-0", "1K", count), 1);
+  }
+});
+
+test("GPT 2.5 variants retain distinct IDs, prices and resolution-specific ratios", () => {
+  for (const id of ["gpt-image-2-5-flare", "gpt-image-2-5-sunburst"] as const) {
+    assert.equal(getImageInputCapabilities(id).maxImages, 16);
+    for (const resolution of ["1K", "2K", "4K"] as const) {
+      const ratios = getImageAspectRatios(id, resolution, 0);
+      assert.ok(ratios.includes("auto") && ratios.includes("1:1"));
+      for (const ratio of ["27:16", "16:27", "9:8", "8:9"]) assert.equal(ratios.includes(ratio), resolution === "1K");
+      assert.equal(getImageGenerationCredits(id, resolution, 16), { "1K": 2, "2K": 3, "4K": 5 }[resolution]);
+      const refs = Array.from({ length: 16 }, (_, i) => `https://example.test/${i}.png`);
+      assert.deepEqual(build({ modelId: id, prompt: "Landscape", aspectRatio: "auto", resolution, inputUrls: refs }), {
+        model: `${id}-image-to-image`, input: { prompt: "Landscape", aspect_ratio: "auto", resolution, input_urls: refs },
+      });
+    }
   }
 });

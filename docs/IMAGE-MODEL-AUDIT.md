@@ -137,3 +137,17 @@ Design Check 与生产构建通过。未部署，真实生成/账单及响应式
 2026-09-07 已按用户授权随完整提交 `8509b39` 发布生产；部署
 `dpl_21zGdRKAMrCSk2q4NyRGE3YpWQx6` READY，正式域名冒烟通过。
 前文“未部署”为当时状态；真实付费出图和实际成本仍未测试。
+
+
+## 2026-09-10 GPT Image 2.5 双版本
+
+已在隐藏内置浏览器逐一读取 Flare/Sunburst 的 text-to-image 与 image-to-image
+API Reference。四个 ID 均为 `gpt-image-2-5-{flare|sunburst}-{text-to-image|image-to-image}`，
+图生图字段 `input_urls` 最多 16 项；共同字段 prompt、aspect_ratio、resolution。
+模型页切换四种模式后均显示 1K/2K/4K 为 6/10/16 Kie 积分（$0.03/$0.05/$0.08）。
+页面明确 27:16、16:27、9:8、8:9 仅 1K；其余列出的比例支持 2K/4K。
+来源：https://kie.ai/gpt-image-2-5 。独立 Pricing 页面未成功加载，不能声称已交叉核对。
+平台收费按已批准方案为 2/3/5，保留 5000 字符、20 MB、JPEG/PNG/WebP 产品限制。
+
+验证：183 项测试中 179 通过、4 跳过；Lint 0 错误/24 警告，Build 与 Design Check
+通过。真实出图/账单及桌面移动视觉检查未完成；本次没有生产部署。

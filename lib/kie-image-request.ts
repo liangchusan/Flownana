@@ -34,6 +34,8 @@ export function buildKieImageRequest(params: {
       input.output_format = "png";
       if (hasImages) input.image_input = params.inputUrls;
       break;
+    case "gpt-image-2-5-flare":
+    case "gpt-image-2-5-sunburst":
     case "gpt-image-2":
       input.aspect_ratio = params.aspectRatio;
       input.resolution = params.resolution;
