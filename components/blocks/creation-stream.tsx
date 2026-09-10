@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import { Modal } from "@/components/ui/modal";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
@@ -314,7 +315,7 @@ function PendingResult({
   if (creation.type === "music") {
     return (
       <div className="creation-loading-sea relative flex min-h-32 w-full max-w-lg items-center justify-center overflow-hidden rounded-ui-lg">
-        <span className="creation-loading-vessel text-5xl sm:text-6xl" aria-hidden="true">🍌</span>
+        <span className="creation-loading-vessel" aria-hidden="true"><Logo size="lg" showText={false} /></span>
         <span className="sr-only">Creating audio</span>
       </div>
     );
@@ -324,7 +325,7 @@ function PendingResult({
 
   return (
     <div className={`creation-loading-sea relative flex items-center justify-center overflow-hidden rounded-ui-lg ${layoutClassName}`}>
-      <span className="creation-loading-vessel text-5xl sm:text-6xl" aria-hidden="true">🍌</span>
+      <span className="creation-loading-vessel" aria-hidden="true"><Logo size="lg" showText={false} /></span>
       <span className="sr-only">Creating {creation.type}</span>
     </div>
   );

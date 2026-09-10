@@ -14,6 +14,25 @@
 4. 代码与测试是实现证据；若与已确认的产品文档冲突，应先报告，而不是
    静默用代码反向修改产品要求。
 
+## 2026-09-10 Logo 替换（本地，未部署）
+
+- 使用用户提供的两张透明 PNG，裁去周围留白并导出 `public/brand/` 的横版、
+  独立图标和字标资源。统一 Logo 组件覆盖 Home、创作侧栏、账户页、营销头尾部；
+  深色区域以 CSS 将字标显示为白色，保留彩色图标及原品牌字形。
+- 生成等待动画复用独立图标，海面及漂移动效保持；PRODUCT 与 DESIGN 已同步
+  品牌描述，未改变业务逻辑、收费或 GA4。
+- `app/icon.png` 为 32px，`app/apple-icon.png` 为 180px，使用 Next.js 文件式
+  元数据及自动版本 URL；移除旧 SVG 图标与冲突的手工 icon 声明。
+  `public/logo.png` 保留为新版 512px 兼容资源。
+- Design Check、完整 Lint（0 错误、24 个已有警告）和最终 Build 通过；追加的
+  等待动画改动也通过定向 ESLint。后台浏览器检查 Home 390/768/1440px、移动
+  抽屉、桌面折叠、落地页桌面/手机及深色页脚，Logo 清晰且未见裁切；手机 Home
+  scrollWidth 等于 390，资源加载成功，元数据仅指向新图标，读取的控制台错误为空。
+- 本机 next dev 遇到 EMFILE，已停止并改用本地生产构建预览；agent-browser
+  Chrome 启动失败后使用后台内置浏览器完成检查。未进行真实付费生成或 Apple
+  添加主屏幕实机测试；浏览器已保存的旧 favicon 仍可能需要刷新或重新打开标签。
+- 未提交、推送或部署生产。
+
 ## 当前技术栈
 
 - Next.js 16 App Router（Turbopack production build）
