@@ -39,13 +39,13 @@ const NAV_ITEMS = [
   { id: "assets" as const, label: "Assets", icon: FolderOpen },
 ];
 
-export function WorkspaceMobileHeader({ onOpen }: { onOpen: () => void }) {
+export function WorkspaceMobileHeader({ onOpen, showLogo = true }: { onOpen: () => void; showLogo?: boolean }) {
   return (
     <header className="flex h-14 items-center justify-between bg-background px-3 lg:hidden">
       <button type="button" onClick={onOpen} className="flex h-11 w-11 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" aria-label="Open navigation">
         <Menu className="h-5 w-5" />
       </button>
-      <Link href={WORKSPACE_PATHS.home} aria-label="Flownana home"><Logo size="compact" showText /></Link>
+      {showLogo && <Link href={WORKSPACE_PATHS.home} aria-label="Flownana home"><Logo size="compact" showText /></Link>}
       <div className="h-11 w-11" />
     </header>
   );

@@ -1,5 +1,4 @@
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
+import { LegalHeader } from "@/components/layout/legal-header";
 
 export const metadata = {
   title: "Terms of Service | Flownana",
@@ -10,7 +9,7 @@ export default function TermsOfServicePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showBackground />
+      <LegalHeader />
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="mb-10">
@@ -22,7 +21,7 @@ export default function TermsOfServicePage() {
         </div>
 
         <div className="rounded-2xl border border-stone-200/50 bg-white p-6 sm:p-8">
-          <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
+          <div className="prose prose-stone max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
           <p>
             These Terms of Service (“Terms”) govern your access to and use of Flownana’s website and services (the
             “Services”). By using the Services, you agree to these Terms. If you do not agree, do not use the Services.
@@ -134,7 +133,6 @@ export default function TermsOfServicePage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

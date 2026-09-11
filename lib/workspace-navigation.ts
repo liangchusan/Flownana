@@ -1,5 +1,5 @@
 export const WORKSPACE_PATHS = {
-  home: "/home",
+  home: "/",
   image: "/image",
   video: "/video",
   assets: "/assets",

@@ -1,0 +1,134 @@
+{
+  "generator": "built-in image_gen",
+  "purpose": "Gallery covers only; not automatic generation reference inputs",
+  "covers": [
+    {
+      "id": "poster",
+      "type": "ads-marketing",
+      "scene": "A beautifully designed botanical exhibition poster, oversized elegant text 'BOTANICAL' and a single dramatic orange bird-of-paradise flower, cream paper on muted terracotta background. No other text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: ads-marketing. Subject: A beautifully designed botanical exhibition poster, oversized elegant text 'BOTANICAL' and a single dramatic orange bird-of-paradise flower, cream paper on muted terracotta background. No other text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-31a0af4c-1505-4306-9c7e-8d44c80a6e2d.png",
+      "file": "/templates/covers/poster-v1.png"
+    },
+    {
+      "id": "interior_design",
+      "type": "stylized-concept",
+      "scene": "An architectural miniature cutaway of a serene living room, oak floor, cream sofa, olive green armchair, tall window, tiny indoor tree, warm sunlight, clay rose studio backdrop. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: stylized-concept. Subject: An architectural miniature cutaway of a serene living room, oak floor, cream sofa, olive green armchair, tall window, tiny indoor tree, warm sunlight, clay rose studio backdrop. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-0d4d75a9-3b4b-47a0-bba7-7a45e9b3c88c.png",
+      "file": "/templates/covers/interior_design-v1.png"
+    },
+    {
+      "id": "logo",
+      "type": "logo-brand",
+      "scene": "One original sophisticated midnight-blue emblem of a swallow and a sun, crisp simple balanced graphic curves printed on ivory textured paper. A strong memorable symbol without letters. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: logo-brand. Subject: One original sophisticated midnight-blue emblem of a swallow and a sun, crisp simple balanced graphic curves printed on ivory textured paper. A strong memorable symbol without letters. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-3f3138cf-3b23-449c-86de-fe7be9958190.png",
+      "file": "/templates/covers/logo-v1.png"
+    },
+    {
+      "id": "illustration",
+      "type": "illustration-story",
+      "scene": "An original gouache illustration of a young adult in a mustard sweater reading beside a curled-up orange cat, lush sage leaves framing them, lavender ground, rich paper texture. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: illustration-story. Subject: An original gouache illustration of a young adult in a mustard sweater reading beside a curled-up orange cat, lush sage leaves framing them, lavender ground, rich paper texture. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-be4039ae-7657-4d7c-a157-ccd98e11f471.png",
+      "file": "/templates/covers/illustration-v1.png"
+    },
+    {
+      "id": "headshot",
+      "type": "photorealistic-natural",
+      "scene": "A warm natural professional studio headshot of a fictional adult woman with curly dark hair, relaxed confident expression, cream blouse, soft taupe backdrop, authentic skin texture, subtle daylight. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: photorealistic-natural. Subject: A warm natural professional studio headshot of a fictional adult woman with curly dark hair, relaxed confident expression, cream blouse, soft taupe backdrop, authentic skin texture, subtle daylight. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-07c40597-92fe-4afb-98c4-de250e753687.png",
+      "file": "/templates/covers/headshot-v1.png"
+    },
+    {
+      "id": "icon",
+      "type": "stylized-concept",
+      "scene": "A coordinated set of six crisp playful cream pictograms: sun, leaf, cloud, moon, flower, bird. Consistent thick rounded lines arranged in a clean 2 by 3 arrangement on a deep forest-green flat background. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: stylized-concept. Subject: A coordinated set of six crisp playful cream pictograms: sun, leaf, cloud, moon, flower, bird. Consistent thick rounded lines arranged in a clean 2 by 3 arrangement on a deep forest-green flat background. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-e90ddb85-819e-44a4-9c76-b8cd372a62ba.png",
+      "file": "/templates/covers/icon-v1.png"
+    },
+    {
+      "id": "product_photo",
+      "type": "product-mockup",
+      "scene": "Premium editorial product photograph of an unbranded frosted pale apricot perfume bottle with cylindrical ivory cap on travertine, soft amber glass reflections, peach background, a restrained elegant shadow. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: product-mockup. Subject: Premium editorial product photograph of an unbranded frosted pale apricot perfume bottle with cylindrical ivory cap on travertine, soft amber glass reflections, peach background, a restrained elegant shadow. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-0c68dce1-fd19-4d64-bd5c-a6aed9e173a6.png",
+      "file": "/templates/covers/product_photo-v1.png"
+    },
+    {
+      "id": "merch",
+      "type": "product-mockup",
+      "scene": "An ivory cotton t-shirt hanging naturally on an oak hanger, bearing one original cobalt blue and orange abstract sun-and-wave screenprint, sage studio background, realistic textile detail. No text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: product-mockup. Subject: An ivory cotton t-shirt hanging naturally on an oak hanger, bearing one original cobalt blue and orange abstract sun-and-wave screenprint, sage studio background, realistic textile detail. No text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-2de091c1-9522-403e-aa1b-fca2df165fbd.png",
+      "file": "/templates/covers/merch-v1.png"
+    },
+    {
+      "id": "infographic",
+      "type": "infographic-diagram",
+      "scene": "A beautiful educational water cycle infographic on cream paper, central mountain and lake, blue cloud and sun, clear directional circular arrows for evaporation condensation rain and runoff. Only headline 'WATER CYCLE', no other text or numerical data. Editorial cut-paper illustration.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: infographic-diagram. Subject: A beautiful educational water cycle infographic on cream paper, central mountain and lake, blue cloud and sun, clear directional circular arrows for evaporation condensation rain and runoff. Only headline 'WATER CYCLE', no other text or numerical data. Editorial cut-paper illustration.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-356b895e-ee74-4838-baea-a6c904aa0c25.png",
+      "file": "/templates/covers/infographic-v1.png"
+    },
+    {
+      "id": "flyer",
+      "type": "ads-marketing",
+      "scene": "A bold polished flyer for a fictional ceramics workshop, headline exactly 'CLAY CLUB', hero photograph of hands shaping a clay bowl, cream and dark burgundy editorial layout, tiny minimal geometric dividers but no other text, no dates or contact details.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: ads-marketing. Subject: A bold polished flyer for a fictional ceramics workshop, headline exactly 'CLAY CLUB', hero photograph of hands shaping a clay bowl, cream and dark burgundy editorial layout, tiny minimal geometric dividers but no other text, no dates or contact details.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-4634017a-c905-4e5f-ab3a-ad00e7592431.png",
+      "file": "/templates/covers/flyer-v1.png"
+    },
+    {
+      "id": "book_cover",
+      "type": "product-mockup",
+      "scene": "A beautifully bound cloth hardcover book, title exactly 'THE QUIET GARDEN', original minimalist embossed golden botanical line drawing on deep pine-green cover, gently angled on pale sage studio background. No author or other text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: product-mockup. Subject: A beautifully bound cloth hardcover book, title exactly 'THE QUIET GARDEN', original minimalist embossed golden botanical line drawing on deep pine-green cover, gently angled on pale sage studio background. No author or other text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-29b58550-9168-4dcb-a8cc-9e7426a48f47.png",
+      "file": "/templates/covers/book_cover-v1.png"
+    },
+    {
+      "id": "app_mockup",
+      "type": "ui-mockup",
+      "scene": "A polished single smartphone mockup showing a serene plant-care app with a large fern photograph, cream interface, sage watering and sunlight icon controls, two small botanical cards. Only heading 'My plants', no other text. Clay pastel background, realistic elegant device.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: ui-mockup. Subject: A polished single smartphone mockup showing a serene plant-care app with a large fern photograph, cream interface, sage watering and sunlight icon controls, two small botanical cards. Only heading 'My plants', no other text. Clay pastel background, realistic elegant device.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-f64cc16b-1044-49f2-8635-f59fbded152a.png",
+      "file": "/templates/covers/app_mockup-v1.png"
+    },
+    {
+      "id": "packaging",
+      "type": "product-mockup",
+      "scene": "Premium fictional tea packaging: a tall cream paper carton beside a cylindrical sage tin, original abstract dark green tea-leaf illustration, single word 'LEAF' on each, clean coherent brand system, warm studio light, no claims, no barcode, no other text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: product-mockup. Subject: Premium fictional tea packaging: a tall cream paper carton beside a cylindrical sage tin, original abstract dark green tea-leaf illustration, single word 'LEAF' on each, clean coherent brand system, warm studio light, no claims, no barcode, no other text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-9b3409fa-558a-44d1-b86b-0186e46b48fa.png",
+      "file": "/templates/covers/packaging-v1.png"
+    },
+    {
+      "id": "advertisement",
+      "type": "ads-marketing",
+      "scene": "A striking editorial advertisement for a fictional orange portable speaker, large close-up product with rich tactile mesh, sculptural terracotta and cream backdrop, exact headline 'MAKE WAVES'. Sophisticated layout, no price, no discount, no other text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: ads-marketing. Subject: A striking editorial advertisement for a fictional orange portable speaker, large close-up product with rich tactile mesh, sculptural terracotta and cream backdrop, exact headline 'MAKE WAVES'. Sophisticated layout, no price, no discount, no other text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-cf5111dc-fb9a-4695-9c05-0da4d84c8a65.png",
+      "file": "/templates/covers/advertisement-v1.png"
+    },
+    {
+      "id": "thumbnail",
+      "type": "ads-marketing",
+      "scene": "A compelling travel video thumbnail: cinematic turquoise sea and tall sunlit coastal cliffs, foreground small yellow campervan, bold readable cream headline 'COASTAL ESCAPE', strong focal hierarchy, natural vivid color, no people or other text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: ads-marketing. Subject: A compelling travel video thumbnail: cinematic turquoise sea and tall sunlit coastal cliffs, foreground small yellow campervan, bold readable cream headline 'COASTAL ESCAPE', strong focal hierarchy, natural vivid color, no people or other text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-26bf7ba0-c01f-4570-92f8-4d22aad9b144.png",
+      "file": "/templates/covers/thumbnail-v1.png"
+    },
+    {
+      "id": "website_mockup",
+      "type": "ui-mockup",
+      "scene": "A premium editorial website concept shown as a clean front-facing desktop webpage composition: cream canvas, large headline exactly 'Spaces to slow down', beautiful large architectural photograph of a tranquil oak-and-linen living room, minimal small navigation shapes and two material sample cards, restrained olive accent. No browser chrome, no additional legible text.",
+      "prompt": "Generate a finished original raster cover for Flownana's image template gallery. Portrait 4:5 composition, single full-bleed image, no rounded card border, no gallery label or watermark. Polished editorial art direction, warm tasteful colors, main subject safely inside central 80%, readable at small thumbnail size. This is a standalone cover, not a contact sheet. Use case: ui-mockup. Subject: A premium editorial website concept shown as a clean front-facing desktop webpage composition: cream canvas, large headline exactly 'Spaces to slow down', beautiful large architectural photograph of a tranquil oak-and-linen living room, minimal small navigation shapes and two material sample cards, restrained olive accent. No browser chrome, no additional legible text.",
+      "source": "/Users/liangchusan/.codex/generated_images/01a08b77-fc33-76b2-a6a0-ecb2566532a6/exec-b9dc6468-6e36-43ab-97d8-ec7536fb28a9.png",
+      "file": "/templates/covers/website_mockup-v1.png"
+    }
+  ]
+}

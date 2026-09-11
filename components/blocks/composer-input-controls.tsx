@@ -140,6 +140,7 @@ export function ComposerAttachments({
 }
 
 export function ComposerToolbarLeading({
+  menuPlacement = "above",
   composerType,
   capabilities,
   attachments,
@@ -147,6 +148,7 @@ export function ComposerToolbarLeading({
   onTypeChange,
   onAdd,
 }: {
+  menuPlacement?: "above" | "below";
   composerType: ActiveComposerType;
   capabilities: GenerationInputCapabilities;
   attachments: ComposerAttachment[];
@@ -366,7 +368,7 @@ export function ComposerToolbarLeading({
           onChange={(event) => void handleMedia("audio", event.target.files)}
         />
         {addOpen && (
-          <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-ui-lg border border-border bg-background shadow-float">
+          <div className={`absolute ${menuPlacement === "below" ? "top-[calc(100%+0.5rem)] max-h-[60vh] overflow-y-auto" : "bottom-[calc(100%+0.5rem)] overflow-hidden"} left-0 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-ui-lg border border-border bg-background shadow-float`}>
             {assetView ? (
               <div>
                 <div className="flex items-center gap-2 border-b border-border px-2 py-2">
@@ -488,7 +490,7 @@ export function ComposerToolbarLeading({
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
         {typeOpen && (
-          <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-50 w-36 rounded-ui-lg border border-border bg-background p-1 shadow-float">
+          <div className={`absolute ${menuPlacement === "below" ? "top-[calc(100%+0.5rem)]" : "bottom-[calc(100%+0.5rem)]"} left-0 z-50 w-36 rounded-ui-lg border border-border bg-background p-1 shadow-float`}>
             {(["image", "video"] as const).map((type) => (
               <button
                 key={type}

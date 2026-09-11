@@ -5,8 +5,9 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
+import { usePricingModal } from "@/components/pricing/pricing-modal-provider";
 import { getAccountScope } from "@/lib/account-scope";
-import { CreditCard, LogOut, UserRound } from "lucide-react";
+import { CreditCard, LogOut, UserRound, Tags, Mail, ShieldCheck, FileText } from "lucide-react";
 import {
   clearCachedBillingSummary,
   fetchBillingSummary,
@@ -80,6 +81,7 @@ export function UserMenu({
 }
 
 function ScopedUserMenu({ user, align, compact, variant, accountScope }: UserMenuProps & { accountScope: string | null }) {
+  const { openPricing } = usePricingModal();
   const [isOpen, setIsOpen] = useState(false);
   const [summary, setSummary] = useState<ClientBillingSummary | null>(() =>
     getCachedBillingSummary(accountScope)
@@ -159,25 +161,41 @@ function ScopedUserMenu({ user, align, compact, variant, accountScope }: UserMen
         <Link
           href="/account/profile"
           role="menuitem"
-          className="flex min-h-10 items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="flex min-h-11 items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           onClick={() => setIsOpen(false)}
         >
           <UserRound className="mr-3 h-4 w-4 text-muted-foreground" />
           Account Profile
         </Link>
+        <button type="button" role="menuitem" className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" onClick={() => { setIsOpen(false); openPricing(); }}>
+          <Tags className="mr-3 h-4 w-4 text-muted-foreground" />
+          Pricing
+        </button>
         <Link
           href="/account/billing"
           role="menuitem"
-          className="flex min-h-10 items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="flex min-h-11 items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           onClick={() => setIsOpen(false)}
         >
           <CreditCard className="mr-3 h-4 w-4 text-muted-foreground" />
           Plans and Billing
         </Link>
+        <a href="mailto:support@flownana.com" role="menuitem" className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" onClick={() => setIsOpen(false)}>
+          <Mail className="mr-3 h-4 w-4 text-muted-foreground" />
+          Contact Us
+        </a>
+        <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" role="menuitem" className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" onClick={() => setIsOpen(false)}>
+          <ShieldCheck className="mr-3 h-4 w-4 text-muted-foreground" />
+          Privacy Policy
+        </a>
+        <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" role="menuitem" className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" onClick={() => setIsOpen(false)}>
+          <FileText className="mr-3 h-4 w-4 text-muted-foreground" />
+          Terms of Service
+        </a>
         <button
           type="button"
           role="menuitem"
-          className="flex min-h-10 w-full items-center rounded-ui px-3 text-sm text-destructive transition-all duration-300 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-destructive transition-all duration-300 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           onClick={async () => {
             setIsOpen(false);
             clearCachedBillingSummary();
@@ -233,7 +251,7 @@ function ScopedUserMenu({ user, align, compact, variant, accountScope }: UserMen
           ref={desktopMenuRef}
           role="menu"
           aria-label="Account menu"
-          className={`absolute z-[60] hidden w-72 overflow-hidden rounded-ui-lg border border-border bg-popover shadow-float lg:block ${
+          className={`absolute z-[60] hidden max-h-[calc(100dvh-2rem)] w-72 overflow-y-auto rounded-ui-lg border border-border bg-popover shadow-float lg:block ${
             align === "left"
               ? "bottom-0 left-[calc(100%+0.75rem)]"
               : "right-0 top-full mt-2"
@@ -249,7 +267,7 @@ function ScopedUserMenu({ user, align, compact, variant, accountScope }: UserMen
             ref={mobileMenuRef}
             role="menu"
             aria-label="Account menu"
-            className="fixed inset-x-3 bottom-3 z-[80] overflow-hidden rounded-ui-lg border border-border bg-popover shadow-float lg:hidden"
+            className="fixed inset-x-3 bottom-3 z-[80] max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-ui-lg border border-border bg-popover shadow-float lg:hidden"
           >
             {menuContents}
           </div>,

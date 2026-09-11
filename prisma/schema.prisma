@@ -20,6 +20,7 @@ model User {
   updatedAt         DateTime           @updatedAt
   subscriptions     Subscription[]
   creditBatches     CreditBatch[]
+  templateRuns      ImageTemplateRun[]
   generations       Generation[]
   mediaAssets       MediaAsset[]
   mediaUploadGrants MediaUploadGrant[]
@@ -171,4 +172,25 @@ model GenerationMedia {
   @@id([generationId, mediaAssetId, role])
   @@index([generationId, role, position])
   @@index([mediaAssetId])
+}
+
+model ImageTemplateRun {
+  id               String   @id
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountCreatedAt DateTime
+  templateId       String
+  templateVersion  Int
+  parseRetries     Int      @default(0)
+  revision         Int      @default(0)
+  status           String   @default("draft")
+  input            Json
+  analysis         Json?
+  generationIds    String[] @default([])
+  error            String?
+  leaseUntil       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId, templateId, createdAt])
 }

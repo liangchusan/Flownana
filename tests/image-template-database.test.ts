@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { createSourceLoader } from "./helpers/load-source.ts";
+import { isolatedTestDatabase } from "./helpers/test-database.ts";
+const url = process.env.FLOWNANA_TEST_DATABASE_URL;
+
+test("template runs: real PostgreSQL RLS, concurrent batches and refunds", { skip: !url }, async (t) => {
+  const db = isolatedTestDatabase(url!);
+  t.after(() => db.$disconnect());
+  const accountId = `template_test_${randomUUID()}`;
+  const user = await db.user.create({ data: { id: accountId, email: `${accountId}@example.test` } });
+  const account = { id: accountId, accountCreatedAt: user.createdAt.toISOString() };
+  t.after(async () => { await db.user.delete({ where: { id: accountId } }); });
+  await db.creditBatch.create({ data: { userId: accountId, amount: 100, remaining: 100, source: "test", expiresAt: new Date(Date.now() + 86400000) } });
+  const loader = createSourceLoader({ "@/lib/prisma": { prisma: db }, "./understand": { understandTemplate: async () => ({ status: "ready", spec: { summary: "Test symbol", subject: "A symbol", composition: "Centered", style: "Minimal", preserve: [], text: [], constraints: [], variants: ["A","B","C","D"].map((title) => ({ title, direction: `${title} distinct concept` })), outputCount: 4 } }) } });
+  const service = loader<any>("lib/image-templates/service.ts");
+  const lifecycle = loader<any>("lib/generation-lifecycle.ts");
+  const price = loader<any>("lib/generation-pricing.ts").getImageGenerationCredits("gpt-image-2-5-sunburst", "1K", 0);
+  const id = randomUUID();
+  const ready = await service.analyzeTemplateRun(account, id, 0, { templateId: "logo", prompt: "Create a symbol without text", images: [], answers: {} });
+  assert.equal(ready.status, "ready");
+  const settings = { count: 4, resolution: "1K", aspectRatio: "1:1", quotedCredits: price * 4 };
+  const batches = await Promise.all([service.generateTemplateRun(account, id, ready.revision, settings), service.generateTemplateRun(account, id, ready.revision, settings)]);
+  assert.equal(batches.flatMap((b: any) => b.outputs).length, 4);
+  assert.equal(await db.generation.count({ where: { userId: accountId } }), 4);
+  assert.equal((await db.creditBatch.findFirstOrThrow({ where: { userId: accountId } })).remaining, 100 - price * 4);
+  await assert.rejects(service.readTemplateRun({ ...account, accountCreatedAt: "2000-01-01T00:00:00.000Z" }, id));
+  const secondId = randomUUID();
+  const second = await service.analyzeTemplateRun(account, secondId, 0, { templateId: "logo", prompt: "Second concept", images: [], answers: {} });
+  await assert.rejects(service.generateTemplateRun(account, secondId, second.revision, settings));
+  assert.equal(await db.generation.count({ where: { userId: accountId } }), 4);
+  const outputs = batches.flatMap((b: any) => b.outputs);
+  // Independently settle failed outputs; retries of settlement must not refund twice.
+  await Promise.all(outputs.slice(0, 2).map((g: any) => lifecycle.failGeneration({ account, id: g.id, error: { errorCode: "generation_failed" } })));
+  await lifecycle.failGeneration({ account, id: outputs[0].id, error: { errorCode: "generation_failed" } });
+  assert.equal((await db.creditBatch.findFirstOrThrow({ where: { userId: accountId } })).remaining, 100 - price * 2);
+  const retry = await service.prepareTemplateRetry(account, randomUUID(), outputs[1].id);
+  assert.equal(retry.status, "ready");
+  assert.equal((retry.analysis as any).spec.outputCount, 1);
+  assert.equal((retry.analysis as any).spec.variants[0].title, "B");
+  assert.equal((await db.creditBatch.findFirstOrThrow({ where: { userId: accountId } })).remaining, 100 - price * 2);
+  const permissions = await db.$queryRaw<Array<{ rls: boolean; anon_access: boolean }>>`SELECT relrowsecurity AS rls, has_table_privilege('anon', '"ImageTemplateRun"', 'SELECT') AS anon_access FROM pg_class WHERE oid = '"ImageTemplateRun"'::regclass`;
+  assert.equal(permissions[0].rls, true);
+  assert.equal(permissions[0].anon_access, false);
+});

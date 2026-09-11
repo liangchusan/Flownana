@@ -11,6 +11,7 @@ export function createSourceLoader(overrides: Record<string, unknown>) {
   const cache = new Map<string, { exports: unknown }>();
   function load<T>(relativePath: string): T {
     const path = resolve(root, relativePath);
+    if (extname(path) === ".json") return JSON.parse(readFileSync(path, "utf8")) as T;
     const cached = cache.get(path);
     if (cached) return cached.exports as T;
     const loaded = { exports: {} };

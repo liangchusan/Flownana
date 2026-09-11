@@ -12,8 +12,7 @@ test("actual workspace and home entrypoints never relabel an old RSC seed as a n
   let user = a;
   const load = createSourceLoader({ "next-auth/react": { useSession: () => ({ data: { user }, status: "authenticated" }) } });
   const workspace = load<any>("components/blocks/media-creation-workspace.tsx").MediaCreationWorkspace;
-  const home = load<any>("app/home/create-content.tsx").CreateContent;
-  for (const [component, prop] of [[workspace, "initialCreations"], [home, "initialRecentCreations"]] as const) {
+  for (const [component, prop] of [[workspace, "initialCreations"]] as const) {
     user = a;
     const props = { initialType: "image", [prop]: seeds, initialPrompt: "private draft", initialAccountScope: getAccountScope(a) };
     const first = component(props);

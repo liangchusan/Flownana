@@ -77,6 +77,7 @@ interface VideoCreationFormProps {
   inputAttachments?: Array<{ url: string; kind: "image" | "video" | "audio" }>;
   initialParameters?: GenerationParameters;
   variant?: "panel" | "composer";
+  menuPlacement?: "above" | "below";
   toolbarLeading?: ReactNode;
   submissionBlocked?: boolean;
   onPromptChange?: (prompt: string) => void;
@@ -104,6 +105,7 @@ export function VideoCreationForm({
   inputAttachments,
   initialParameters,
   variant = "panel",
+  menuPlacement = "above",
   toolbarLeading,
   submissionBlocked = false,
   onPromptChange,
@@ -584,7 +586,7 @@ export function VideoCreationForm({
   const modelPopup = modelOpen && (
     <div
       ref={modelPopupRef}
-      className={`${MODEL_POPUP_CLS} w-56 max-w-[calc(100vw-2rem)] py-1.5`}
+      className={`${menuPlacement === "below" ? "absolute top-[calc(100%+0.5rem)] right-0 z-50 max-h-[60vh] overflow-y-auto rounded-ui-lg border border-border bg-background shadow-float sm:left-0 sm:right-auto" : MODEL_POPUP_CLS} w-56 max-w-[calc(100vw-2rem)] py-1.5`}
     >
       <p className="px-3 pb-1.5 pt-1 text-xs font-medium text-stone-400">Model</p>
       {modelNameOptions.map((name) => (
@@ -609,7 +611,7 @@ export function VideoCreationForm({
   const optionsPopup = optionsOpen && (
     <div
       ref={optionsPopupRef}
-      className={`${OPTIONS_POPUP_CLS} w-72 max-w-[calc(100vw-2rem)] px-4 py-3`}
+      className={`${menuPlacement === "below" ? "absolute top-[calc(100%+0.5rem)] left-0 z-50 max-h-[60vh] overflow-y-auto rounded-ui-lg border border-border bg-background shadow-float sm:left-auto sm:right-0" : OPTIONS_POPUP_CLS} w-72 max-w-[calc(100vw-2rem)] px-4 py-3`}
     >
       <div className="divide-y divide-stone-100">
         <div className="pb-3">

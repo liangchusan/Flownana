@@ -1,0 +1,837 @@
+[
+  {
+    "id": "poster",
+    "title": "Poster",
+    "version": 1,
+    "cover": "/templates/covers/poster-v1.png",
+    "instruction": "Create a poster that expresses the user’s idea through clear hierarchy, readable required text, and imagery/typography that work together for the intended viewing context. Preserve all supplied details exactly; do not invent names, dates, locations, sponsors, logos, or include additional copy.\n\nAsk clarifying questions to establish the poster’s message, required content, layout, and visual style. Present relevant layout and visual style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a poster that expresses the user’s idea through clear hierarchy, readable required text, and imagery/typography that work together for the intended viewing context.",
+      "preserve": [
+        "Preserve all supplied details exactly; do not invent names, dates, locations, sponsors, logos, or include additional copy."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What should the poster communicate?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which exact words and details must appear? Say “no text” if none.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which layout and visual style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "interior_design",
+    "title": "Interior design",
+    "version": 1,
+    "cover": "/templates/covers/interior_design-v1.png",
+    "instruction": "Create an interior design visualization that shows how the user’s space could look and function. Preserve the existing architecture and room proportions; do not invent structural changes, openings, fixtures, or dimensions.\n\nAsk for a photo or description of the room, then ask clarifying questions to establish how the space is used, desired changes or constraints, items to preserve, and interior style. Present relevant interior style directions when available.",
+    "reference": "recommended",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create an interior design visualization that shows how the user’s space could look and function.",
+      "preserve": [
+        "Preserve the existing architecture and room proportions; do not invent structural changes, openings, fixtures, or dimensions."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "Describe the room or upload a photo.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "How is it used? What should change and what must stay?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which interior style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Warm minimal",
+          "Contemporary",
+          "Natural rustic",
+          "Classic"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "logo",
+    "title": "Logo",
+    "version": 1,
+    "cover": "/templates/covers/logo-v1.png",
+    "instruction": "Create a small set of distinct logo options for the user’s brand, company, or project. Make each option differ in concepts and keep them recognizable at small and large sizes. Preserve all supplied wording exactly. Do not invent brand names, taglines, or additional wording.\n\nAsk clarifying questions about the brand and purpose, required wording, intended impression, and visual style. Present relevant logo style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a small set of distinct logo options for the user’s brand, company, or project.",
+      "preserve": [
+        "Make each option differ in concepts and keep them recognizable at small and large sizes",
+        "Preserve all supplied wording exactly",
+        "Do not invent brand names, taglines, or additional wording."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What is the brand name and what does it do?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which exact words must appear? Say “symbol only” for no text.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which logo direction and impression do you prefer?",
+        "type": "visual_select",
+        "required": false,
+        "options": [
+          "Independent symbol",
+          "Wordmark",
+          "Lettermark",
+          "Symbol and wordmark"
+        ],
+        "previews": [
+          "/templates/options/logo-symbol.svg",
+          "/templates/options/logo-wordmark.svg",
+          "/templates/options/logo-lettermark.svg",
+          "/templates/options/logo-combination.svg"
+        ]
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "illustration",
+    "title": "Illustration",
+    "version": 1,
+    "cover": "/templates/covers/illustration-v1.png",
+    "instruction": "Create an illustration that expresses the user’s idea through a clear subject, composition, medium, and mood. Preserve supplied or reference details exactly; do not add conflicting story elements or invented copy.\n\nAsk clarifying questions to establish the subject, intent, intended use, reference details to preserve, and visual style. Present relevant illustration style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create an illustration that expresses the user’s idea through a clear subject, composition, medium, and mood.",
+      "preserve": [
+        "Preserve supplied or reference details exactly; do not add conflicting story elements or invented copy."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What would you like illustrated?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Where will it be used and which details must stay?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which medium and visual style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Watercolor",
+          "Editorial gouache",
+          "Line drawing",
+          "3D illustration"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "headshot",
+    "title": "Headshot",
+    "version": 1,
+    "cover": "/templates/covers/headshot-v1.png",
+    "instruction": "Create a headshot or portrait that presents the person clearly for the intended use. Use the uploaded photo only to preserve identity, facial structure, skin tone, and defining features. Reinterpret the photo’s lighting, angle, pose, expression, clothing, background, shadows, color cast, and snapshot quality.\n\nAsk for a clear photo of the person, then ask clarifying questions to establish intended use, portrait style and lighting. Present relevant portrait style directions when available.",
+    "reference": "required",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a headshot or portrait that presents the person clearly for the intended use.",
+      "preserve": [
+        "Use the uploaded photo only to preserve identity, facial structure, skin tone, and defining features",
+        "Reinterpret the photo’s lighting, angle, pose, expression, clothing, background, shadows, color cast, and snapshot quality."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "Upload a clear photo of the person.",
+        "type": "image_upload",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Where will you use the portrait?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which portrait style and lighting do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Professional studio",
+          "Natural daylight",
+          "Editorial portrait",
+          "Creative portrait"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "icon",
+    "title": "Icon",
+    "version": 1,
+    "cover": "/templates/covers/icon-v1.png",
+    "instruction": "Create an icon set that represents the requested idea clearly at the intended size. Keep symbols simple, legible, and consistent in shape, weight, detail, and perspective. Do not add unrelated imagery, labels, or mismatched visual styles.\n\nAsk clarifying questions to establish the icon subject, intended use, and visual style. Present relevant icon style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create an icon set that represents the requested idea clearly at the intended size.",
+      "preserve": [
+        "Keep symbols simple, legible, and consistent in shape, weight, detail, and perspective",
+        "Do not add unrelated imagery, labels, or mismatched visual styles."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "Which concepts should the icons represent?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Where will the icons be used?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which icon style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Outline",
+          "Solid",
+          "Rounded",
+          "Isometric"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "product_photo",
+    "title": "Product photo",
+    "version": 1,
+    "cover": "/templates/covers/product_photo-v1.png",
+    "instruction": "Create a product photograph that presents the user’s product faithfully and professionally for the intended use. Preserve shape, proportions, materials, colors, branding, labels, and functional details. Do not redesign the product or invent features, finishes, branding, labels, or accessories.\n\nAsk for a product image or clear description, then ask clarifying questions to establish details to preserve, setting, lighting, and photographic style. Present relevant photographic directions when available.",
+    "reference": "recommended",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a product photograph that presents the user’s product faithfully and professionally for the intended use.",
+      "preserve": [
+        "Preserve shape, proportions, materials, colors, branding, labels, and functional details",
+        "Do not redesign the product or invent features, finishes, branding, labels, or accessories."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "Describe the product or upload a product photo.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which product details must remain unchanged?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which setting and photographic style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "merch",
+    "title": "Merch",
+    "version": 1,
+    "cover": "/templates/covers/merch-v1.png",
+    "instruction": "Create a merchandise design that applies the user’s idea, artwork, or brand naturally to the chosen item. Fit the design to the item’s shape, scale, placement, surface, and production method. Preserve supplied wording or artwork exactly; do not add unrelated logos, graphics, placements, or product features.\n\nAsk clarifying questions to establish the item, artwork or wording, placement, intended audience, and visual style. Present relevant merchandise item options and style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a merchandise design that applies the user’s idea, artwork, or brand naturally to the chosen item.",
+      "preserve": [
+        "Fit the design to the item’s shape, scale, placement, surface, and production method",
+        "Preserve supplied wording or artwork exactly; do not add unrelated logos, graphics, placements, or product features."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "Which merchandise item are you designing?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which exact artwork or wording should appear?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Where should it be placed and in which style?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "infographic",
+    "title": "Infographic",
+    "version": 1,
+    "cover": "/templates/covers/infographic-v1.png",
+    "instruction": "Create an infographic that makes the user’s information and main takeaway easy to understand. Organize content with clear structure, hierarchy, readable labels, and accurate facts or data. Do not invent facts, data, statistics, sources, or conclusions.\n\nAsk clarifying questions to establish the main takeaway, supplied data or content, audience, intended use, level of detail, and visual style. Present relevant infographic style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create an infographic that makes the user’s information and main takeaway easy to understand.",
+      "preserve": [
+        "Organize content with clear structure, hierarchy, readable labels, and accurate facts or data",
+        "Do not invent facts, data, statistics, sources, or conclusions."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What is the main takeaway?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Provide the exact facts or data to include.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Who is it for and which visual format do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "flyer",
+    "title": "Flyer",
+    "version": 1,
+    "cover": "/templates/covers/flyer-v1.png",
+    "instruction": "Create a flyer that communicates the user’s message clearly and makes essential information easy to find. Use clear hierarchy, readable required details, and an obvious next step. Preserve all supplied details exactly; do not invent names, dates, locations, prices, contact info, sponsors, offers, or additional copy.\n\nAsk clarifying questions to establish the purpose, required content, desired action, format and distribution, layout, and visual style. Present relevant layout and style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a flyer that communicates the user’s message clearly and makes essential information easy to find.",
+      "preserve": [
+        "Use clear hierarchy, readable required details, and an obvious next step",
+        "Preserve all supplied details exactly; do not invent names, dates, locations, prices, contact info, sponsors, offers, or additional copy."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What is the flyer promoting?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which exact details and call to action must appear?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Where will it be distributed and in which visual style?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "book_cover",
+    "title": "Book cover",
+    "version": 1,
+    "cover": "/templates/covers/book_cover-v1.png",
+    "instruction": "Create a book cover that reflects the book’s content, genre, audience, and tone. Build strong hierarchy for title, author, supporting text, and imagery, and keep it readable at full size and thumbnail size. Preserve all supplied text exactly; do not invent subtitles, quotes, awards, publisher marks, series details, or promotional copy.\n\nAsk clarifying questions to establish title and author, subject and genre, audience, must-have or avoid details, and visual style. Present relevant cover style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a book cover that reflects the book’s content, genre, audience, and tone.",
+      "preserve": [
+        "Build strong hierarchy for title, author, supporting text, and imagery, and keep it readable at full size and thumbnail size",
+        "Preserve all supplied text exactly; do not invent subtitles, quotes, awards, publisher marks, series details, or promotional copy."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What are the exact title and author name? Say if either should be omitted.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Describe the subject, genre and audience.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which cover style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "app_mockup",
+    "title": "App mockup",
+    "version": 1,
+    "cover": "/templates/covers/app_mockup-v1.png",
+    "instruction": "Create an app mockup that clearly shows the intended screen and user experience. Make the screen purpose, hierarchy, primary actions, spacing, and components coherent. Preserve supplied labels and content exactly; do not invent claims, pricing, accounts, or features that conflict with the brief.\n\nAsk clarifying questions to establish app purpose, audience, target screen, key actions, required content, platform, and visual style. Present relevant interface style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create an app mockup that clearly shows the intended screen and user experience.",
+      "preserve": [
+        "Make the screen purpose, hierarchy, primary actions, spacing, and components coherent",
+        "Preserve supplied labels and content exactly; do not invent claims, pricing, accounts, or features that conflict with the brief."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What does the app do and who is it for?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which screen, actions and exact content should appear?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which platform and interface style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "packaging",
+    "title": "Packaging",
+    "version": 1,
+    "cover": "/templates/covers/packaging-v1.png",
+    "instruction": "Create packaging that represents the user’s product and brand clearly on the physical package. Fit the design to the package shape, scale, materials, and usable surfaces, with required information in a clear hierarchy. Preserve supplied branding and product information exactly; do not invent claims, ingredients, certifications, legal copy, quantities, or barcodes.\n\nAsk clarifying questions to establish product, required branding or content, package type, size, shape, materials, surfaces to design, and visual style. Present relevant packaging style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create packaging that represents the user’s product and brand clearly on the physical package.",
+      "preserve": [
+        "Fit the design to the package shape, scale, materials, and usable surfaces, with required information in a clear hierarchy",
+        "Preserve supplied branding and product information exactly; do not invent claims, ingredients, certifications, legal copy, quantities, or barcodes."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What product is being packaged?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which package shape, branding and exact content should appear?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which materials and visual style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "advertisement",
+    "title": "Advertisement",
+    "version": 1,
+    "cover": "/templates/covers/advertisement-v1.png",
+    "instruction": "Create an advertisement that communicates the user’s offer clearly and supports the intended goal. Build clear hierarchy for the product or service, main message, supporting details, and action. Preserve all supplied text and details exactly; do not invent prices, discounts, testimonials, results, terms, endorsements, or additional copy.\n\nAsk clarifying questions to establish the offering, main message, desired action, required content, placement, audience, and visual style. Present relevant campaign style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create an advertisement that communicates the user’s offer clearly and supports the intended goal.",
+      "preserve": [
+        "Build clear hierarchy for the product or service, main message, supporting details, and action",
+        "Preserve all supplied text and details exactly; do not invent prices, discounts, testimonials, results, terms, endorsements, or additional copy."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What are you advertising?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which exact message, details and call to action should appear?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Where will it appear, who is it for and which visual style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "thumbnail",
+    "title": "Thumbnail",
+    "version": 1,
+    "cover": "/templates/covers/thumbnail-v1.png",
+    "instruction": "Create a thumbnail that communicates the user’s idea instantly at small size. Use one strong focal point, clear hierarchy, and brief readable text for the intended context. Preserve supplied details exactly; do not invent names, claims, labels, or additional copy.\n\nAsk for a content image the thumbnail will represent, then ask clarifying questions to required text, audience or context, and visual style. Present relevant thumbnail style directions when available.",
+    "reference": "recommended",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a thumbnail that communicates the user’s idea instantly at small size.",
+      "preserve": [
+        "Use one strong focal point, clear hierarchy, and brief readable text for the intended context",
+        "Preserve supplied details exactly; do not invent names, claims, labels, or additional copy."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "Describe the content or upload a representative image.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Which exact words should appear? Say “no text” if none.",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Where will it appear and which visual style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  },
+  {
+    "id": "website_mockup",
+    "title": "Website mockup",
+    "version": 1,
+    "cover": "/templates/covers/website_mockup-v1.png",
+    "instruction": "Create a website mockup that clearly presents the page purpose, content, and primary user action. Build strong information hierarchy, understandable navigation and actions, and a coherent interface. Preserve supplied names, copy, prices, and claims exactly; do not invent testimonials, client logos, metrics, or business details.\n\nAsk clarifying questions to establish site purpose, audience, required content, and visual style. Present relevant UI style directions when available.",
+    "reference": "optional",
+    "maxQuestions": 3,
+    "rules": {
+      "objective": "Create a website mockup that clearly presents the page purpose, content, and primary user action.",
+      "preserve": [
+        "Build strong information hierarchy, understandable navigation and actions, and a coherent interface",
+        "Preserve supplied names, copy, prices, and claims exactly; do not invent testimonials, client logos, metrics, or business details."
+      ]
+    },
+    "questions": [
+      {
+        "id": "q1",
+        "title": "What is the website for?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q2",
+        "title": "Who is it for, and which exact content and actions should appear?",
+        "type": "textarea",
+        "required": true,
+        "options": [],
+        "previews": []
+      },
+      {
+        "id": "q3",
+        "title": "Which interface style do you prefer?",
+        "type": "single_select_with_custom",
+        "required": false,
+        "options": [
+          "Clean and minimal",
+          "Bold and graphic",
+          "Natural and textured",
+          "Editorial"
+        ],
+        "previews": []
+      }
+    ],
+    "outputPolicy": {
+      "defaultCount": 4,
+      "editCount": 1,
+      "diversity": "Four distinct visual directions within every user-specified constraint. Change only permitted axes; never vary factual content."
+    }
+  }
+]

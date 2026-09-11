@@ -8,7 +8,7 @@ import {
 
 test("workspace navigation uses the approved canonical routes", () => {
   assert.deepEqual(WORKSPACE_PATHS, {
-    home: "/home",
+    home: "/",
     image: "/image",
     video: "/video",
     assets: "/assets",

@@ -2,6 +2,11 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
+import { Footer } from "@/components/layout/footer";
+import { TemplatePanel, TEMPLATE_OPEN_KEY } from "@/components/blocks/home/template-panel";
+import { trackEvent } from "@/lib/analytics";
+import { imageTemplates } from "@/lib/image-templates/catalog";
+import { TemplateGallery } from "@/components/blocks/home/template-gallery";
 import { Modal } from "@/components/ui/modal";
 import { PanelRight, Trash2, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
@@ -58,7 +63,7 @@ function updateWorkspaceUrl(
   nextUrl.search = "";
   nextUrl.hash = "";
   if (`${window.location.pathname}${window.location.search}${window.location.hash}` === `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`) return;
-  window.history[method](window.history.state, "", nextUrl);
+  window.history[method](null, "", nextUrl);
 }
 
 type WorkspaceProps = {
@@ -85,6 +90,9 @@ function ScopedMediaCreationWorkspace({
   const { capture: captureGeneration } = useAccountOperation();
   const { showToast } = useToast();
   const pathname = usePathname();
+  const isHome = pathname === "/";
+  const { status: sessionStatus } = useSession();
+  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; editing?: CreationHistoryItem } | null>(null);
   const [view, setView] = useState<WorkspaceView>(initialView);
   const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
   const [creations, setCreations] = useState<CreationHistoryItem[]>(initialCreations);
@@ -106,6 +114,7 @@ function ScopedMediaCreationWorkspace({
   const scrollRef = useRef<HTMLDivElement>(null);
   const preservedScrollTopRef = useRef<number | null>(null);
   const mutationRevision = useRef(0);
+  const templateOutputs = useRef(new Set<string>());
   const creationTimelineKey = getCreationTimelineKey(creations);
 
   useLayoutEffect(() => {
@@ -116,9 +125,9 @@ function ScopedMediaCreationWorkspace({
 
   useEffect(() => {
     const target = scrollRef.current;
-    if (!target || view !== "create") return;
+    if (!target || view !== "create" || isHome) return;
     target.scrollTop = target.scrollHeight;
-  }, [creationTimelineKey, view]);
+  }, [creationTimelineKey, view, isHome]);
 
   useEffect(() => {
     try { window.localStorage.setItem(COMPOSER_TYPE_STORAGE_KEY, composerType); } catch { /* Optional preference storage. */ }
@@ -126,6 +135,12 @@ function ScopedMediaCreationWorkspace({
 
   useEffect(() => {
     const destination = getWorkspaceDestination(pathname);
+    if (destination === "home") {
+      setView("create");
+      setDetailsRun(null);
+      setDetailsOpen(false);
+      return;
+    }
     if (destination === "assets") {
       setView("assets");
       setDetailsRun(null);
@@ -134,15 +149,35 @@ function ScopedMediaCreationWorkspace({
     }
     if (destination !== "image" && destination !== "video") return;
     setView("create");
-    setComposerType(destination);
-    setInputCapabilities(
-      destination === "image"
-        ? getImageInputCapabilities("gpt-image-2")
-        : getVideoInputCapabilities("MiniMax H3")
-    );
+    if (destination !== composerType) {
+      setComposerType(destination);
+      setInputCapabilities(
+        destination === "image"
+          ? getImageInputCapabilities("gpt-image-2")
+          : getVideoInputCapabilities("MiniMax H3")
+      );
+    }
     setDetailsRun(null);
     setDetailsOpen(false);
-  }, [pathname]);
+  }, [pathname, composerType]);
+
+  useEffect(() => {
+    if (!isHome) return;
+    try { const id = sessionStorage.getItem(TEMPLATE_OPEN_KEY); if (imageTemplates.some((item) => item.id === id)) setSelectedTemplate({ id: id! }); } catch { /* Optional storage. */ }
+  }, [isHome]);
+
+  useEffect(() => {
+    for (const creation of creations) {
+      if (!creation.parameters?.templateId) continue;
+      if (["pending", "generating", "processing"].includes(creation.status)) templateOutputs.current.add(creation.id);
+      if (templateOutputs.current.has(creation.id) && ["success", "failed"].includes(creation.status)) {
+        templateOutputs.current.delete(creation.id);
+        const key = `template-result:${accountScope}:${creation.id}`;
+        try { if (sessionStorage.getItem(key)) continue; sessionStorage.setItem(key, "1"); } catch { /* In-memory de-duplication remains available. */ }
+        trackEvent(creation.status === "success" ? "generation_success" : "generation_failed", { type: "image", template_id: creation.parameters.templateId, output_index: creation.parameters.outputIndex, model: creation.parameters.model });
+      }
+    }
+  }, [creations, accountScope]);
 
   const activeGenerationCount = creations.filter((creation) => ["pending", "generating", "processing"].includes(creation.status) && !(creation.optimistic && creation.statusUncertain && !creation.taskId)).length;
 
@@ -201,7 +236,7 @@ function ScopedMediaCreationWorkspace({
       if (view === "assets") return;
       setView("assets");
     } else {
-      if (view === "create" && composerType === destination) return;
+      if (!isHome && view === "create" && composerType === destination) return;
       setView("create");
       applyComposerType(destination);
     }
@@ -211,10 +246,16 @@ function ScopedMediaCreationWorkspace({
   const setType = (nextType: ActiveComposerType) => {
     setView("create");
     applyComposerType(nextType);
-    updateWorkspaceUrl(nextType, "replaceState");
+    if (!isHome) updateWorkspaceUrl(nextType, "replaceState");
   };
 
   const restoreCreation = (creation: CreationHistoryItem) => {
+    if (creation.parameters?.templateId && ["success", "failed"].includes(creation.status)) {
+      setSelectedTemplate({ id: creation.parameters.templateId, editing: creation });
+      trackEvent("variant_selected", { template_id: creation.parameters.templateId, output_index: creation.parameters.outputIndex });
+      if (creation.status === "success") trackEvent("continued_edit", { template_id: creation.parameters.templateId });
+      return;
+    }
     if (creation.type === "music") {
       showToast({ title: "Audio generation is unavailable", message: "Suno has been retired. Existing audio remains available in Create and Assets.", variant: "warning" });
       return;
@@ -282,6 +323,9 @@ function ScopedMediaCreationWorkspace({
   };
 
   const updateOptimisticOutput = ({ optimisticId, outputIndex = 0, url, taskId, prompt, parameters, inputUrls, status, error, errorCode }: { optimisticId: string; outputIndex?: number; url?: string; taskId?: string; prompt?: string; parameters?: GenerationParameters; inputUrls?: string[]; status: CreationHistoryItem["status"]; error?: string; errorCode?: string }) => {
+    if (window.location.pathname === "/" && (taskId || status === "success") && status !== "failed") {
+      updateWorkspaceUrl(composerType, "pushState");
+    }
     mutationRevision.current += 1;
     setCreations((current) => current.map((creation) => {
       if (creation.parameters?.runId !== optimisticId || (creation.parameters.outputIndex ?? 0) !== outputIndex) return creation;
@@ -332,6 +376,7 @@ function ScopedMediaCreationWorkspace({
   }, [creations]);
   const toolbarLeading = (
     <ComposerToolbarLeading
+      menuPlacement={isHome ? "below" : "above"}
       composerType={composerType}
       capabilities={inputCapabilities}
       attachments={draft.attachments}
@@ -346,24 +391,33 @@ function ScopedMediaCreationWorkspace({
   const composerKey = `${composerType}-${draft.revision}`;
   const composer = (() => {
     if (composerType === "image") {
-      return <GenerateForm key={composerKey} captureGeneration={captureGeneration} onGenerationUncertain={markGenerationUncertain} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.image} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeGenerationCount} isGenerating={activeGenerationCount >= 5} setIsGenerating={() => undefined} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, image: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
+      return <GenerateForm key={composerKey} captureGeneration={captureGeneration} onGenerationUncertain={markGenerationUncertain} variant="composer" menuPlacement={isHome ? "below" : "above"} initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} initialParameters={draft.parametersByType.image} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeGenerationCount} isGenerating={activeGenerationCount >= 5} setIsGenerating={() => undefined} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, image: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "image" })} onGenerationTaskCreated={({ optimisticId, taskId, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, status: "generating" })} onGenerate={(url, taskId, prompt, parameters, optimisticId, inputUrls, outputIndex) => optimisticId && updateOptimisticOutput({ optimisticId, outputIndex, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, taskId, prompt, error, errorCode, outputIndex }) => updateOptimisticOutput({ optimisticId, outputIndex, taskId, prompt, error, errorCode, status: "failed" })} />;
     }
     if (composerType === "video") {
-      return <VideoCreationForm key={composerKey} captureGeneration={captureGeneration} onGenerationUncertain={markGenerationUncertain} variant="composer" initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} inputAttachments={draft.attachments.map(({ url, kind }) => ({ url, kind }))} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeGenerationCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputAttachmentsChange={(attachments) => setDraft((current) => ({ ...current, attachments: attachments.map((attachment, index) => ({ ...attachment, id: `input-${index}-${attachment.url.slice(-24)}`, name: `Input ${attachment.kind} ${index + 1}`, source: "reference" })) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
+      return <VideoCreationForm key={composerKey} captureGeneration={captureGeneration} onGenerationUncertain={markGenerationUncertain} variant="composer" menuPlacement={isHome ? "below" : "above"} initialPrompt={draft.prompt} initialImages={imageAttachments.map((attachment) => attachment.url)} inputAttachments={draft.attachments.map(({ url, kind }) => ({ url, kind }))} initialParameters={draft.parametersByType.video} toolbarLeading={toolbarLeading} submissionBlocked={attachmentIncompatible} activeGenerationCount={activeGenerationCount} onPromptChange={(prompt) => setDraft((current) => ({ ...current, prompt }))} onInputImagesChange={(urls) => setDraft((current) => ({ ...current, attachments: replaceImageAttachments(current.attachments, urls) }))} onInputAttachmentsChange={(attachments) => setDraft((current) => ({ ...current, attachments: attachments.map((attachment, index) => ({ ...attachment, id: `input-${index}-${attachment.url.slice(-24)}`, name: `Input ${attachment.kind} ${index + 1}`, source: "reference" })) }))} onInputCapabilityChange={setInputCapabilities} onParametersChange={(parameters) => setDraft((current) => ({ ...current, parametersByType: { ...current.parametersByType, video: parameters } }))} onGenerationStart={(data) => addOptimisticRun({ ...data, type: "video" })} onGenerationTaskCreated={({ optimisticId, taskId, prompt, inputUrls }) => updateOptimisticOutput({ optimisticId, taskId, prompt, inputUrls, status: "generating" })} onGenerate={(url, taskId, prompt, optimisticId, parameters, inputUrls) => optimisticId && updateOptimisticOutput({ optimisticId, url, taskId, prompt, parameters, inputUrls, status: "success" })} onGenerationFailure={({ optimisticId, prompt, error, errorCode }) => updateOptimisticOutput({ optimisticId, prompt, error, errorCode, status: "failed" })} />;
     }
     return null;
   })();
-  const activeSection = view === "assets" ? "assets" : composerType;
+  const activeSection = isHome ? "home" : view === "assets" ? "assets" : composerType;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      {selectedTemplate && <TemplatePanel key={`${selectedTemplate.id}:${selectedTemplate.editing?.id || "new"}`} templateId={selectedTemplate.id} editing={selectedTemplate.editing} onClose={() => { setSelectedTemplate(null); try { sessionStorage.removeItem(TEMPLATE_OPEN_KEY); } catch { /* Optional storage. */ } }} onAccepted={(ids) => {
+        ids.forEach((id) => templateOutputs.current.add(id));
+        setSelectedTemplate(null);
+        try { sessionStorage.removeItem(TEMPLATE_OPEN_KEY); } catch { /* Optional storage. */ }
+        setView("create"); applyComposerType("image", false); updateWorkspaceUrl("image", "pushState");
+        const operation = captureGeneration();
+        void fetch("/api/creations", { headers: operation.headers, signal: operation.signal, cache: "no-store" }).then(async (response) => { const data = await response.json(); operation.assertCurrent(); if (response.ok && data.accountScope === accountScope && Array.isArray(data.creations)) setCreations((current) => mergeCreations(current, data.creations)); }).catch(() => { showToast({ title: "Generation submitted", message: `${ids.length} images are processing. Results will appear shortly.`, variant: "warning" }); });
+      }} />}
       <WorkspaceSidebar activeSection={activeSection} onWorkspaceNavigate={navigateWorkspace} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <WorkspaceMobileHeader onOpen={() => setMobileSidebarOpen(true)} />
+        <WorkspaceMobileHeader showLogo={!isHome} onOpen={() => setMobileSidebarOpen(true)} />
         {view === "assets" ? <div className="min-h-0 flex-1 overflow-y-auto"><AssetsLibrary creations={creations} onReference={referenceAsset} onChange={updateCreation} /></div> : (
           <div className="flex min-h-0 flex-1">
-            <main className="relative flex min-w-0 flex-1 flex-col">
-              {!detailsOpen && (
+            <main className={`relative flex min-w-0 flex-1 flex-col ${isHome ? "overflow-y-auto" : ""}`}>
+              {isHome && <h1 className="mx-auto w-full max-w-4xl px-4 pb-8 pt-12 text-center font-display text-3xl font-medium leading-tight text-foreground md:pt-20 md:text-display-lg">What will you create today?</h1>}
+              {!isHome && !detailsOpen && (
                   <button
                     type="button"
                     onClick={() => detailsRun && setDetailsOpen(true)}
@@ -375,14 +429,16 @@ function ScopedMediaCreationWorkspace({
                     <PanelRight className="h-4 w-4" strokeWidth={1.5} />
                   </button>
               )}
-              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto"><CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} /></div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6">
+              <div ref={scrollRef} className={isHome ? "hidden" : "min-h-0 flex-1 overflow-y-auto"}>{!isHome && <CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} />}</div>
+              <div className={isHome ? "relative z-30 shrink-0 px-4 pb-12 md:px-8 md:pb-16" : "pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6"}>
                 <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background p-2.5 shadow-float sm:p-3">
                   <ComposerAttachments attachments={draft.attachments} capabilities={inputCapabilities} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />
                   {attachmentIncompatible && <div className="mt-2 flex items-center gap-2 rounded-ui bg-destructive/5 px-2 py-1.5"><Trash2 className="h-3.5 w-3.5 text-destructive" /><p className="min-w-0 flex-1 text-[11px] text-destructive">Remove inputs marked as unsupported before creating.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachments: filterCompatibleAttachments(current.attachments, inputCapabilities) }))} className="text-[11px] font-medium text-destructive underline underline-offset-2">Remove unsupported</button></div>}
                   {composer}
                 </div>
               </div>
+              {isHome && <TemplateGallery onSelect={(id) => { setSelectedTemplate({ id }); trackEvent("template_click", { template_id: id }); try { sessionStorage.setItem(TEMPLATE_OPEN_KEY, id); } catch { /* Optional storage. */ } }} />}
+              {isHome && sessionStatus === "unauthenticated" && <Footer variant="light" />}
             </main>
             {detailsRun && detailsOpen && <DetailsPanel run={detailsRun} onClose={() => setDetailsOpen(false)} />}
           </div>

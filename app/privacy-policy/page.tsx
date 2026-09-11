@@ -1,5 +1,4 @@
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
+import { LegalHeader } from "@/components/layout/legal-header";
 
 export const metadata = {
   title: "Privacy Policy | Flownana",
@@ -10,7 +9,7 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header showBackground />
+      <LegalHeader />
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="mb-10">
@@ -22,7 +21,7 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div className="rounded-2xl border border-stone-200/50 bg-white p-6 sm:p-8">
-          <div className="prose prose-gray max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
+          <div className="prose prose-stone max-w-none prose-headings:scroll-mt-24 prose-h2:text-2xl prose-h2:font-bold prose-h3:text-lg prose-h3:font-semibold prose-p:leading-relaxed">
           <p>
             This Privacy Policy explains how Flownana (“Flownana”, “we”, “us”, “our”) collects, uses, shares, and
             protects information when you use our website and services (the “Services”).
@@ -164,7 +163,6 @@ export default function PrivacyPolicyPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

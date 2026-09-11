@@ -57,7 +57,7 @@ expect_body_contains() {
 }
 
 expect_status GET / 200
-expect_status GET /home 200
+expect_status GET /home 404
 expect_status GET /image 200
 expect_status GET /video 200
 expect_status GET /assets 200

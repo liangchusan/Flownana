@@ -1,6 +1,7 @@
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export type AnalyticsEventName =
+  | "template_view" | "template_click" | "template_input_submit" | "clarification_started" | "clarification_completed" | "variant_selected" | "continued_edit"
   | "landing_page_view"
   | "hero_cta_click"
   | "ai_image_entry_click"

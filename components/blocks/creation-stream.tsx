@@ -59,7 +59,7 @@ export function groupWorkspaceRuns(creations: CreationHistoryItem[]): WorkspaceR
       return {
         id,
         type: first.type,
-        prompt: first.prompt,
+        prompt: first.parameters?.templateBrief || first.prompt,
         createdAt: first.createdAt,
         creations: ordered,
       };
@@ -246,7 +246,7 @@ function ResultActions({
   onDelete: () => void;
 }) {
   const download = () => {
-    trackEvent("result_download_clicked", { type: creation.type, source: "create_stream" });
+    trackEvent("result_download_clicked", { type: creation.type, source: "create_stream", template_id: creation.parameters?.templateId });
     const link = document.createElement("a");
     link.href = buildCreationDownloadPath(creation.taskId || creation.id, url);
     link.download = "";
@@ -502,7 +502,7 @@ export function CreationStream({
         const resultLayoutClassName = cells.length === 1
           ? "w-full max-w-lg"
           : isFourPortraits
-            ? "grid w-full max-w-5xl grid-cols-2 gap-3 sm:grid-cols-4"
+            ? (run.creations[0]?.parameters?.templateId ? "grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2" : "grid w-full max-w-5xl grid-cols-2 gap-3 sm:grid-cols-4")
             : "grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2";
         const showTimestamp = shouldShowConversationTimestamp(
           run.createdAt,
@@ -559,11 +559,13 @@ export function CreationStream({
                     return <PendingResult key={key} creation={creation} compactPortrait={isFourPortraits} />;
                   }
                   if (creation.status === "failed") {
-                    return <div key={key} className="max-w-lg rounded-ui-lg bg-destructive/5 px-4 py-3"><p className="text-sm font-medium text-destructive">Generation failed</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{creation.error || "Please reprompt and try again."}</p></div>;
+                    return <div key={key} className="max-w-lg rounded-ui-lg bg-destructive/5 px-4 py-3"><p className="text-sm font-medium text-destructive">Generation failed</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{creation.error || "Please reprompt and try again."}</p>{creation.parameters?.templateId && <button type="button" onClick={() => onReprompt(creation)} className="mt-3 min-h-11 rounded-ui border border-border px-3 text-sm transition-all duration-300 hover:bg-surface-soft">Review paid retry</button>}</div>;
                   }
                   if (!url) return null;
                   return (
                     <div key={key} className={`group/result relative min-w-0 ${creation.type === "music" || isFourPortraits ? "w-full" : "w-fit max-w-full"} ${creation.type === "music" ? "max-w-lg" : ""}`}>
+                      {creation.parameters?.templateDirection && <p className="mb-2 text-sm font-medium">{creation.parameters.templateDirection}</p>}
+                      {creation.parameters?.templateId && creation.status === "success" && <button type="button" onClick={() => onReprompt(creation)} className="mb-2 min-h-11 rounded-ui border border-border px-3 text-sm transition-all duration-300 hover:bg-surface-soft focus-visible:ring-2 focus-visible:ring-primary">Continue editing</button>}
                       {creation.type === "image" ? <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Image" className="max-w-lg rounded-ui-lg">{({ src, onError, onReady }) => <button type="button" onClick={() => setViewer({ creation, url })} className={`inline-flex max-w-full overflow-hidden rounded-ui-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isFourPortraits ? "w-full" : ""}`}><img src={src} alt={creation.prompt} onError={onError} onLoad={onReady} className={`h-auto max-h-[30rem] max-w-full object-contain ${isFourPortraits ? "w-full" : "w-auto"}`} /></button>}</ResilientMedia> : creation.type === "video" ? <VideoResult creationId={creation.taskId || creation.id} url={url} prompt={creation.prompt} audioDisabled={getCreationParameters(creation)?.audio?.toLowerCase() === "off"} onOpen={() => setViewer({ creation, url })} /> : <div className="relative w-full max-w-lg"><ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Audio" className="min-h-0 rounded-ui-lg py-4">{({ src, onError, onReady }) => <audio src={src} controls onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div>}
                       <ResultActions creation={creation} url={url} onReference={() => onReference(creation, url)} onDelete={() => setPendingDelete({ creation, url })} />
                     </div>

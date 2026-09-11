@@ -259,7 +259,7 @@ function ScopedAccountProfileClient({ initialUser }: { initialUser: ProfileUser 
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-background">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/home" aria-label="Flownana home">
+          <Link href="/" aria-label="Flownana home">
             <Logo size="md" showText />
           </Link>
           <Link

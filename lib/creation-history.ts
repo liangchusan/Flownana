@@ -7,6 +7,12 @@ export type CreationStatus =
   | "deleted";
 
 export interface GenerationParameters {
+  templateId?: string;
+  templateRunId?: string;
+  templateVersion?: number;
+  templateDirection?: string;
+  templateBrief?: string;
+  parentGenerationId?: string;
   model?: string;
   resolution?: string;
   aspectRatio?: string;
@@ -54,6 +60,12 @@ export function normalizeGenerationParameters(
       ? outputCountValue
       : undefined;
   const parameters: GenerationParameters = {
+    ...(readParameterString(candidate.templateId) ? { templateId: readParameterString(candidate.templateId) } : {}),
+    ...(readParameterString(candidate.templateRunId) ? { templateRunId: readParameterString(candidate.templateRunId) } : {}),
+    ...(typeof candidate.templateVersion === "number" ? { templateVersion: candidate.templateVersion } : {}),
+    ...(readParameterString(candidate.templateDirection) ? { templateDirection: readParameterString(candidate.templateDirection) } : {}),
+    ...(readParameterString(candidate.templateBrief) ? { templateBrief: readParameterString(candidate.templateBrief) } : {}),
+    ...(readParameterString(candidate.parentGenerationId) ? { parentGenerationId: readParameterString(candidate.parentGenerationId) } : {}),
     model: readParameterString(candidate.model),
     resolution: readParameterString(candidate.resolution),
     aspectRatio: readParameterString(candidate.aspectRatio),
