@@ -921,7 +921,7 @@
 - 手动验收：最近会话展开/收起、新建图标、标题更多菜单改名/删除、首次回复短标题、
   Agent Plus 上传。真实模型标题质量和媒体付费链路仍待用户验收；GA4 后台配置仍未核实。
 
-## 2026-09-12 Runway 与 Flownana 品牌 UI 迁移（本地完成，未发布）
+## 2026-09-12 Runway 与 Flownana 品牌 UI 迁移及生产发布
 
 - 用户最终确认 Runway 为视觉基调、Flownana 蓝黄为点缀，替代此前 Mobbin 提案，
   并明确授权依照方案开发。
@@ -938,6 +938,13 @@
   warning，build 与 design:check 通过。浏览器检查 Home 390/768/1440px、Agent 390px、
   移动抽屉和 /design-system 1440px，无横向溢出；Inter、白底、黑色 primary、
   蓝色 ring 和侧栏 260px 均实测生效，读取的本地页面控制台错误为空。
-- 未部署、未执行真实登录或付费生成。登录态会话菜单/报价/媒体结果、Pricing 嵌套
+- 用户明确授权“提交、推送、发布”。功能提交 `34f0bc6` 已创建；Vercel 部署
+  `dpl_Cj1MRj9tFFcQwpJieiDYC1dcBosJ` 为 READY，生产地址
+  `https://flownana-p72fdretm-liangchusans-projects.vercel.app` 已绑定
+  `https://www.flownana.com`。云端 Next.js 构建、TypeScript 与 Prisma Client 生成通过，
+  发布后 `npm run smoke:prod` 全部通过。
+- 未执行真实登录或付费生成。登录态会话菜单/报价/媒体结果、Pricing 嵌套
   弹窗、真实生成等待/失败/退款状态仍需人工验收；外部 Runway 参考页在设计 QA
   二次截图时网络超时，但此前公开页面和预览内容已读取，本地实现截图已完成。
+- GitHub HTTPS 在首次推送时持续连接超时；生产发布不受影响，功能提交及本条发布记录
+  需要在连通恢复后完成 `origin/main` SHA 核验。
