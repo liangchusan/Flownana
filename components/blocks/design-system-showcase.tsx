@@ -25,6 +25,8 @@ const colors = [
   { name: "Card", className: "bg-card" },
   { name: "Strong", className: "bg-surface-strong" },
   { name: "Primary", className: "bg-primary" },
+  { name: "Brand blue", className: "bg-brand-blue" },
+  { name: "Brand yellow", className: "bg-brand-yellow" },
   { name: "Dark", className: "bg-surface-dark" },
 ];
 
@@ -33,13 +35,13 @@ export function DesignSystemShowcase() {
     <main className="min-h-screen bg-background text-foreground">
       <section className="border-b border-border">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 md:py-24 lg:px-8">
-          <Badge variant="primary">MVP visual baseline</Badge>
+          <Badge variant="primary">Runway × Flownana</Badge>
           <h1 className="mt-6 max-w-4xl font-display text-5xl font-medium leading-none tracking-tight md:text-display-xl">
-            A warm, editorial workspace for visual creation.
+            A focused workspace for visual creation.
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
-            This page is the rendered reference for Flownana&apos;s Claude-inspired
-            tokens, primitives, product states, and responsive visual floor.
+            A paper-white canvas, cinematic media stages and precise black actions,
+            signed with Flownana blue and yellow.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button size="lg">
@@ -58,7 +60,7 @@ export function DesignSystemShowcase() {
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
             Color roles
           </p>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
             {colors.map((color) => (
               <div key={color.name}>
                 <div className={`h-24 rounded-ui-lg ${color.className}`} />
@@ -77,7 +79,7 @@ export function DesignSystemShowcase() {
               <p className="font-display text-display-lg font-medium">Display large</p>
               <p className="font-display text-display-md font-medium">Display medium</p>
               <p className="text-lg font-medium">Functional panel title</p>
-              <p className="max-w-2xl leading-relaxed text-stone-700">
+              <p className="max-w-2xl leading-relaxed text-text-secondary">
                 Body text stays calm and highly readable. Generated media—not
                 decorative interface chrome—carries the visual energy.
               </p>
@@ -90,14 +92,14 @@ export function DesignSystemShowcase() {
           <Card tone="editorial">
             <CardHeader>
               <CardTitle className="font-display text-display-sm font-medium">
-                Quiet surface, clear hierarchy
+                Clear surface, precise hierarchy
               </CardTitle>
               <CardDescription>
-                Editorial cards use warm surface contrast instead of heavy shadow.
+                Neutral cards use tonal contrast instead of heavy shadow.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-ui bg-background p-4 text-sm leading-relaxed text-stone-700">
+              <div className="rounded-ui bg-background p-4 text-sm leading-relaxed text-text-secondary">
                 One surface, one purpose, and one obvious next action.
               </div>
             </CardContent>
@@ -116,7 +118,7 @@ export function DesignSystemShowcase() {
             <CardHeader>
               <CardTitle>Create an image</CardTitle>
               <CardDescription>
-                Labels stay visible and focus states use the primary semantic ring.
+                Labels stay visible and focus states use the Flownana blue ring.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -186,7 +188,7 @@ export function DesignSystemShowcase() {
                 <h2 className="mt-6 font-display text-display-md font-medium">
                   The image stays at the center.
                 </h2>
-                <p className="mt-4 max-w-md text-sm leading-relaxed text-stone-400">
+                <p className="mt-4 max-w-md text-sm leading-relaxed text-white/60">
                   Dark framing supports media review while nearby controls stay quiet
                   and predictable.
                 </p>

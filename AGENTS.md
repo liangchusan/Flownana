@@ -74,9 +74,10 @@
 
 ## UI 与前端约束
 
-- 遵循 `docs/DESIGN.md`，保持温暖、可信、编辑感、克制且以媒体为中心。
-- 优先使用语义化 Tailwind Token；Stone/Zinc 可作为局部中性色，禁止
-  Slate/Gray 色系漂移。
+- 遵循 `docs/DESIGN.md`，保持清晰、可信、克制且以媒体为中心；采用 Runway
+  黑白灰基调和 Flownana 蓝黄品牌点缀。
+- 优先使用语义化 Tailwind Token；旧 Stone/Zinc 仅用于迁移兼容，不新增
+  原始色系类名。
 - 基础组件优先复用 `@/components/ui/`，业务组合放在
   `@/components/blocks/`。
 - `@/app/` 页面聚焦数据获取与组件组合，避免堆积长篇页面级 UI 逻辑。

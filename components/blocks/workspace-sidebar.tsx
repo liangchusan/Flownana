@@ -74,7 +74,7 @@ export function WorkspaceSidebar({
           <button
             type="button"
             onClick={() => onCollapsedChange(!collapsed)}
-            className={`absolute top-3 hidden h-8 w-8 items-center justify-center rounded-md bg-transparent text-stone-500 transition-all duration-300 hover:bg-stone-200/60 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-400/50 lg:flex ${collapsed ? "left-4" : "right-3"}`}
+            className={`absolute top-3 hidden h-8 w-8 items-center justify-center rounded-ui bg-transparent text-muted-foreground transition-all duration-300 hover:bg-surface-strong hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:flex ${collapsed ? "left-4" : "right-3"}`}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -101,7 +101,7 @@ export function WorkspaceSidebar({
                     }
                     onMobileOpenChange(false);
                   }}
-                  className={`flex h-10 w-full items-center rounded-ui text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${collapsed ? "lg:justify-center lg:px-0" : "gap-3 px-3"} ${active ? "bg-background text-foreground shadow-soft" : "text-muted-foreground hover:bg-background/70 hover:text-foreground"}`}
+                  className={`flex h-10 w-full items-center rounded-ui text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${collapsed ? "lg:justify-center lg:px-0" : "gap-3 px-3"} ${active ? "bg-surface-strong text-foreground" : "text-muted-foreground hover:bg-background hover:text-foreground"}`}
                   title={item.label}
                   aria-current={active ? "page" : undefined}
                 >

@@ -55,7 +55,7 @@ for (const sourceRoot of sourceRoots) {
 
       if (/(?:bg|text|border|ring|from|via|to)-(?:slate|gray)-/.test(line)) {
         violations.push(
-          `${projectPath}:${lineNumber}: use warm semantic tokens or Stone/Zinc instead of Slate/Gray`
+          `${projectPath}:${lineNumber}: use the Runway-Flownana semantic tokens instead of raw Slate/Gray`
         );
       }
 

@@ -11,7 +11,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       ref={ref}
       className={cn(
         "rounded-ui-lg",
-        tone === "editorial" && "bg-card text-card-foreground",
+        tone === "editorial" && "border border-border bg-surface-soft text-card-foreground",
         tone === "functional" &&
           "border border-border bg-background text-foreground",
         tone === "dark" && "bg-surface-dark text-background",

@@ -1,53 +1,50 @@
-# Sidebar Toggle Design QA
+# Runway × Flownana Design QA
+
+final result: passed
 
 ## Evidence
 
-- Source visual truth: `/var/folders/58/sdnw29p17n379gtp2yfy0__r0000gn/T/codex-clipboard-5c963a59-7202-4d08-b152-c55fba73fb1d.png`
-- Secondary collapsed-state reference: `/var/folders/58/sdnw29p17n379gtp2yfy0__r0000gn/T/codex-clipboard-efbe28fc-68b1-4c55-be1b-ca57ccef7e38.png`
-- Final expanded implementation: `/Users/liangchusan/flownana/design-qa-expanded-final.png`
-- Final collapsed implementation: `/Users/liangchusan/flownana/design-qa-collapsed-final.png`
-- Final details-open implementation: `/Users/liangchusan/flownana/design-qa-details-open-final.png`
-- Final mobile implementation: `/Users/liangchusan/flownana/design-qa-mobile.png`
-- Focused source/implementation comparison: `/Users/liangchusan/flownana/design-qa-controls-comparison-final.png`
-- Browser viewport: 1440 x 900 desktop and 390 x 844 mobile, device scale factor 1.
-- Source pixels: 3840 x 1300 expanded and 3832 x 1406 collapsed. The source was captured at a different viewport/density, so full-frame pixel alignment was not used for control sizing.
-- Implementation pixels: 1440 x 900 desktop and 390 x 844 mobile.
-- State: authenticated Test User workspace on `/image`; left sidebar expanded/collapsed; right details sidebar closed/open.
-
-## Full-view comparison
-
-The implementation keeps the existing Flownana layout and design tokens while adopting the reference's lightweight split-panel controls. Desktop expanded, desktop collapsed, details-open, and mobile states were rendered. Mobile body width remained 390 px with no horizontal overflow. Browser console error check returned no errors.
-
-## Focused comparison
-
-The control crops place the source and implementation in one image. This focused comparison was necessary because the reference has a different product layout, viewport, density, and red annotation boxes; only the left/right panel controls are the selected visual target. Final controls match the source's arrowless split-panel silhouette, thin stroke, quiet neutral color, transparent default surface, and top-corner placement.
-
-## Required fidelity surfaces
-
-- Fonts and typography: unchanged because the selected target contains only icon controls; surrounding Flownana type remains consistent.
-- Spacing and layout rhythm: both controls use a 32 px hit area with 16 px icons, 12 px top inset, and 12 px edge inset where applicable. Existing side-panel widths and content rhythm remain unchanged.
-- Colors and tokens: transparent default surface, stone neutral foreground, quiet stone hover surface, and subtle focus ring.
-- Image and asset fidelity: no raster assets were needed; the project-mandated `lucide-react` `PanelLeft` and `PanelRight` icons are the closest library match to the source controls.
-- Copy and content: no user-facing copy changed. Accessible labels and titles continue to describe expand/collapse behavior.
-
-## Comparison history
-
-1. Initial pass found a P2 mismatch: the 14 px stone-400 icons were visibly smaller and fainter than the source, especially in the right corner.
-2. Fix: increased the icons to 16 px and the default foreground to stone-500, retaining a 1.5 px stroke and transparent button surface.
-3. Post-fix evidence: `design-qa-controls-comparison-final.png` shows the source and final implementation controls together. No actionable P0, P1, or P2 differences remain within the approved target.
+- Source visual truth: https://getdesign.md/design-md/runwayml/preview
+- Implementation: http://127.0.0.1:3108/
+- Source evidence: getdesign Runway preview inspected on 2026-09-12; its visible system uses paper-white reading bands, black pill CTAs, neutral grey hierarchy, single-sans typography and dark media stages.
+- Implementation evidence: Codex in-app browser captures of Home at 390 × 844, 768-class default viewport and 1440 × 900; Agent and mobile drawer at 390 × 844; design system at 1440 × 900.
+- CSS viewport and captured pixels matched 1:1 for the 390 × 844 and 1440 × 900 checks. Device pixel density was not altered.
+- State: signed-out Home, empty signed-out Agent, open mobile navigation, design-system default states.
+- Console: no local-page error entries in the checked Agent and design-system states.
 
 ## Findings
 
-No actionable P0, P1, or P2 findings remain. The source's red rectangles and blue dot are annotations, not UI, and were intentionally not reproduced.
+No actionable P0, P1 or P2 mismatch remains in the checked states.
 
-## Implementation checklist
+- Fonts and typography: Inter is the computed heading family; display and UI typography use one sans family with clear weight and scale. Home title wraps cleanly at 390px.
+- Spacing and layout: Home preserves the 260px desktop sidebar and two-column mobile template grid. Scroll width equals viewport width at 390 and 1440. Composer, template rhythm and mobile drawer remain stable.
+- Colors and tokens: computed body background is white, primary is `17 17 17`, and focus ring is `0 102 204`. Black actions and grey surfaces match the selected direction; blue/yellow remain controlled brand accents.
+- Image quality and assets: original Flownana logo and generated template covers remain intact, sharp and uncropped. Media assets were not replaced with code-drawn substitutes.
+- Copy and content: existing product copy, navigation and template names remain unchanged except the internal design-system explanation.
 
-- [x] Use arrowless split-panel icons for left and right controls.
-- [x] Remove visible default border and filled background.
-- [x] Keep 32 px pointer target plus hover and keyboard focus states.
-- [x] Keep the right control visible even before a details result is selected.
-- [x] Verify authenticated desktop expanded/collapsed and details-open states.
-- [x] Verify 390 px mobile layout without horizontal overflow.
-- [x] Check browser console errors.
+Focused comparison used the Home heading/Composer, template gallery, sidebar Logo/navigation,
+Agent Composer and design-system color strip because those regions expose typography, action,
+brand and density decisions more clearly than the full-page view.
 
-final result: passed
+## Comparison History
+
+- Initial implementation showed the former semantic primary and serif display mapping in code.
+- Fixes: primary moved to black, ring/link moved to brand blue, Inter became the display family,
+  buttons became pill-shaped, neutral surfaces replaced warm Token values, and the Home/template
+  hierarchy and design-system reference were updated.
+- Post-fix evidence: Home, Agent, drawer and design-system captures show the new system without
+  overflow, broken assets or unreadable controls. No further P0/P1/P2 visual fix was identified.
+
+## Follow-up Polish
+
+- P3: validate signed-in Agent quotes, generated media states and nested Pricing dialogs with real
+  account data; these states require external/account setup and are covered by existing component behavior tests rather than the signed-out visual capture.
+
+## Implementation Checklist
+
+- [x] Global semantic tokens and Inter typography
+- [x] Shared controls, sidebar, Home and template gallery
+- [x] 390/768/1440 responsive checks
+- [x] Agent empty state and mobile drawer
+- [x] Lint, build, tests and design-system check
+- [ ] Signed-in real-data visual acceptance by the user

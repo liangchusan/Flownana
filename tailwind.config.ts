@@ -46,6 +46,15 @@ const config: Config = {
         border: withAlpha("--border"),
         input: withAlpha("--input"),
         ring: withAlpha("--ring"),
+        link: withAlpha("--link"),
+        brand: {
+          blue: withAlpha("--brand-blue"),
+          "blue-soft": withAlpha("--brand-blue-soft"),
+          "blue-on-dark": withAlpha("--brand-blue-on-dark"),
+          yellow: withAlpha("--brand-yellow"),
+          "yellow-soft": withAlpha("--brand-yellow-soft"),
+        },
+        "text-secondary": withAlpha("--text-secondary"),
         success: withAlpha("--success"),
         warning: withAlpha("--warning"),
         surface: {
@@ -57,7 +66,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        display: ["Cormorant Garamond", "EB Garamond", "Georgia", "serif"],
+        display: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       fontSize: {
@@ -73,13 +82,12 @@ const config: Config = {
         "ui-xl": "var(--radius-xl)",
       },
       boxShadow: {
-        soft: "0 1px 3px rgb(20 20 19 / 0.08)",
-        float: "0 16px 48px rgb(20 20 19 / 0.12)",
+        soft: "0 1px 3px rgb(17 17 17 / 0.06)",
+        float: "0 18px 54px rgb(17 17 17 / 0.14)",
       },
     },
   },
   plugins: [],
 };
 export default config;
-
 

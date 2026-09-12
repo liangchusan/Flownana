@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,32 +6,39 @@
 
 :root {
   color-scheme: light;
-  --background: 250 249 245;
-  --foreground: 20 20 19;
-  --card: 239 233 222;
-  --card-foreground: 20 20 19;
-  --popover: 250 249 245;
-  --popover-foreground: 20 20 19;
-  --primary: 204 120 92;
+  --background: 255 255 255;
+  --foreground: 17 17 17;
+  --card: 255 255 255;
+  --card-foreground: 17 17 17;
+  --popover: 255 255 255;
+  --popover-foreground: 17 17 17;
+  --primary: 17 17 17;
   --primary-foreground: 255 255 255;
-  --primary-active: 169 88 62;
-  --secondary: 245 240 232;
-  --secondary-foreground: 37 37 35;
-  --muted: 245 240 232;
-  --muted-foreground: 108 106 100;
-  --accent: 232 224 210;
-  --accent-foreground: 20 20 19;
-  --destructive: 198 69 69;
+  --primary-active: 43 43 43;
+  --secondary: 247 247 247;
+  --secondary-foreground: 17 17 17;
+  --muted: 247 247 247;
+  --muted-foreground: 102 102 102;
+  --accent: 238 238 238;
+  --accent-foreground: 17 17 17;
+  --destructive: 180 35 24;
   --destructive-foreground: 255 255 255;
-  --border: 230 223 216;
-  --input: 230 223 216;
-  --ring: 204 120 92;
-  --success: 93 184 114;
-  --warning: 212 160 23;
-  --surface-soft: 245 240 232;
-  --surface-strong: 232 224 210;
-  --surface-dark: 24 23 21;
-  --surface-dark-elevated: 37 35 32;
+  --border: 229 229 229;
+  --input: 138 138 138;
+  --ring: 0 102 204;
+  --link: 0 102 204;
+  --brand-blue: 0 102 204;
+  --brand-blue-soft: 237 245 255;
+  --brand-blue-on-dark: 117 184 255;
+  --brand-yellow: 245 197 66;
+  --brand-yellow-soft: 255 248 219;
+  --text-secondary: 64 64 64;
+  --success: 24 121 78;
+  --warning: 138 90 0;
+  --surface-soft: 247 247 247;
+  --surface-strong: 238 238 238;
+  --surface-dark: 26 26 26;
+  --surface-dark-elevated: 41 41 41;
   --creation-sea-sky: 230 245 250;
   --creation-sea-horizon: 185 228 243;
   --creation-sea-surface: 82 189 225;
@@ -52,7 +59,7 @@ body {
 
 ::selection {
   color: rgb(var(--primary-foreground));
-  background: rgb(var(--primary));
+  background: rgb(var(--brand-blue));
 }
 
 @layer base {

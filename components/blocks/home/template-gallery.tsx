@@ -102,12 +102,12 @@ export function TemplateGallery({ onSelect }: { onSelect?: (id: string) => void 
     <section ref={root} aria-labelledby="templates-heading" className="px-4 pb-12 md:px-8 md:pb-16">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-4">
-          <h2 id="templates-heading" className="font-display text-xl font-medium text-foreground">Templates</h2>
+          <h2 id="templates-heading" className="font-display text-xl font-medium tracking-[-0.02em] text-foreground">Templates</h2>
         </div>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {templates.map((template) => (
             <li data-template-id={template.id} key={template.id} className="min-w-0">
-              <button type="button" onClick={() => onSelect?.(template.id)} aria-label={`Use ${template.title} template`} className="relative block aspect-[4/5] w-full overflow-hidden rounded-ui-xl bg-surface-soft transition-all duration-300 hover:shadow-soft active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              <button type="button" onClick={() => onSelect?.(template.id)} aria-label={`Use ${template.title} template`} className="relative block aspect-[4/5] w-full overflow-hidden rounded-ui-lg bg-surface-soft transition-all duration-300 hover:-translate-y-0.5 hover:shadow-soft active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <Image
                   src={`/templates/covers/${template.id}-v1.png`}
                   alt={`${template.title} example`}

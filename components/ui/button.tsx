@@ -12,19 +12,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center rounded-ui text-sm font-medium transition-all duration-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center rounded-full text-sm font-semibold transition-all duration-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-45",
           {
             "bg-primary text-primary-foreground hover:bg-primary-active":
               variant === "default",
-            "border border-border bg-background text-foreground hover:bg-surface-soft":
+            "border border-input bg-background text-foreground hover:border-foreground hover:bg-surface-soft":
               variant === "outline",
             "bg-secondary text-secondary-foreground hover:bg-surface-strong":
               variant === "secondary",
             "text-foreground hover:bg-surface-soft": variant === "ghost",
             "bg-destructive text-destructive-foreground hover:bg-destructive/90":
               variant === "destructive",
-            "h-10 px-4 py-2": size === "default",
-            "h-9 px-3 text-sm": size === "sm",
+            "h-10 px-5 py-2": size === "default",
+            "h-9 px-4 text-sm": size === "sm",
             "h-12 px-6 text-base": size === "lg",
             "h-10 w-10": size === "icon",
           },
@@ -39,5 +39,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export { Button };
-
 
