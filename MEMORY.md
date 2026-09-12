@@ -909,3 +909,14 @@
 用户授权“提交上线”。审阅批次包含已批准且此前已上线的 Agent 首版、模板卡片样式，
 以及侧栏入口、Plus 上传、最近会话菜单/折叠与自动短标题调整。452 项测试通过；
 本批不新增迁移，生产 Agent 四表已在此前发布时完成。提交后核对远端 SHA，再发布并验证。
+
+## 2026-09-12 Agent 最近会话生产发布完成
+
+- 功能代码提交 53c134d，包含 Agent 首版与最近会话 UI 调整。
+- Vercel dpl_6MdDviwmDog1mUJH7BeuC7GoJiHX 为 READY，
+  https://flownana-h7gnyk8tz-liangchusans-projects.vercel.app 已绑定 https://www.flownana.com。
+- 发布后 smoke:prod 全部通过，Agent/Logo 模板入口返回 200，未登录 Agent API 返回 401。
+- GitHub 直连超时，代理推送首次被自动审批拒绝；用户明确授权具体远端后，
+  53c134d 已成功推送 origin/main。后续文档提交记录此次发布。
+- 手动验收：最近会话展开/收起、新建图标、标题更多菜单改名/删除、首次回复短标题、
+  Agent Plus 上传。真实模型标题质量和媒体付费链路仍待用户验收；GA4 后台配置仍未核实。
