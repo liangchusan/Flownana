@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Footer } from "@/components/layout/footer";
-import { TemplatePanel, TEMPLATE_OPEN_KEY } from "@/components/blocks/home/template-panel";
+import { AgentComposer } from "@/components/blocks/agent/agent-composer";
 import { trackEvent } from "@/lib/analytics";
-import { imageTemplates } from "@/lib/image-templates/catalog";
 import { TemplateGallery } from "@/components/blocks/home/template-gallery";
 import { Modal } from "@/components/ui/modal";
 import { PanelRight, Trash2, X } from "lucide-react";
@@ -90,9 +89,10 @@ function ScopedMediaCreationWorkspace({
   const { capture: captureGeneration } = useAccountOperation();
   const { showToast } = useToast();
   const pathname = usePathname();
+  const router = useRouter();
+  const [agentMode, setAgentMode] = useState(false);
   const isHome = pathname === "/";
   const { status: sessionStatus } = useSession();
-  const [selectedTemplate, setSelectedTemplate] = useState<{ id: string; editing?: CreationHistoryItem } | null>(null);
   const [view, setView] = useState<WorkspaceView>(initialView);
   const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
   const [creations, setCreations] = useState<CreationHistoryItem[]>(initialCreations);
@@ -102,6 +102,12 @@ function ScopedMediaCreationWorkspace({
     parametersByType: {},
     revision: 0,
   });
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  useEffect(() => {
+    try { const saved = sessionStorage.getItem(`ordinary-draft:${accountScope ?? "anonymous"}`); if (saved) { const value = JSON.parse(saved); if (typeof value.prompt === "string" && Array.isArray(value.attachments)) setDraft({ ...value, revision: (value.revision ?? 0) + 1 }); } } catch { /* Optional draft recovery. */ }
+    setDraftLoaded(true);
+  }, [accountScope]);
+  useEffect(() => { if (draftLoaded) try { sessionStorage.setItem(`ordinary-draft:${accountScope ?? "anonymous"}`, JSON.stringify(draft)); } catch { /* Live draft remains available. */ } }, [draft, draftLoaded, accountScope]);
   const [inputCapabilities, setInputCapabilities] = useState<GenerationInputCapabilities>(
     initialType === "image"
       ? getImageInputCapabilities("gpt-image-2")
@@ -162,13 +168,8 @@ function ScopedMediaCreationWorkspace({
   }, [pathname, composerType]);
 
   useEffect(() => {
-    if (!isHome) return;
-    try { const id = sessionStorage.getItem(TEMPLATE_OPEN_KEY); if (imageTemplates.some((item) => item.id === id)) setSelectedTemplate({ id: id! }); } catch { /* Optional storage. */ }
-  }, [isHome]);
-
-  useEffect(() => {
     for (const creation of creations) {
-      if (!creation.parameters?.templateId) continue;
+      if (!creation.parameters?.templateId || creation.parameters.agentConversationId) continue;
       if (["pending", "generating", "processing"].includes(creation.status)) templateOutputs.current.add(creation.id);
       if (templateOutputs.current.has(creation.id) && ["success", "failed"].includes(creation.status)) {
         templateOutputs.current.delete(creation.id);
@@ -230,6 +231,7 @@ function ScopedMediaCreationWorkspace({
   };
 
   const navigateWorkspace = (destination: WorkspaceCreationDestination | "assets") => {
+    setAgentMode(false);
     setDetailsRun(null);
     setDetailsOpen(false);
     if (destination === "assets") {
@@ -244,6 +246,7 @@ function ScopedMediaCreationWorkspace({
   };
 
   const setType = (nextType: ActiveComposerType) => {
+    setAgentMode(false);
     setView("create");
     applyComposerType(nextType);
     if (!isHome) updateWorkspaceUrl(nextType, "replaceState");
@@ -251,7 +254,7 @@ function ScopedMediaCreationWorkspace({
 
   const restoreCreation = (creation: CreationHistoryItem) => {
     if (creation.parameters?.templateId && ["success", "failed"].includes(creation.status)) {
-      setSelectedTemplate({ id: creation.parameters.templateId, editing: creation });
+      router.push(`/agent?template=${encodeURIComponent(creation.parameters.templateId)}&source=${encodeURIComponent(creation.id)}`);
       trackEvent("variant_selected", { template_id: creation.parameters.templateId, output_index: creation.parameters.outputIndex });
       if (creation.status === "success") trackEvent("continued_edit", { template_id: creation.parameters.templateId });
       return;
@@ -382,6 +385,7 @@ function ScopedMediaCreationWorkspace({
       attachments={draft.attachments}
       assets={assetOptions}
       onTypeChange={setType}
+      onAgent={() => { if (isHome) setAgentMode(true); else router.push("/agent"); }}
       onAdd={(attachments) => setDraft((current) => ({
         ...current,
         attachments: [...current.attachments, ...attachments],
@@ -402,14 +406,6 @@ function ScopedMediaCreationWorkspace({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {selectedTemplate && <TemplatePanel key={`${selectedTemplate.id}:${selectedTemplate.editing?.id || "new"}`} templateId={selectedTemplate.id} editing={selectedTemplate.editing} onClose={() => { setSelectedTemplate(null); try { sessionStorage.removeItem(TEMPLATE_OPEN_KEY); } catch { /* Optional storage. */ } }} onAccepted={(ids) => {
-        ids.forEach((id) => templateOutputs.current.add(id));
-        setSelectedTemplate(null);
-        try { sessionStorage.removeItem(TEMPLATE_OPEN_KEY); } catch { /* Optional storage. */ }
-        setView("create"); applyComposerType("image", false); updateWorkspaceUrl("image", "pushState");
-        const operation = captureGeneration();
-        void fetch("/api/creations", { headers: operation.headers, signal: operation.signal, cache: "no-store" }).then(async (response) => { const data = await response.json(); operation.assertCurrent(); if (response.ok && data.accountScope === accountScope && Array.isArray(data.creations)) setCreations((current) => mergeCreations(current, data.creations)); }).catch(() => { showToast({ title: "Generation submitted", message: `${ids.length} images are processing. Results will appear shortly.`, variant: "warning" }); });
-      }} />}
       <WorkspaceSidebar activeSection={activeSection} onWorkspaceNavigate={navigateWorkspace} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceMobileHeader showLogo={!isHome} onOpen={() => setMobileSidebarOpen(true)} />
@@ -429,15 +425,15 @@ function ScopedMediaCreationWorkspace({
                     <PanelRight className="h-4 w-4" strokeWidth={1.5} />
                   </button>
               )}
-              <div ref={scrollRef} className={isHome ? "hidden" : "min-h-0 flex-1 overflow-y-auto"}>{!isHome && <CreationStream creations={creations} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} />}</div>
+              <div ref={scrollRef} className={isHome ? "hidden" : "min-h-0 flex-1 overflow-y-auto"}>{!isHome && <CreationStream creations={creations.filter(c => !c.parameters?.agentConversationId)} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} />}</div>
               <div className={isHome ? "relative z-30 shrink-0 px-4 pb-12 md:px-8 md:pb-16" : "pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6"}>
                 <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background p-2.5 shadow-float sm:p-3">
-                  <ComposerAttachments attachments={draft.attachments} capabilities={inputCapabilities} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />
-                  {attachmentIncompatible && <div className="mt-2 flex items-center gap-2 rounded-ui bg-destructive/5 px-2 py-1.5"><Trash2 className="h-3.5 w-3.5 text-destructive" /><p className="min-w-0 flex-1 text-[11px] text-destructive">Remove inputs marked as unsupported before creating.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachments: filterCompatibleAttachments(current.attachments, inputCapabilities) }))} className="text-[11px] font-medium text-destructive underline underline-offset-2">Remove unsupported</button></div>}
-                  {composer}
+                  {!agentMode && <ComposerAttachments attachments={draft.attachments} capabilities={inputCapabilities} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />}
+                  {!agentMode && attachmentIncompatible && <div className="mt-2 flex items-center gap-2 rounded-ui bg-destructive/5 px-2 py-1.5"><Trash2 className="h-3.5 w-3.5 text-destructive" /><p className="min-w-0 flex-1 text-[11px] text-destructive">Remove inputs marked as unsupported before creating.</p><button type="button" onClick={() => setDraft((current) => ({ ...current, attachments: filterCompatibleAttachments(current.attachments, inputCapabilities) }))} className="text-[11px] font-medium text-destructive underline underline-offset-2">Remove unsupported</button></div>}
+                  {agentMode ? <AgentComposer onModeChange={(type) => { setAgentMode(false); setType(type); }} /> : composer}
                 </div>
               </div>
-              {isHome && <TemplateGallery onSelect={(id) => { setSelectedTemplate({ id }); trackEvent("template_click", { template_id: id }); try { sessionStorage.setItem(TEMPLATE_OPEN_KEY, id); } catch { /* Optional storage. */ } }} />}
+              {isHome && <TemplateGallery onSelect={(id) => { trackEvent("template_click", { template_id: id }); router.push(`/agent?template=${encodeURIComponent(id)}`); }} />}
               {isHome && sessionStatus === "unauthenticated" && <Footer variant="light" />}
             </main>
             {detailsRun && detailsOpen && <DetailsPanel run={detailsRun} onClose={() => setDetailsOpen(false)} />}

@@ -74,7 +74,7 @@ test("both workspace composers use the workspace operation owner, not their disp
   const load = createSourceLoader({
     react: { ...React, useState: (initial: any) => [typeof initial === "function" ? initial() : initial, () => {}], useRef: (value: any) => ({ current: value }), useEffect: () => {}, useLayoutEffect: () => {}, useMemo: (fn: any) => fn() },
     "next-auth/react": { useSession: () => ({ data: { user: a }, status: "authenticated" }) },
-    "next/navigation": { usePathname: () => "/image" },
+    "next/navigation": { useRouter: () => ({ push: () => undefined }), usePathname: () => "/image" },
     "@/lib/use-account-operation": { useAccountOperation: () => ({ accountScope: getAccountScope(a), capture }) },
     "@/components/blocks/app-toast-provider": { useToast: () => ({ showToast: () => {} }) },
   });

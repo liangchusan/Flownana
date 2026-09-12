@@ -1,6 +1,8 @@
 # Flownana 工程记忆
 
-最近复核：2026-09-10（Logo 替换已提交并推送为 `f2e6833`；生产部署
+最近生产复核：2026-09-12（Agent 已发布，部署 READY；生产迁移与权限验证完成，详见末尾）。
+
+此前生产复核记录：2026-09-10（Logo 替换已提交并推送为 `f2e6833`；生产部署
 `dpl_H8nxw5pTZxYEbiexS6NPyF4BLL6V` 为 READY，正式域名
 `https://www.flownana.com` 已绑定，`npm run smoke:prod` 全部通过。）
 
@@ -735,3 +737,175 @@
 - Supabase 生产项目已执行 ImageTemplateRun 新增表迁移，并写入对应 Prisma checksum
   与完成记录；此次迁移不更新现有用户、积分或作品。生产部署尚待 READY 与冒烟确认。
 - 用户将在生产验收真实四图生成、继续编辑与部分失败；当前真实模型验证仅覆盖两个问答场景。
+
+
+## 2026-09-11 模板生产发布完成
+
+- 运行时代码提交 62831652a5e035cc5e2fb7206e499fd36c4307c2，首次 Git push 成功，
+  本地 HEAD 与 origin/main 一致。随后重复代理 push 被自动审批拒绝，未继续重试。
+- Vercel 部署 dpl_C2XyVYa5HX2FRRNH6MAwtWZz7JyS /
+  https://flownana-6ufy2eih7-liangchusans-projects.vercel.app 已确认 READY，
+  www.flownana.com 和 flownana.com 别名已绑定。
+- 生产 OPENROUTER_API_KEY Secret 已配置；新表 RLS=true，服务端角色有 CRUD，
+  anon/authenticated 无读取权限；Prisma 迁移记录 finished=true、applied_steps_count=1。
+- npm run smoke:prod 全部通过，额外检查模板 API 未登录返回 401。
+  部署最近 15 分钟 error 日志查询返回 No logs found。CLI 查询完成后遇本地更新缓存
+  EPERM，未影响已返回的云端 READY/日志查询结果。
+- 用户选择线上验收；尚需人工走完整模板问答、真实四图生成、单方向编辑、失败重试与积分。
+  本条为发布后本地记录，尚未追加提交到远端。
+
+## 2026-09-11 模板展示精简（本地）
+
+- TemplateGallery 改为桌面 6 列与图内标题，移除模块副标题和卡片用途文字；点击行为及埋点保持。
+- 用户提出另开任务讨论交互；本次只调整展示，交互流程尚未重新定义。
+- 本次 Build、Design Check、git diff --check 通过；浏览器连接超时，390/768/1440px 真实渲染待人工检查。3107 已重启，未发布此展示修改。
+- 新讨论可读取 docs/TEMPLATE-INTERACTION-HANDOFF.md，避免复制冗长历史。
+
+
+## 2026-09-11 紧凑模板卡片已发布
+
+- 用户明确批准发布本次样式调整。Vercel dpl_3SvcguYGwQ7hMvudeSyQCC419Tbe 已 READY，
+  https://flownana-41akjbpza-liangchusans-projects.vercel.app 绑定 www.flownana.com。
+- 正式首页 HTTP 200，返回 HTML 已验证六列类名、图内标题和副标题移除；smoke:prod 全部通过。
+- 本次从工作区部署，样式与发布后文档尚未追加 Git 提交/推送。未改变模板问答逻辑。
+- 浏览器真实截图检查仍待用户在手机与桌面核对；线上 HTML 验证不替代视觉验收。
+
+
+## 2026-09-11 Agent 会话需求已确认（仅文档，未开发）
+
+- 产品范围见 PRODUCT 第 18 节，设计同步 DESIGN 的 Agent 会话交互章节。
+  用户明确本轮先确认需求、不开发；现有模板弹窗实现与生产行为没有在本轮更改。
+- 已确认首页 Agent/Image/Video 三模式；Agent 隐藏后置参数；模板点击直接进入
+  会话；支持图片和视频、同会话选图生视频、各次付费前确认方案与总积分。
+- 会话支持历史、新建、自动标题、重命名、删除与继续交流；删除会话保留 Assets
+  作品。模板初次默认四张、编辑一张锁方向；普通 Agent 按需求决定数量。
+- Agent 自动确定模型与规格，具体候选和策略尚未确定；旧 Qwen/Sunburst 为现有
+  实现背景，不等同未来 Agent 选型。AI SDK 仅为技术建议，未安装或接入。
+- 待落实对话额度、游客承接、路由/空会话保存、上下文管理、活跃会话删除、旧模板
+  状态兼容与新事件口径；真实图片/视频和多轮质量仍需预算及验收。
+- 本轮只修改 PRODUCT、DESIGN、本文件与交接说明；不修改代码、依赖、数据库或
+  环境配置，不提交或部署。文档核对不能替代运行测试。
+
+
+## 2026-09-11 Agent 未决项已形成细化草案（待确认，未开发）
+
+- 新增 docs/AGENT-SPEC.md，PRODUCT 18.5 链接并概括待确认的额度、默认模型、
+  路由/登录、上下文/中断、删除、旧模板兼容及 Analytics 口径；不是新增已批准需求。
+- 本轮核对现有计价、账号 scope、事件和模板理解代码；未安装 AI SDK，技术建议
+  为单 Agent + 有限工具/服务端付费确认，数据库消息恢复，不增 Redis 流恢复依赖。
+- 已查官方 AI SDK 文档及 OpenRouter 无鉴权模型列表。当前 Qwen 列表为 text/image
+  输入并支持 tools；不能用模型宣传中的视频描述承诺当前通路可理解视频或音频。
+- 建议免费 20/付费 100 次每日对话、每分钟 6 次、单账号一个回复；预算与默认
+  模型均为待确认值，成本是公开 token 价格的上界推算，不是生产成本实测。
+- Agent 媒体继续使用现有执行体系；未审计全部执行路径，具体 Provider 质量、
+  套餐权益校验与存储/迁移方案需开发阶段验证。无付费调用、无迁移或部署。
+- 本轮仅文档，未运行应用测试/构建；更新交接并进行文档差异检查。
+
+
+## 2026-09-11 Agent 每日次数与图片默认模型确认（仅文档）
+
+- 用户确认免费每天 10 次、付费每天 100 次，默认图片模型 GPT-Image-2.5 Flare，
+  适用于普通 Agent 图片和图片模板；替代此前免费 20 次和 Sunburst 默认的建议。
+- PRODUCT 第 18 节、AGENT-SPEC 与交接说明同步。成本预算按此前价格快照重算，
+  免费每日最坏 token 预算为 $0.04368，不代表实测成本或支出授权。
+- 其余计数/重置细则、视频默认值、生命周期及事件规则仍待确认。仅文档修改，
+  未开发或部署，无需本轮手测；真实调用质量与成本仍需验收。
+
+
+## 2026-09-11 Agent 产品需求收口（已确认，未开发）
+
+- 用户确认剩余规则：完整 Agent 回复计一次（追问计、失败不计），UTC 零点重置，
+  超额不自动扣积分；发送/上传前登录并保留草稿；未结生成/退款等待结束才删会话；
+  历史通过新消息修正、无消息分支。免费 10/付费 100 次和 Flare 默认图片保持。
+- 理解现有 Qwen 先验收、不自动切换；视频默认 Seedance Mini 720P/5 秒/无声/一个。
+  单 Agent 调用现有图片/视频能力，服务端管理会话、报价和扣费。
+- 四个新增 Agent 事件及草案对应口径获确认，既有生成/下载含义保留。
+  PRODUCT 18.5、AGENT-SPEC 和交接已同步，不再重复要求确认这些产品规则。
+- 工程建议参数与预算保持区分；未授权开发、付费测试、迁移或生产部署。
+  本轮仅文档检查，无需手测；多轮理解质量、真实媒体效果和成本仍待开发后验收。
+
+## 2026-09-12 Agent 首版本地实现（用户已批准开发，未发布）
+
+- 用户明确“可以，我们开发”。本轮开发范围为 PRODUCT 18 的 Agent 独立会话；
+  没有生产迁移、部署、提交或推送，没有真实付费 Provider 调用。
+- 新入口 `/agent`、`/agent?template=<id>`、`/agent/<uuid>`；首页三模式切换保留
+  草稿，模板入口直接转会话。旧 TemplatePanel 不再挂到新入口，旧任务 API 保留。
+- `lib/agent/understand.ts` 使用 AI SDK 7.0.97、OpenAI-compatible 3.0.47、Zod 4.6.2，
+  Qwen ID 延用 `qwen/qwen3-vl-32b-instruct`。工具只有追问和服务端报价，不提供付费工具。
+  3 步、每步 1500 输出 tokens、80 秒超时、100 秒租约；28k 字符上下文保护，不静默
+  丢弃原始历史，不实现自动摘要。流错误/截断不计有效回复；记录 Provider 可用用量。
+- `lib/agent/service.ts` 在既有 User 行锁下维护额度、会话 revision、报价和任务。
+  每日 UTC 免费 10/付费 100，完成才计数，失败/停止不计；每分钟 6 次、账号 1 个理解回复。
+  10 分钟报价；重复确认返回原任务；多输出原子扣费，失败沿用逐输出退款。
+- 图片默认 Flare/1K，普通默认 1 张，模板默认 4 张、编辑 1 张；视频默认 Seedance Mini
+  720P/5s/无声/1 个。Agent 图片复用模板 worker、视频抽出共用服务，旧视频路由保留行为。
+- 新表 AgentConversation/AgentTurn/AgentUsage/AgentAttachment；迁移
+  `20260911160000_agent_conversations` 已在独立 PostgreSQL 从空库重放，未应用生产。
+  四表 RLS + 浏览器角色撤权 + flownana_app 策略。附件关系使用 Cascade 兼容账号注销；
+  普通作品删除在 User 锁下先检查会话引用，不能提前删除仍被引用的素材。
+- 删除会话保留生成作品；活跃回复/任务/退款先阻止删除。未引用附件清理失败保留
+  tombstone cleanupUrls 以便重试。旧草稿自愿承接，旧所选图带入原始约束与方向。
+- 回复时 1.5 秒、媒体运行时 3 秒、空闲时 15 秒读取持久化状态；不是 Redis 字节流恢复。
+  图片后台 worker 执行，视频状态沿用现有轮询/settlement；未新增常驻任务队列。
+- GA4 加四项 Agent 事件，保留生成与下载语义；显式事件/页面配置清理私有会话信息。
+  自动 enhanced-measurement 页面采集配置仍需发布前核对，未在此轮操作 GA4 管理端。
+- 验证：451 项测试通过，无跳过（独立本地 PostgreSQL）；含额度 10/11、100/101、
+  并发首发/确认、部分批次回滚、退款幂等、过期报价、引用保护、跨账号和账号注销。
+  真实 AI SDK 使用模拟模型测试工具、追问、错误流及截断。lint 零错误/30 warnings，
+  build、design:check 通过。浏览器 390/768/1440px 无横向溢出，验证登录草稿保留、
+  首页模式切换与首次发送、会话恢复/改名、报价与视频失败退款；理解响应由临时本地
+  fixture 拦截，媒体 key 置空。模拟脚本仅在 /tmp，不属于产品代码。
+- 本地 next dev 因 EMFILE 监听限制反复重启，已停止并改用 build + start 验证；
+  生产构建关闭测试登录 UI。测试数据库与服务均为本机隔离资源，未接触生产数据。
+- 仍需手测：真实 Qwen 多轮与文字保护、16 模板完整出图、选图编辑/转视频、上传与
+  视频/音频参考、真实 Blob 存储和失败退款。全站 $10 成本熔断与 $50 验收预算仍是
+  未授权建议；没有精确多模态总输入 token 预算熔断，不把缺失用量当作零成本。
+
+- 收尾补充：自然语言引用本会话已有图片由服务端校验所选输出 ID，报价携带所选图、
+  原始参考与约束；实际 SDK 模拟测试覆盖选择及非法 ID 拒绝。删除附件清理失败在
+  刷新后仍可发现并重试；成功收到人工重试报价后允许用户再次请求新的报价。
+  最终 451 项测试、build、lint、design:check 均通过；隔离测试服务已关闭。
+
+
+## 2026-09-12 Agent 生产发布
+
+- 用户明确授权“可以，我们上线”。生产 Supabase 已执行新增四表迁移
+  20260911160000_agent_conversations；Prisma 完成记录与本地 checksum
+  aab314446fdac81b199c24435a597f5fd7a171827eb48a07750ee61142dccdbb 一致。
+  既有用户、积分、作品未改写。四表 RLS 开启，anon/authenticated 无 SELECT 权限，
+  flownana_app 有应用访问权限；security advisor 仅报告既有 _prisma_migrations 无策略 INFO。
+- 初次 CLI 账户验证返回 403；用户重新登录后恢复。备用发布接口因不完整文件清单被
+  自动审批拒绝，未执行；最终使用完整工作区通过 Vercel CLI 成功发布。
+- 部署 dpl_EbJm8qdevd4UcrqAsnnX4HHgwaP7 已 READY，
+  https://flownana-r7c7isem4-liangchusans-projects.vercel.app 已绑定 https://www.flownana.com。
+  云端构建、TypeScript、Prisma Client 生成通过。此次未提交或推送。
+- 真实 Qwen 多轮效果、图片/编辑/视频及素材组合、生产退款和存储仍待手动付费验收；
+  GA4 后台自动历史页面采集配置尚未核实，全站每日成本熔断仍未实现。
+- 发布后 npm run smoke:prod 全部通过；/agent 与 /agent?template=logo 返回 200，
+  无效会话路径返回 404，Agent GET/POST 未登录返回 401；登录 Provider 仅 Google。
+
+## 2026-09-12 Agent 入口小调整（本地）
+
+- 按用户要求移除共用侧栏独立 Agent 标签，保留会话历史和新建会话。
+- Agent 上传按钮改为与 Image/Video 一致的圆形 Plus 图标，保留上传和素材选择逻辑。
+- PRODUCT 与 DESIGN 已同步；build、lint（0 错误，30 条既有警告）、design:check 通过。
+  浏览器检查 390/768/1440px；此次两处调整尚未部署，未重复执行真实上传或生成。
+
+## 2026-09-12 最近会话交互（本地未发布）
+
+- 移除独立 New conversation 行，Recent conversations 右侧小型 SquarePen 图标新建；
+  标题按钮支持收起/展开，每行更多按钮提供重命名和删除确认，手机常显、桌面悬停/聚焦显示。
+- 首次成功回复通过 Qwen 工具参数概括简短标题；讨论可使用 set_conversation_title，
+  报价/追问直接附带标题。服务端只在首轮完成时替换初始标题，手动改名与完成重放受保护。
+  不新增数据库结构，不额外记一次对话额度；旧会话不批量重新命名。
+- 452 项测试全部通过、无跳过，包含真实隔离 PostgreSQL 的自动标题/手动改名/重复完成；
+  build、lint（0 错误，30 条既有 warning）、design:check 通过。
+- 浏览器使用临时会话与历史 API fixtures 检查 390/768/1440px、折叠、逐条菜单、重命名
+  和删除确认；fixtures 不写入产品代码，未访问真实用户数据。
+- 本次未上线；真实 Qwen 标题质量仍需线上验收，模型未返回标题时保留初始提示词标题。
+
+## 2026-09-12 Agent 与最近会话提交发布准备
+
+用户授权“提交上线”。审阅批次包含已批准且此前已上线的 Agent 首版、模板卡片样式，
+以及侧栏入口、Plus 上传、最近会话菜单/折叠与自动短标题调整。452 项测试通过；
+本批不新增迁移，生产 Agent 四表已在此前发布时完成。提交后核对远端 SHA，再发布并验证。

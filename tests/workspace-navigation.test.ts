@@ -11,7 +11,7 @@ test("workspace navigation uses the approved canonical routes", () => {
     home: "/",
     image: "/image",
     video: "/video",
-    assets: "/assets",
+    assets: "/assets", agent: "/agent",
   });
   for (const [destination, pathname] of Object.entries(WORKSPACE_PATHS)) {
     assert.equal(getWorkspaceDestination(pathname), destination);
@@ -26,7 +26,7 @@ test("legacy media routes permanently redirect to the canonical routes", () => {
   assert.match(videoRoute, /permanentRedirect\("\/video"\)/);
 });
 
-test("workspace sidebar exposes only the four approved destinations", () => {
+test("workspace sidebar preserves the existing destinations alongside Agent", () => {
   const sidebar = readFileSync(new URL("../components/blocks/workspace-sidebar.tsx", import.meta.url), "utf8");
   for (const label of ["Home", "Image", "Video", "Assets"]) {
     assert.match(sidebar, new RegExp(`label: "${label}"`));

@@ -12,6 +12,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import { AgentHistory } from "@/components/blocks/agent/agent-history";
 import { Logo } from "@/components/ui/logo";
 import { CreditsWidget } from "@/components/creation/credits-widget";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -26,7 +27,7 @@ export type WorkspaceView = "create" | "assets";
 
 interface WorkspaceSidebarProps {
   activeSection: WorkspaceDestination;
-  onWorkspaceNavigate?: (destination: Exclude<WorkspaceDestination, "home">) => void;
+  onWorkspaceNavigate?: (destination: Exclude<WorkspaceDestination, "home" | "agent">) => void;
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
   mobileOpen: boolean;
@@ -110,6 +111,7 @@ export function WorkspaceSidebar({
               );
             })}
           </nav>
+          <div className={collapsed ? "lg:hidden" : ""}><AgentHistory onNavigate={() => onMobileOpenChange(false)} /></div>
         </div>
 
         <div className="p-3">

@@ -1,6 +1,7 @@
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export type AnalyticsEventName =
+  | "agent_conversation_started" | "agent_message_submitted" | "agent_quote_viewed" | "agent_limit_reached"
   | "template_view" | "template_click" | "template_input_submit" | "clarification_started" | "clarification_completed" | "variant_selected" | "continued_edit"
   | "landing_page_view"
   | "hero_cta_click"
@@ -30,7 +31,7 @@ export function trackEvent(name: AnalyticsEventName, params: EventParams = {}) {
     return;
   }
 
-  window.gtag("event", name, params);
+  window.gtag("event", name, { ...params, ...(window.location?.pathname.startsWith("/agent") ? { page_location: `${window.location.origin}/agent`, page_path: "/agent", page_title: "Agent · Flownana", page_referrer: "" } : {}) });
 }
 
 export function trackPageView(path: string) {
@@ -43,6 +44,11 @@ export function trackPageView(path: string) {
   }
 
   window.gtag("config", GA_MEASUREMENT_ID, {
-    page_path: path,
+    send_page_view: true,
+    page_location: `${window.location.origin}${path}`,
+    page_title: document.title,
+    page_referrer: document.referrer.includes("/agent") ? "" : document.referrer,
+    page_path: path.startsWith("/agent") ? (path.split("?")[0] === "/agent" ? "/agent" : "/agent/[id]") : path,
+    ...(path.startsWith("/agent") ? { page_location: `${window.location.origin}/agent`, page_title: "Agent · Flownana", page_referrer: "" } : {}),
   });
 }

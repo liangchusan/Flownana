@@ -20,6 +20,8 @@ model User {
   updatedAt         DateTime           @updatedAt
   subscriptions     Subscription[]
   creditBatches     CreditBatch[]
+  agentConversations AgentConversation[]
+  agentUsage        AgentUsage[]
   templateRuns      ImageTemplateRun[]
   generations       Generation[]
   mediaAssets       MediaAsset[]
@@ -155,6 +157,7 @@ model MediaAsset {
   origin      String
   createdAt   DateTime          @default(now())
   generations GenerationMedia[]
+  agentAttachments AgentAttachment[]
 
   @@unique([userId, url])
   @@index([userId, type, createdAt(sort: Desc)])
@@ -193,4 +196,64 @@ model ImageTemplateRun {
   updatedAt        DateTime @updatedAt
 
   @@index([userId, templateId, createdAt])
+}
+
+model AgentConversation {
+  id            String @id
+  userId        String
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  templateId    String?
+  revision      Int @default(0)
+  deletedAt     DateTime?
+  cleanupUrls   String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  turns         AgentTurn[]
+  assets        AgentAttachment[]
+  @@index([userId, updatedAt])
+}
+
+model AgentTurn {
+  id             String @id
+  conversationId String
+  conversation   AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  revision       Int
+  prompt         String
+  inputs         Json
+  sourceContext  String @default("")
+  responseKind   String?
+  providerUsage  Json?
+  response       String @default("")
+  suggestions    String[] @default([])
+  quote          Json?
+  quoteExpiresAt DateTime?
+  generationIds  String[] @default([])
+  status         String @default("running")
+  error          String?
+  day            String
+  attempt        Int @default(1)
+  leaseUntil     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@index([conversationId, createdAt])
+  @@index([status, leaseUntil])
+}
+
+model AgentUsage {
+  userId     String
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day        String
+  used       Int @default(0)
+  attempts   DateTime[] @default([])
+  @@id([userId, day])
+}
+
+model AgentAttachment {
+  conversationId String
+  conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  mediaAssetId String
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  @@id([conversationId, mediaAssetId])
+  @@index([mediaAssetId])
 }

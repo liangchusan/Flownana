@@ -146,6 +146,7 @@ export function ComposerToolbarLeading({
   attachments,
   assets,
   onTypeChange,
+  onAgent,
   onAdd,
 }: {
   menuPlacement?: "above" | "below";
@@ -154,6 +155,7 @@ export function ComposerToolbarLeading({
   attachments: ComposerAttachment[];
   assets: ComposerAssetOption[];
   onTypeChange: (type: ActiveComposerType) => void;
+  onAgent?: () => void;
   onAdd: (attachments: ComposerAttachment[]) => void;
 }) {
   const { showToast } = useToast();
@@ -491,6 +493,7 @@ export function ComposerToolbarLeading({
         </button>
         {typeOpen && (
           <div className={`absolute ${menuPlacement === "below" ? "top-[calc(100%+0.5rem)]" : "bottom-[calc(100%+0.5rem)]"} left-0 z-50 w-36 rounded-ui-lg border border-border bg-background p-1 shadow-float`}>
+            {onAgent && <button type="button" onClick={() => { onAgent(); setTypeOpen(false); }} className="flex min-h-11 w-full items-center gap-2 rounded-ui px-2 text-xs transition-all duration-300 hover:bg-surface-soft focus-visible:ring-2 focus-visible:ring-primary">Agent</button>}
             {(["image", "video"] as const).map((type) => (
               <button
                 key={type}

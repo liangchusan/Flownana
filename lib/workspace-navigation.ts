@@ -3,6 +3,7 @@ export const WORKSPACE_PATHS = {
   image: "/image",
   video: "/video",
   assets: "/assets",
+  agent: "/agent",
 } as const;
 
 export type WorkspaceDestination = keyof typeof WORKSPACE_PATHS;

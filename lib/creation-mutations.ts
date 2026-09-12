@@ -60,6 +60,7 @@ export async function deleteCreationOutputs(account: GenerationAccount, target: 
       if (asset) {
         await tx.generationMedia.deleteMany({ where: { generationId: generation.id, mediaAssetId: asset.id, role: "output" } });
         if (await tx.generationMedia.count({ where: { mediaAssetId: asset.id } })) continue;
+        if (await tx.agentAttachment.count({ where: { mediaAssetId: asset.id } })) continue;
         // Once removed under the User lock, a concurrent reference reservation
         // cannot recreate this input after the external Blob cleanup starts.
         await tx.mediaAsset.delete({ where: { id: asset.id } });

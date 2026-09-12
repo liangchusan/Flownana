@@ -24,7 +24,7 @@ test("home footer appears only after the session is confirmed anonymous", () => 
   const load = createSourceLoader({
     react: hooks,
     "next-auth/react": { useSession: () => ({ status, data: status === "authenticated" ? { user } : null }) },
-    "next/navigation": { usePathname: () => "/" },
+    "next/navigation": { useRouter: () => ({ push: () => undefined }), usePathname: () => "/" },
     "@/lib/use-account-operation": { useAccountOperation: () => ({ capture: () => {} }) },
     "@/components/blocks/app-toast-provider": { useToast: () => ({ showToast: () => {} }) },
     "@/components/layout/footer": { Footer },
@@ -85,7 +85,7 @@ test("Home submits through the shared forms and navigates only after acceptance"
   const load = createSourceLoader({
     react: hooks,
     "next-auth/react": { useSession: () => ({ data: { user }, status: "authenticated" }) },
-    "next/navigation": { usePathname: () => "/" },
+    "next/navigation": { useRouter: () => ({ push: () => undefined }), usePathname: () => "/" },
     "@/lib/use-account-operation": { useAccountOperation: () => ({ capture: () => {} }) },
     "@/components/blocks/app-toast-provider": { useToast: () => ({ showToast: () => {} }) },
     "@/components/generate/generate-form": { GenerateForm: Form },

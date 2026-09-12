@@ -7,6 +7,7 @@ export type CreationStatus =
   | "deleted";
 
 export interface GenerationParameters {
+  agentConversationId?: string;
   templateId?: string;
   templateRunId?: string;
   templateVersion?: number;
@@ -60,6 +61,7 @@ export function normalizeGenerationParameters(
       ? outputCountValue
       : undefined;
   const parameters: GenerationParameters = {
+    ...(readParameterString(candidate.agentConversationId) ? { agentConversationId: readParameterString(candidate.agentConversationId) } : {}),
     ...(readParameterString(candidate.templateId) ? { templateId: readParameterString(candidate.templateId) } : {}),
     ...(readParameterString(candidate.templateRunId) ? { templateRunId: readParameterString(candidate.templateRunId) } : {}),
     ...(typeof candidate.templateVersion === "number" ? { templateVersion: candidate.templateVersion } : {}),

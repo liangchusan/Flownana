@@ -101,11 +101,10 @@ export function TemplateGallery({ onSelect }: { onSelect?: (id: string) => void 
   return (
     <section ref={root} aria-labelledby="templates-heading" className="px-4 pb-12 md:px-8 md:pb-16">
       <div className="mx-auto w-full max-w-7xl">
-        <div className="mb-6">
-          <h2 id="templates-heading" className="font-display text-3xl font-medium text-foreground">Templates</h2>
-          <p className="mt-2 text-sm text-muted-foreground">A little inspiration for your next image.</p>
+        <div className="mb-4">
+          <h2 id="templates-heading" className="font-display text-xl font-medium text-foreground">Templates</h2>
         </div>
-        <ul className="grid grid-cols-2 gap-x-4 gap-y-6 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-6">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {templates.map((template) => (
             <li data-template-id={template.id} key={template.id} className="min-w-0">
               <button type="button" onClick={() => onSelect?.(template.id)} aria-label={`Use ${template.title} template`} className="relative block aspect-[4/5] w-full overflow-hidden rounded-ui-xl bg-surface-soft transition-all duration-300 hover:shadow-soft active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -113,12 +112,12 @@ export function TemplateGallery({ onSelect }: { onSelect?: (id: string) => void 
                   src={`/templates/covers/${template.id}-v1.png`}
                   alt={`${template.title} example`}
                   fill
-                  sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, (max-width: 1535px) 25vw, 320px"
+                  sizes="(max-width: 639px) 50vw, (max-width: 767px) 33vw, (max-width: 1023px) 25vw, (max-width: 1535px) 17vw, 205px"
                   className="object-cover"
                 />
+                <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-surface-dark/70 to-transparent" />
+                <span className="absolute inset-x-0 bottom-0 p-3 text-left text-sm font-medium leading-snug text-white">{template.title}</span>
               </button>
-              <h3 className="mt-3 text-sm font-medium text-foreground sm:text-base">{template.title}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{template.description}</p>
             </li>
           ))}
         </ul>
