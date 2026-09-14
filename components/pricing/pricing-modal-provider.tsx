@@ -10,8 +10,11 @@ import {
 } from "react";
 import { X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { PricingPlans } from "@/components/pricing/pricing-plans";
+import dynamic from "next/dynamic";
+import { PanelLoading } from "@/components/ui/panel-loading";
 import { trackEvent } from "@/lib/analytics";
+
+const PricingPlans = dynamic(() => import("@/components/pricing/pricing-plans").then(m => m.PricingPlans), { loading: PanelLoading });
 
 type PricingModalContextValue = {
   openPricing: () => void;

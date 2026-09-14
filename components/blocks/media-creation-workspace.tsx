@@ -2,16 +2,15 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { PanelLoading } from "@/components/ui/panel-loading";
 import { Footer } from "@/components/layout/footer";
-import { AgentComposer } from "@/components/blocks/agent/agent-composer";
 import { trackEvent } from "@/lib/analytics";
 import { TemplateGallery } from "@/components/blocks/home/template-gallery";
 import { Modal } from "@/components/ui/modal";
 import { PanelRight, Trash2, X } from "lucide-react";
 import { GenerateForm } from "@/components/generate/generate-form";
-import { VideoCreationForm } from "@/components/creation/video-creation-form";
-import { CreationStream, type WorkspaceRun } from "@/components/blocks/creation-stream";
-import { AssetsLibrary } from "@/components/blocks/assets-library";
+import type { WorkspaceRun } from "@/components/blocks/creation-stream";
 import { WorkspaceMobileHeader, WorkspaceSidebar, type WorkspaceView } from "@/components/blocks/workspace-sidebar";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, getCreationTimelineKey, mergeCreations, reconcileCreationSnapshot, type CreationHistoryItem, type GenerationParameters } from "@/lib/creation-history";
@@ -32,6 +31,7 @@ import { COMPOSER_TYPE_STORAGE_KEY } from "@/lib/composer-preference";
 import { useSession } from "next-auth/react";
 import { accountRequestHeaders, getAccountScope } from "@/lib/account-scope";
 import { useAccountOperation } from "@/lib/use-account-operation";
+import { initialHistoryRefreshDelay } from "@/lib/history-refresh";
 import { GENERATION_STATUS_UNAVAILABLE } from "@/lib/generation-request-state";
 import { InputMedia } from "@/components/creation/input-media";
 import {
@@ -39,6 +39,11 @@ import {
   getWorkspaceDestination,
   type WorkspaceCreationDestination,
 } from "@/lib/workspace-navigation";
+
+const VideoCreationForm = dynamic(() => import("@/components/creation/video-creation-form").then(m => m.VideoCreationForm), { loading: PanelLoading });
+const AgentComposer = dynamic(() => import("@/components/blocks/agent/agent-composer").then(m => m.AgentComposer), { loading: PanelLoading });
+const AssetsLibrary = dynamic(() => import("@/components/blocks/assets-library").then(m => m.AssetsLibrary), { loading: PanelLoading });
+const CreationStream = dynamic(() => import("@/components/blocks/creation-stream").then(m => m.CreationStream), { loading: PanelLoading });
 
 type ComposerType = CreationHistoryItem["type"];
 
@@ -70,13 +75,14 @@ type WorkspaceProps = {
   initialView?: WorkspaceView;
   initialCreations?: CreationHistoryItem[];
   initialAccountScope?: string | null;
+  initialHistoryLoadedAt?: number;
   initialPrompt?: string;
 };
 
 export function MediaCreationWorkspace(props: WorkspaceProps) {
   const { data: session } = useSession();
   const accountScope = getAccountScope(session?.user);
-  return <ScopedMediaCreationWorkspace key={accountScope || "anonymous"} {...props} accountScope={accountScope} initialPrompt={accountScope === (props.initialAccountScope ?? null) ? props.initialPrompt : undefined} initialCreations={accountScope && accountScope === props.initialAccountScope ? props.initialCreations : []} />;
+  return <ScopedMediaCreationWorkspace key={accountScope || "anonymous"} {...props} accountScope={accountScope} initialHistoryLoadedAt={accountScope && accountScope === props.initialAccountScope ? props.initialHistoryLoadedAt : undefined} initialPrompt={accountScope === (props.initialAccountScope ?? null) ? props.initialPrompt : undefined} initialCreations={accountScope && accountScope === props.initialAccountScope ? props.initialCreations : []} />;
 }
 
 function ScopedMediaCreationWorkspace({
@@ -84,6 +90,7 @@ function ScopedMediaCreationWorkspace({
   initialView = "create",
   initialCreations = [],
   initialPrompt,
+  initialHistoryLoadedAt,
   accountScope,
 }: WorkspaceProps & { accountScope: string | null }) {
   const { capture: captureGeneration } = useAccountOperation();
@@ -96,6 +103,7 @@ function ScopedMediaCreationWorkspace({
   const [view, setView] = useState<WorkspaceView>(initialView);
   const [composerType, setComposerType] = useState<ActiveComposerType>(initialType);
   const [creations, setCreations] = useState<CreationHistoryItem[]>(initialCreations);
+  const historySeedTime = useRef(initialHistoryLoadedAt);
   const [draft, setDraft] = useState<DraftSeed>({
     prompt: initialPrompt || "",
     attachments: [],
@@ -201,7 +209,9 @@ function ScopedMediaCreationWorkspace({
       } catch { /* A transport failure is not a terminal generation failure. */ }
       finally { if (!controller.signal.aborted) timer = setTimeout(refresh, 10_000); }
     };
-    void refresh();
+    const initialDelay = initialHistoryRefreshDelay(historySeedTime.current);
+    if (initialDelay) timer = setTimeout(refresh, initialDelay);
+    else void refresh();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [accountScope]);
 

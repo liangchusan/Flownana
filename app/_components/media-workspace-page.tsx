@@ -24,6 +24,9 @@ export async function MediaWorkspacePage({
   const initialCreations = session?.user?.id
     ? await getCreationHistory({ userId: session.user.id, accountCreatedAt: session.user.accountCreatedAt })
     : [];
+  // This server-only timestamp records completion of the uncached DB read.
+  // eslint-disable-next-line react-hooks/purity
+  const historyLoadedAt = Date.now();
   const params = searchParams ? await searchParams : {};
   const prompt = typeof params.prompt === "string" ? params.prompt : undefined;
 
@@ -34,6 +37,7 @@ export async function MediaWorkspacePage({
           initialType={initialType}
           initialView={initialView}
           initialCreations={initialCreations}
+          initialHistoryLoadedAt={historyLoadedAt}
           initialAccountScope={getAccountScope(session?.user)}
           initialPrompt={prompt}
         />
@@ -41,4 +45,3 @@ export async function MediaWorkspacePage({
     </SessionBoundary>
   );
 }
-

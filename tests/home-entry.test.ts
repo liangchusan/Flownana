@@ -97,7 +97,9 @@ test("Home submits through the shared forms and navigates only after acceptance"
     navigations.length = 0;
     const scope = Workspace({ initialType: type });
     const tree = scope.type(scope.props);
-    const form = elements(tree).find((item) => item.type === Form);
+    // next/dynamic wraps the video form; verify the submitted contract at the
+    // form boundary rather than relying on the wrapper's component identity.
+    const form = elements(tree).find((item) => item.props?.variant === "composer");
     assert.ok(form);
     assert.equal(form.props.variant, "composer");
     form.props.toolbarLeading.props.onTypeChange(type);

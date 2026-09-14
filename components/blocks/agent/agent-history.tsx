@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, MoreHorizontal, Pencil, SquarePen, Trash2 } from "lucide-react";
-import { accountRequestHeaders, getAccountScope } from "@/lib/account-scope";
+import { getAccountScope } from "@/lib/account-scope";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { fetchAgentSnapshot } from "@/lib/shared-agent-read";
 type Conversation = { id: string; title: string };
 const iconClass = "flex h-9 w-9 shrink-0 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50";
 export function AgentHistory({ onNavigate }: { onNavigate: () => void }) {
@@ -26,12 +27,12 @@ export function AgentHistory({ onNavigate }: { onNavigate: () => void }) {
     setRows([]); setMenu(null); setDialog(null); setBusy(false);
     if (!scope) return;
     const abort = new AbortController();
-    const read = async () => { try { const res = await fetch("/api/agent", { headers: accountRequestHeaders(scope), signal: abort.signal, cache: "no-store" }); const data = await res.json(); if (!abort.signal.aborted && res.ok && data.accountScope === scope) { setRows(data.conversations); setLoadedScope(scope); } } catch { /* Preserve the last successful history while offline. */ } };
+    const read = async () => { try { const { ok, data } = await fetchAgentSnapshot(scope, undefined, abort.signal); if (!abort.signal.aborted && ok && data.accountScope === scope) { setRows(data.conversations); setLoadedScope(scope); } } catch { /* Preserve the last successful history while offline. */ } };
     void read();
     const interval = window.setInterval(() => { if (!document.hidden) void read(); }, 15000);
     window.addEventListener("agent-conversations-changed", read);
     return () => { abort.abort(); window.clearInterval(interval); window.removeEventListener("agent-conversations-changed", read); };
-  }, [scope, path]);
+  }, [scope]);
   useEffect(() => {
     if (!menu) return;
     const close = (event: PointerEvent) => { if (!(event.target instanceof Element) || !event.target.closest("[data-conversation-actions]")) setMenu(null); };

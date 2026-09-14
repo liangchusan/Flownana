@@ -5,34 +5,37 @@ import { getAccountScope, matchesRequestAccount } from "@/lib/account-scope";
 import { getCreationHistory, type CreationType } from "@/lib/creations";
 import { CreationMutationError, deleteCreationOutputs, hideCreations } from "@/lib/creation-mutations";
 import { GenerationRequestError } from "@/lib/generation-lifecycle";
+import { measureRequestStage, timedResponse } from "@/lib/request-timing";
 
 export async function GET(request: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !matchesRequestAccount(request, session.user)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return timedResponse("/api/creations", async () => {
+    try {
+      const session = await measureRequestStage("auth", () => getServerSession(authOptions));
+      if (!session?.user?.id || !matchesRequestAccount(request, session.user)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const { searchParams } = new URL(request.url);
+      const type = searchParams.get("type");
+      const creationType =
+        type === "image" || type === "video" || type === "music"
+          ? (type as CreationType)
+          : undefined;
+      const creations = await measureRequestStage("history", () => getCreationHistory({
+        userId: session.user.id,
+        accountCreatedAt: session.user.accountCreatedAt,
+        type: creationType,
+      }));
+
+      return NextResponse.json({ success: true, accountScope: getAccountScope(session.user), creations });
+    } catch (error) {
+      console.error("Error fetching creations:", error);
+      return NextResponse.json(
+        { success: false, creations: [] },
+        { status: 500 }
+      );
     }
-
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type");
-    const creationType =
-      type === "image" || type === "video" || type === "music"
-        ? (type as CreationType)
-        : undefined;
-    const creations = await getCreationHistory({
-      userId: session.user.id,
-      accountCreatedAt: session.user.accountCreatedAt,
-      type: creationType,
-    });
-
-    return NextResponse.json({ success: true, accountScope: getAccountScope(session.user), creations });
-  } catch (error) {
-    console.error("Error fetching creations:", error);
-    return NextResponse.json(
-      { success: false, creations: [] },
-      { status: 500 }
-    );
-  }
+  });
 }
 
 export async function DELETE(request: Request) {

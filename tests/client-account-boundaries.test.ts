@@ -14,13 +14,15 @@ test("actual workspace and home entrypoints never relabel an old RSC seed as a n
   const workspace = load<any>("components/blocks/media-creation-workspace.tsx").MediaCreationWorkspace;
   for (const [component, prop] of [[workspace, "initialCreations"]] as const) {
     user = a;
-    const props = { initialType: "image", [prop]: seeds, initialPrompt: "private draft", initialAccountScope: getAccountScope(a) };
+    const props = { initialType: "image", [prop]: seeds, initialPrompt: "private draft", initialAccountScope: getAccountScope(a), initialHistoryLoadedAt: 12345 };
     const first = component(props);
     assert.equal(first.props[prop], seeds);
+    assert.equal(first.props.initialHistoryLoadedAt, 12345);
     user = b;
     const second = component(props);
     assert.notEqual(second.key, first.key);
     assert.deepEqual(second.props[prop], []);
+    assert.equal(second.props.initialHistoryLoadedAt, undefined);
     if (component === workspace) assert.equal(second.props.initialPrompt, undefined);
     user = { ...a, accountCreatedAt: "2026-08-31T01:00:00.000Z" };
     assert.deepEqual(component(props).props[prop], []);

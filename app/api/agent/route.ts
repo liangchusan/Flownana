@@ -8,6 +8,7 @@ import { beginAgentTurn, readAgent, prepareAgentMediaRetry, failAgentTurn, confi
 import { understandAgent, stopLocalAgent } from "@/lib/agent/understand";
 import { executeAgentOutput } from "@/lib/agent/worker";
 import { GenerationRequestError } from "@/lib/generation-lifecycle";
+import { measureRequestStage, timedResponse } from "@/lib/request-timing";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 async function accountFor(request: NextRequest) {
@@ -24,8 +25,13 @@ function failure(error: unknown) {
   return NextResponse.json({ error: "Agent is temporarily unavailable. Your input is preserved; please try again.", code: "unavailable" }, { status: 503 });
 }
 export async function GET(request: NextRequest) {
-  try { const account = await accountFor(request); return NextResponse.json({ ...await readAgent(account, request.nextUrl.searchParams.get("id") || undefined), accountScope: getAccountScope(account) }, { headers: { "Cache-Control": "private, no-store" } }); }
-  catch (error) { return failure(error); }
+  return timedResponse("/api/agent", async () => {
+    try {
+      const account = await measureRequestStage("auth", () => accountFor(request));
+      const snapshot = await measureRequestStage("agent", () => readAgent(account, request.nextUrl.searchParams.get("id") || undefined));
+      return NextResponse.json({ ...snapshot, accountScope: getAccountScope(account) }, { headers: { "Cache-Control": "private, no-store" } });
+    } catch (error) { return failure(error); }
+  });
 }
 export async function POST(request: NextRequest) {
   try {

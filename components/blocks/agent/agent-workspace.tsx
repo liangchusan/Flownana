@@ -16,6 +16,7 @@ import { trackEvent } from "@/lib/analytics";
 import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import type { AgentSnapshot, AgentTurnView, AgentOutput } from "./types";
+import { fetchAgentSnapshot } from "@/lib/shared-agent-read";
 
 export function AgentWorkspace(props: { id?: string; templateId?: string; sourceId?: string }) {
   const { data: session } = useSession();
@@ -38,9 +39,9 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
     if (!scope) return;
     const op = capture();
     try {
-      const res = await fetch(`/api/agent${id ? `?id=${encodeURIComponent(id)}` : ""}`, { headers: op.headers, signal: op.signal, cache: "no-store" });
-      const data = await res.json(); op.assertCurrent();
-      if (!res.ok) { setError(data.error); setCleanupPending(data.code === "cleanup_pending"); return; }
+      const { ok, data } = await fetchAgentSnapshot(scope, id, op.signal);
+      op.assertCurrent();
+      if (!ok) { setError(data.error ?? "Could not load conversation."); setCleanupPending(data.code === "cleanup_pending"); return; }
       if (data.accountScope !== scope) return;
       setSnapshot(data);
       let intent = data.turns[0]?.id;
