@@ -7,6 +7,14 @@ if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Resolve legacy URLs before the root loading boundary starts streaming.
+  redirects() {
+    return [
+      { source: "/ai-image", destination: "/image", permanent: true },
+      { source: "/ai-video", destination: "/video", permanent: true },
+      { source: "/ai-music", destination: "/image", permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       {
