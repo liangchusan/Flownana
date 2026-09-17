@@ -1,5 +1,22 @@
 # Flownana 工程记忆
 
+## 2026-09-17 生成设置与引用校验生产发布
+
+- 已提交并推送 `41b4f19 feat: unify generation settings and reference validation`；本地
+  `HEAD`、`origin/main` 与 GitHub `main` 已核对一致。远端仅保留 `main`，没有需合并、推送
+  或清理的其他分支。
+- Vercel 生产部署 `dpl_8DYwpMMTbDjtkW8jF4JhiaDqWGTq` 已 READY，绑定
+  `https://www.flownana.com`、根域名和 Vercel 别名。此产物包含统一 Generation Settings、
+  Reference Picker/服务端所有权与元数据检查、媒体时长校验、Agent 报价与引用收敛、Toast 与
+  共享媒体预览行为，以及对应的产品/设计/测试更新。
+- 本地 `npm run test` 为 393 passed、11 skipped、0 failed；`npm run design:check`、
+  `npm run lint -- --quiet`、`npm run build` 与 `git diff --check` 通过。生产
+  `npm run smoke:prod` 全部通过：首页、Image、Video、Assets、旧路由、演示视频、未登录 API
+  边界、Suno 410 和 Veo options 均符合预期。
+- 仍需登录态手测：390/768/1440px 下的 Generation Settings、直接上传/Assets 引用限制 Toast、
+  上传占位和替换、Agent `@` 引用及超过 10 分钟报价后的真实生成；冒烟不覆盖真实 Provider、
+  Stripe 或付费数据库链路。
+
 ## 2026-09-17 Composer 引用缩略图与上传占位（已发布，待提交）
 
 - Image/Video Composer 的参考图片和视频统一为 80px 的 1:1 缩略图，移除名称文字；删除
