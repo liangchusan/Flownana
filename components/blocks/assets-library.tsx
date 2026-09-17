@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AtSign, Download, Image as ImageIcon, Music, Search, Trash2, Video, X } from "lucide-react";
+import { AtSign, Download, Image as ImageIcon, Music, Search, Trash2, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { MediaPreviewModal } from "@/components/ui/media-preview-modal";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, type CreationHistoryItem } from "@/lib/creation-history";
@@ -121,7 +122,7 @@ export function AssetsLibrary({
         </div>
       )}
 
-      {preview && <Modal onClose={() => setPreview(null)} aria-label="Media preview" className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-dark/95 p-4" ><button type="button" aria-label="Close preview" onClick={() => setPreview(null)} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white"><X className="h-5 w-5" /></button>{preview.creation.type === "image" ? <ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Image" className="max-w-xl rounded-ui-xl">{({ src, onError, onReady }) => <img src={src} alt={preview.creation.prompt} onError={onError} onLoad={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}</ResilientMedia> : preview.creation.type === "video" ? <ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Video" className="max-w-xl rounded-ui-xl">{({ src, onError, onReady }) => <video src={src} controls autoPlay playsInline onError={onError} onLoadedData={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}</ResilientMedia> : <div className="w-full max-w-xl rounded-ui-xl bg-surface-elevated p-8 text-center text-white"><Music className="mx-auto h-12 w-12 text-stone-400" /><p className="mt-4 text-sm text-stone-300">{preview.creation.prompt}</p><div className="relative mt-6 overflow-hidden rounded-ui-lg"><ResilientMedia creationId={preview.creation.taskId || preview.creation.id} url={preview.url} label="Audio" className="min-h-32 rounded-ui-lg">{({ src, onError, onReady }) => <audio src={src} controls autoPlay onError={onError} onCanPlay={onReady} className="w-full" />}</ResilientMedia></div></div>}</Modal>}
+      {preview && <MediaPreviewModal creationId={preview.creation.taskId || preview.creation.id} url={preview.url} type={preview.creation.type === "music" ? "audio" : preview.creation.type} alt={preview.creation.prompt || "Asset preview"} prompt={preview.creation.prompt} onClose={() => setPreview(null)} />}
       {pendingDelete && <Modal onClose={() => setPendingDelete(null)} aria-label="Delete this asset?" className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/25 p-4" ><div className="w-full max-w-md rounded-ui-xl border border-border bg-background p-6 shadow-float"><h2 className="text-lg font-medium text-foreground">Delete this asset?</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">It will disappear from Assets and become a deleted placeholder in its Create record.</p><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button><Button onClick={deleteAsset} className="bg-destructive text-white hover:bg-destructive/90">Delete</Button></div></div></Modal>}
     </div>
   );

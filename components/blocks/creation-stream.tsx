@@ -7,7 +7,6 @@ import {
   Download,
   Ellipsis,
   Image as ImageIcon,
-  Music,
   Pause,
   Play,
   RefreshCw,
@@ -20,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { Modal } from "@/components/ui/modal";
+import { MediaPreviewModal } from "@/components/ui/media-preview-modal";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, formatConversationTimestamp, formatProcessingDuration, getCreationRunRemovalTarget, shouldShowConversationTimestamp, type CreationHistoryItem } from "@/lib/creation-history";
@@ -69,41 +69,6 @@ export function groupWorkspaceRuns(creations: CreationHistoryItem[]): WorkspaceR
     );
 }
 
-function MediaViewer({
-  creation,
-  url,
-  onClose,
-}: {
-  creation: CreationHistoryItem;
-  url: string;
-  onClose: () => void;
-}) {
-  return (
-    <Modal onClose={onClose} className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-dark/95 p-4" aria-label="Media preview">
-      <button type="button" onClick={onClose} className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300 hover:bg-white/20" aria-label="Close preview"><X className="h-5 w-5" /></button>
-      {creation.type === "image" ? (
-        <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Image" className="max-w-xl rounded-ui-xl">
-          {({ src, onError, onReady }) => <img src={src} alt={creation.prompt} onError={onError} onLoad={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}
-        </ResilientMedia>
-      ) : creation.type === "video" ? (
-        <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Video" className="max-w-xl rounded-ui-xl">
-          {({ src, onError, onReady }) => <video src={src} controls autoPlay playsInline onError={onError} onLoadedData={onReady} className="max-h-[88vh] max-w-[92vw] rounded-ui-xl object-contain" />}
-        </ResilientMedia>
-      ) : (
-        <div className="w-full max-w-xl rounded-ui-xl border border-white/10 bg-surface-elevated p-8 text-center text-white">
-          <Music className="mx-auto h-12 w-12 text-stone-400" />
-          <p className="mt-4 text-sm text-stone-300">{creation.prompt}</p>
-          <div className="relative mt-6 overflow-hidden rounded-ui-lg">
-            <ResilientMedia creationId={creation.taskId || creation.id} url={url} label="Audio" className="min-h-32 rounded-ui-lg">
-              {({ src, onError, onReady }) => <audio src={src} controls autoPlay onError={onError} onCanPlay={onReady} className="w-full" />}
-            </ResilientMedia>
-          </div>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
 function formatMediaTime(value: number) {
   if (!Number.isFinite(value) || value < 0) return "0:00";
   const totalSeconds = Math.floor(value);
@@ -112,7 +77,7 @@ function formatMediaTime(value: number) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-function VideoResult({
+export function VideoResult({
   creationId,
   url,
   prompt,
@@ -234,6 +199,32 @@ function VideoResult({
   );
 }
 
+export function ResultOverlayActions({
+  showReference = true,
+  onReference,
+  onDownload,
+  onDelete,
+}: {
+  showReference?: boolean;
+  onReference: () => void;
+  onDownload: () => void;
+  onDelete: () => void;
+}) {
+  const actions = [
+    ...(showReference ? [{ label: "Reference", icon: AtSign, action: onReference }] : []),
+    { label: "Download", icon: Download, action: onDownload },
+    { label: "Delete", icon: Trash2, action: onDelete },
+  ];
+  return (
+    <div className="absolute right-2 top-2 z-20 flex items-center gap-1 opacity-100 transition-all duration-300 sm:translate-y-1 sm:opacity-0 sm:group-hover/result:translate-y-0 sm:group-hover/result:opacity-100 sm:group-focus-within/result:translate-y-0 sm:group-focus-within/result:opacity-100">
+      {actions.map((item) => {
+        const Icon = item.icon;
+        return <button key={item.label} type="button" onClick={(event) => { event.stopPropagation(); item.action(); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-stone-950/80 text-white shadow-soft transition-all duration-300 hover:bg-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={item.label} title={item.label}><Icon className="h-4 w-4" /></button>;
+      })}
+    </div>
+  );
+}
+
 function ResultActions({
   creation,
   url,
@@ -254,18 +245,7 @@ function ResultActions({
     link.click();
     document.body.removeChild(link);
   };
-  return (
-    <div className="absolute right-2 top-2 z-20 flex items-center gap-1 opacity-100 transition-all duration-300 sm:translate-y-1 sm:opacity-0 sm:group-hover/result:translate-y-0 sm:group-hover/result:opacity-100 sm:group-focus-within/result:translate-y-0 sm:group-focus-within/result:opacity-100">
-      {[
-        { label: "Reference", icon: AtSign, action: onReference },
-        { label: "Download", icon: Download, action: download },
-        { label: "Delete", icon: Trash2, action: onDelete },
-      ].map((item) => {
-        const Icon = item.icon;
-        return <button key={item.label} type="button" onClick={(event) => { event.stopPropagation(); item.action(); }} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-stone-950/80 text-white shadow-soft transition-all duration-300 hover:bg-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={item.label} title={item.label}><Icon className="h-4 w-4" /></button>;
-      })}
-    </div>
-  );
+  return <ResultOverlayActions onReference={onReference} onDownload={download} onDelete={onDelete} />;
 }
 
 function RunStatus({ run }: { run: WorkspaceRun }) {
@@ -587,7 +567,7 @@ export function CreationStream({
         );
       })}
 
-      {viewer && <MediaViewer creation={viewer.creation} url={viewer.url} onClose={() => setViewer(null)} />}
+      {viewer && <MediaPreviewModal creationId={viewer.creation.taskId || viewer.creation.id} url={viewer.url} type={viewer.creation.type === "music" ? "audio" : viewer.creation.type} alt={viewer.creation.prompt || "Generated media"} prompt={viewer.creation.prompt} onClose={() => setViewer(null)} />}
       {(pendingDelete || pendingRemove) && (
         <Modal onClose={() => { setPendingDelete(null); setPendingRemove(null); }} className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/25 p-4" aria-label={pendingDelete ? "Delete this media?" : "Remove this record from recent?"}>
           <div className="w-full max-w-md rounded-ui-xl border border-border bg-background p-6 shadow-float">

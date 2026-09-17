@@ -1,5 +1,6 @@
+import { referenceBatchIssue } from "../reference-validation.ts";
 import { z } from "zod";
-import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, getImageGenerationCredits, getVideoModelName, type ImageModelOptionId, type ImageResolutionKey } from "../generation-pricing.ts";
+import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, getImageGenerationCredits, getVideoModelName, DEFAULT_VIDEO_RESOLUTIONS, DEFAULT_VIDEO_ASPECT_RATIOS, videoFollowsInputRatio, type ImageModelOptionId, type ImageResolutionKey } from "../generation-pricing.ts";
 import { getImageInputCapabilities, getVideoInputCapabilities } from "../generation-input-capabilities.ts";
 import { getImageAspectRatios, isSupportedImageInputType } from "../image-model-capabilities.ts";
 
@@ -10,14 +11,15 @@ export class AgentError extends Error {
 }
 export const agentInputSchema = z.object({
   url: z.string().url().max(2048), kind: z.enum(["image", "video", "audio"]),
+  name: z.string().max(255).optional(), contentType: z.string().max(100).optional(), sizeBytes: z.number().nonnegative().optional(), durationSeconds: z.number().positive().optional(),
   role: z.enum(["subject", "style", "layout", "brand", "edit", "reference"]).default("reference"),
 });
 export type AgentInput = z.infer<typeof agentInputSchema>;
 export const messageSchema = z.object({
   conversationId: z.string().uuid(), id: z.string().uuid(), revision: z.number().int().min(0),
-  prompt: z.string().trim().min(1).max(5000), inputs: z.array(agentInputSchema).max(22).default([]),
+  prompt: z.string().trim().max(5000), inputs: z.array(agentInputSchema).max(22).default([]),
   templateId: z.string().max(80).optional(), sourceGenerationId: z.string().max(128).optional(),
-});
+}).refine(value => !!value.prompt || value.inputs.length > 0, { message: "Add a description or reference." });
 export const proposalSchema = z.object({
   type: z.enum(["image", "video"]), summary: z.string().min(1).max(1000),
   prompt: z.string().min(3).max(4500), exactText: z.array(z.string().max(500)).max(20),
@@ -25,22 +27,25 @@ export const proposalSchema = z.object({
   model: z.string().max(100).optional(), resolution: z.string().max(10).optional(),
   aspectRatio: z.string().max(10).optional(), count: z.number().int().min(1).max(4).optional(),
   duration: z.number().int().min(1).max(30).optional(), sound: z.boolean().optional(),
-  directions: z.array(z.object({ title: z.string().min(1).max(100), prompt: z.string().min(1).max(350) })).max(4),
+  directions: z.array(z.object({ title: z.string().min(1).max(100), prompt: z.string().min(1).max(350) })).max(4).default([]),
 });
 export type AgentProposal = z.infer<typeof proposalSchema>;
 export type AgentQuote = AgentProposal & {
   model: string; modelId: string; resolution: string; aspectRatio: string; count: number;
   credits: number; unitCredits: number; inputs: AgentInput[]; templateId?: string; templateVersion?: number;
 };
+export function quoteFeedback(quote: AgentQuote) {
+  return `已为你准备好${quote.summary.trim()}生成方案，点击 Generate 即可生成。`;
+}
 export function usageDay(now = new Date()) { return now.toISOString().slice(0, 10); }
 export function quotaLimit(paid: boolean) { return paid ? 100 : 10; }
 export function resetTime(now = new Date()) { return new Date(`${usageDay(new Date(now.getTime() + 86400000))}T00:00:00.000Z`).toISOString(); }
 export function modelCatalog() {
   return {
-    images: IMAGE_MODEL_OPTIONS.map(m => ({ id: m.id, name: m.label, resolutions: m.resolutions ?? Object.keys(m.credits), ...getImageInputCapabilities(m.id) })),
+    images: IMAGE_MODEL_OPTIONS.map(m => ({ id: m.id, name: m.label, resolutions: m.resolutions ?? Object.keys(m.credits), aspectRatios: getImageAspectRatios(m.id, "1K", 0), ...getImageInputCapabilities(m.id) })),
     videos: [...new Set(VIDEO_MODEL_OPTIONS.map(getVideoModelName))].map(name => {
-      const options = VIDEO_MODEL_OPTIONS.filter(m => getVideoModelName(m) === name);
-      return { name, ...getVideoInputCapabilities(name), resolutions: [...new Set(options.map(m => m.resolution))], durations: [...new Set(options.map(m => m.duration))] };
+      const options = VIDEO_MODEL_OPTIONS.filter(m => getVideoModelName(m) === name && DEFAULT_VIDEO_RESOLUTIONS.includes(m.resolution as never));
+      return { name, aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS.filter(r => options.some(o => o.aspectRatios?.includes(r))), sound: options.some(o => o.hasAudio), audioConfigurable: options.some(o => o.audioConfigurable), ...getVideoInputCapabilities(name), resolutions: [...new Set(options.map(m => m.resolution))], durations: [...new Set(options.map(m => m.duration))] };
     }),
   };
 }
@@ -63,24 +68,30 @@ export function buildQuote(value: unknown, inputs: AgentInput[], context: {
     if (model.flatCredits && resolution !== "Auto") throw new AgentError("This model does not offer a resolution setting.");
     const aspectRatio = p.aspectRatio ?? "1:1";
     if (!getImageAspectRatios(modelId, resolution as ImageResolutionKey, counts.image).includes(aspectRatio)) throw new AgentError("Choose a supported image ratio.");
-    const count = p.count ?? (context.editing ? 1 : context.templateId ? 4 : 1);
-    if (p.directions.length !== count) throw new AgentError(`Provide exactly ${count} directions, preserving the selected direction when editing.`);
+    const count = p.count ?? (context.editing ? 1 : 4);
     const unitCredits = getImageGenerationCredits(modelId, resolution as ImageResolutionKey, counts.image);
     if (!unitCredits) throw new AgentError("This image quote is unavailable.");
-    return { ...base, model: model.label, modelId, resolution, aspectRatio, count, unitCredits, credits: unitCredits * count };
+    return { ...base, directions: [], model: model.label, modelId, resolution, aspectRatio, count, unitCredits, credits: unitCredits * count };
   }
   if (p.count && p.count !== 1) throw new AgentError("Video requests create one output at a time.");
   const name = p.model ?? "Seedance 2.0 Mini";
-  const resolution = p.resolution ?? "720P", duration = p.duration ?? 5, sound = p.sound ?? false;
+  const resolution = p.resolution ?? "720P", duration = p.duration ?? 5;
+  if (!DEFAULT_VIDEO_RESOLUTIONS.includes(resolution as never)) throw new AgentError("Choose an available video resolution.");
   const options = VIDEO_MODEL_OPTIONS.filter(m => (getVideoModelName(m) === name || m.id === name) && m.resolution === resolution && m.duration === duration);
   const option = options.sort((a, b) => a.credits - b.credits)[0];
   if (!option) throw new AgentError("This video model does not support those settings. Offer a supported alternative.");
+  const sound = p.sound ?? !!option.hasAudio;
   const caps = getVideoInputCapabilities(getVideoModelName(option));
   if (counts.image > caps.maxImages || counts.video > caps.maxVideos || counts.audio > caps.maxAudios || (caps.imageRequired && !counts.image) || (option.family === "wan" && counts.video > 0 && duration > 15)) throw new AgentError("The references do not fit this video model. Ask for compatible inputs.");
+  const referenceError = referenceBatchIssue(caps, inputs);
+  if (referenceError) throw new AgentError(referenceError);
   const rank: Record<string, number> = { "480P": 0, "720P": 1, "1080P": 2, "2K": 3, "4K": 4 };
   if (rank[resolution] > rank[context.maxVideoResolution ?? "720P"]) throw new AgentError("This resolution is above the account's video allowance. Ask the user to choose an allowed resolution.");
   if ((sound && !option.hasAudio) || (!sound && option.hasAudio && !option.audioConfigurable)) throw new AgentError("This model does not support the requested sound setting.");
-  const aspectRatio = p.aspectRatio ?? "16:9";
+  const followsImage = videoFollowsInputRatio(getVideoModelName(option), counts.image);
+  const aspectRatio = p.aspectRatio ?? (followsImage ? "Auto" : "16:9");
+  if (followsImage && aspectRatio !== "Auto") throw new AgentError("This model follows the input image ratio. Explain this and offer a compatible image or model for a fixed ratio.");
+  if (!DEFAULT_VIDEO_ASPECT_RATIOS.includes(aspectRatio as never)) throw new AgentError("Choose an available video ratio.");
   if (!(option.aspectRatios ?? ["Auto", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]).includes(aspectRatio as never)) throw new AgentError("Choose a supported video ratio.");
   return { ...base, model: getVideoModelName(option), modelId: option.id, resolution, aspectRatio, duration, sound, count: 1, unitCredits: option.credits, credits: option.credits };
 }

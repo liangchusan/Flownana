@@ -110,6 +110,9 @@ export async function reserveGeneration(params: {
       if (!owned || owned.type !== input.type || input.role !== "input") {
         throw new GenerationRequestError("invalid_image");
       }
+      if (owned.origin === "generated" && !await tx.generation.findFirst({ where: { userId: params.account.id, status: "success", urls: { has: owned.url } }, select: { id: true } })) {
+        throw new GenerationRequestError("invalid_image");
+      }
     }
     const consumed = await consumeCreditsFIFOWithClient(tx, params.account.id, params.creditsCost);
     const generation = await tx.generation.create({ data: {

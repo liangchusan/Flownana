@@ -4,11 +4,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { AlertTriangle, CheckCircle2, Info, X, XCircle, type LucideIcon } from "lucide-react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, CheckCircle2, Info, XCircle, type LucideIcon } from "lucide-react";
 
 type ToastVariant = "info" | "success" | "warning" | "error";
 
@@ -38,28 +40,40 @@ const variantConfig: Record<
 > = {
   info: {
     icon: Info,
-    iconClassName: "text-stone-600",
+    iconClassName: "text-muted-foreground",
     title: "Notice",
   },
   success: {
     icon: CheckCircle2,
-    iconClassName: "text-emerald-700",
+    iconClassName: "text-success",
     title: "Success",
   },
   warning: {
     icon: AlertTriangle,
-    iconClassName: "text-amber-700",
+    iconClassName: "text-warning",
     title: "Notice",
   },
   error: {
     icon: XCircle,
-    iconClassName: "text-red-600",
+    iconClassName: "text-destructive",
     title: "Something went wrong",
   },
 };
 
 export function AppToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [toastHost, setToastHost] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const findTopDialog = () => {
+      const dialogs = Array.from(document.querySelectorAll<HTMLDialogElement>("dialog[open]"));
+      setToastHost(dialogs.at(-1) ?? null);
+    };
+    findTopDialog();
+    const observer = new MutationObserver(findTopDialog);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
+    return () => observer.disconnect();
+  }, [toasts.length]);
 
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -75,48 +89,41 @@ export function AppToastProvider({ children }: { children: ReactNode }) {
         variant,
       };
 
-      setToasts((current) => [...current, nextToast].slice(-4));
-      window.setTimeout(() => dismissToast(id), 5000);
+      setToasts((current) => [...current, nextToast].slice(-3));
+      window.setTimeout(() => dismissToast(id), 3000);
     },
     [dismissToast]
   );
 
   const value = useMemo(() => ({ showToast }), [showToast]);
 
+  const toastLayer = (
+    <div className="pointer-events-none fixed inset-0 z-[2147483647] flex w-full flex-col items-center justify-start gap-3 p-4 pt-[33.333vh]">
+      {toasts.map((toast) => {
+        const config = variantConfig[toast.variant];
+        const Icon = config.icon;
+
+        return (
+          <div
+            key={toast.id}
+            className="pointer-events-auto w-full max-w-sm rounded-ui-lg border border-border bg-background px-4 py-3 shadow-float transition-all duration-300"
+          >
+            <div className="flex items-start gap-3">
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${config.iconClassName}`} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm leading-snug text-foreground">{toast.message}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed right-4 top-4 z-[60] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3 sm:right-6 sm:top-6">
-        {toasts.map((toast) => {
-          const config = variantConfig[toast.variant];
-          const Icon = config.icon;
-
-          return (
-            <div
-              key={toast.id}
-              className="pointer-events-auto rounded-xl border border-stone-200/50 bg-white p-4 shadow-lg shadow-stone-200/20 transition-all duration-300"
-            >
-              <div className="flex items-start gap-3">
-                <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${config.iconClassName}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-stone-900">{toast.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-600">
-                    {toast.message}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => dismissToast(toast.id)}
-                  className="rounded-lg p-1 text-stone-400 transition-all duration-300 hover:bg-stone-100 hover:text-stone-700"
-                  aria-label="Dismiss notification"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {toastHost ? createPortal(toastLayer, toastHost) : toastLayer}
     </ToastContext.Provider>
   );
 }

@@ -1,3 +1,4 @@
+import { validateReferenceDurations } from "@/lib/inspect-reference";
 import { matchesRequestAccount } from "@/lib/account-scope";
 import { authOptions } from "@/lib/auth-options";
 import {
@@ -11,6 +12,8 @@ import {
 } from "@/lib/generation-lifecycle";
 import {
   DEFAULT_VIDEO_ASPECT_RATIOS,
+  DEFAULT_VIDEO_RESOLUTIONS,
+  videoFollowsInputRatio,
   formatVideoResolution,
   getVideoModelName,
   VIDEO_MODEL_OPTIONS
@@ -60,9 +63,9 @@ export async function POST(request: NextRequest) {
       (generateAudio != null && typeof generateAudio !== "boolean") ||
       (watermark != null && typeof watermark !== "string")) return videoErrorResponse("invalid_parameters");
     const option = resolveVideoOption({ modelOptionId, model });
-    if (!option) return videoErrorResponse("invalid_parameters");
+    if (!option || !DEFAULT_VIDEO_RESOLUTIONS.includes(formatVideoResolution(option.resolution))) return videoErrorResponse("invalid_parameters");
     const ratio = aspectRatio || option.aspectRatios?.[0] || "Auto";
-    if (!(option.aspectRatios || DEFAULT_VIDEO_ASPECT_RATIOS).includes(ratio)) return videoErrorResponse("invalid_parameters");
+    if (!DEFAULT_VIDEO_ASPECT_RATIOS.includes(ratio) || !(option.aspectRatios || DEFAULT_VIDEO_ASPECT_RATIOS).includes(ratio)) return videoErrorResponse("invalid_parameters");
     if (inputs != null && (!Array.isArray(inputs) || inputs.some((input) =>
       !input || typeof input.url !== "string" || !input.url.trim() || !["image", "video", "audio"].includes(input.kind)
     ))) return videoErrorResponse("invalid_parameters");
@@ -77,11 +80,15 @@ export async function POST(request: NextRequest) {
     if (counts.image > capabilities.maxImages || counts.video > capabilities.maxVideos || counts.audio > capabilities.maxAudios ||
       (option.family === "wan" && counts.video > 0 && option.duration > 15)) return videoErrorResponse("invalid_parameters");
     if (option.requiresImageInput && !counts.image) return videoErrorResponse("input_image_required");
+    if (videoFollowsInputRatio(getVideoModelName(option), counts.image) && ratio !== "Auto") return videoErrorResponse("invalid_parameters");
+    if (generateAudio === false && option.hasAudio && !option.audioConfigurable) return videoErrorResponse("invalid_parameters");
     const inputMedia = await Promise.all(requestedInputs.map(async (input, index) =>
       enforceInputMediaSize(await persistOrReuseMediaInput({
         source: input.url.trim(), userId: account!.id, requestId: `${crypto.randomUUID()}-${index}`, kind: input.kind,
       }), input.kind === "image" ? capabilities.maxImageBytes : input.kind === "video" ? capabilities.maxVideoBytes : capabilities.maxAudioBytes, input.kind)
     ));
+    try { await validateReferenceDurations(capabilities, requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }))); }
+    catch (e) { return videoErrorResponse("invalid_parameters", 400, { message: e instanceof Error ? e.message : "Check your reference files." }); }
     const normalizedInputs = requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }));
     const normalizedImageUrls = normalizedInputs.filter((input) => input.kind === "image").map((input) => input.url);
     const parameters: Prisma.InputJsonObject = {

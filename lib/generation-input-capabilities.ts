@@ -4,6 +4,8 @@ import { getImageInputTypes } from "./image-model-capabilities.ts";
 export type ComposerAttachmentKind = "image" | "video" | "audio";
 
 export interface GenerationInputCapabilities {
+  maxReferences?: number;
+  referenceDurationLimits?: boolean;
   maxImages: number;
   imageContentTypes?: string[];
   maxImageBytes: number;

@@ -94,6 +94,7 @@ export function WorkspaceSidebar({
                 <Link
                   key={item.id}
                   href={WORKSPACE_PATHS[item.id]}
+                  prefetch={onWorkspaceNavigate ? undefined : true}
                   onClick={(event) => {
                     if (item.id !== "home" && onWorkspaceNavigate) {
                       event.preventDefault();

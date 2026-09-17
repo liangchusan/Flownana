@@ -47,7 +47,7 @@ test("Agent selects a prior image for video and rejects unavailable output ids",
   assert.equal(selected.completed.length, 1);
   assert.equal(selected.completed[0].quote.inputs[0].url, "https://fixture.example.test/second.png");
   assert.equal(selected.completed[0].quote.inputs[1].url, "https://fixture.example.test/brand.png");
-  assert.match(selected.completed[0].quote.prompt, /ACME/);
+  assert.equal(selected.completed[0].quote.prompt, "Gentle camera movement");
   const missing = await run(parts);
   assert.equal(missing.completed.length, 0); assert.equal(missing.failed.length, 1); assert.ok(missing.calls.length <= 3);
 });

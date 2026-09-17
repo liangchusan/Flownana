@@ -35,6 +35,14 @@ test("workspace sidebar preserves the existing destinations alongside Agent", ()
   assert.doesNotMatch(sidebar, /label: "Create"/);
 });
 
+test("switching to Agent from a media workspace returns to Home", () => {
+  const workspace = readFileSync(new URL("../components/blocks/media-creation-workspace.tsx", import.meta.url), "utf8");
+  assert.match(workspace, /onAgent=\{\(\) => \{ if \(isHome\) setAgentMode\(true\); else router\.push\("\/\?mode=agent"\); \}\}/);
+  assert.doesNotMatch(workspace, /if \(isHome\) setAgentMode\(true\); else router\.push\("\/agent"\)/);
+  const home = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(home, /initialAgentMode=\{params\.mode === "agent"\}/);
+});
+
 test("desktop sidebar toggles use lightweight split-panel controls", () => {
   const leftSidebar = readFileSync(new URL("../components/blocks/workspace-sidebar.tsx", import.meta.url), "utf8");
   const workspace = readFileSync(new URL("../components/blocks/media-creation-workspace.tsx", import.meta.url), "utf8");

@@ -1,4 +1,6 @@
-import { Prisma, type AgentTurn } from "@prisma/client";
+import { inspectReference, validateReferenceDurations } from "@/lib/inspect-reference";
+import { getVideoInputCapabilities } from "@/lib/generation-input-capabilities";
+import { Prisma, type AgentTurn, type MediaAsset } from "@prisma/client";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { withGenerationAccount, recoverGenerationObligations, generationParameters, isActiveGeneration, hasActiveOutputStorage, getPendingGenerationOutputPaths, MAX_ACTIVE_OUTPUTS, type GenerationAccount } from "@/lib/generation-lifecycle";
@@ -7,7 +9,7 @@ import { syncGenerationMediaAssets, enforceInputMediaSize } from "@/lib/media-as
 import { isOwnedBlobUrl } from "@/lib/account-profile";
 import { IMAGE_MODEL_OPTION_MAP, type ImageModelOptionId } from "@/lib/generation-pricing";
 import { getImageTemplate } from "@/lib/image-templates/catalog";
-import { AgentError, buildQuote, messageSchema, usageDay, quotaLimit, resetTime, validateInputMetadata, type AgentInput, type AgentQuote } from "./contract";
+import { AgentError, buildQuote, messageSchema, proposalSchema, quoteFeedback, usageDay, quotaLimit, resetTime, validateInputMetadata, type AgentInput, type AgentQuote } from "./contract";
 
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 const LEASE = 100_000;
@@ -49,12 +51,17 @@ export async function beginAgentTurn(account: GenerationAccount, value: unknown)
   const input = messageSchema.parse(value);
   const template = input.templateId ? getImageTemplate(input.templateId) : null;
   // Uploaded assets are already registered by the upload route. Never fetch arbitrary model/user URLs.
-  const media = await Promise.all(input.inputs.map(async ref => {
+  const media: Array<MediaAsset & { contentType: string; sizeBytes: number }> = [];
+  for (const ref of input.inputs) {
     const asset = await prisma.mediaAsset.findUnique({ where: { userId_url: { userId: account.id, url: ref.url } } });
     if (!asset || asset.type !== (ref.kind === "audio" ? "music" : ref.kind)) throw new AgentError("Choose an uploaded reference from your account.");
     const verified = await enforceInputMediaSize({ url: asset.url, contentType: asset.contentType ?? undefined, sizeBytes: asset.sizeBytes ?? undefined }, ref.kind === "image" ? 20 * 1024 ** 2 : ref.kind === "video" ? 50 * 1024 ** 2 : 15 * 1024 ** 2, ref.kind);
-    return { ...asset, contentType: verified.contentType!, sizeBytes: verified.sizeBytes! };
-  }));
+    const metadata = ref.kind !== "image" ? await inspectReference(verified.url, ref.kind, ref.kind === "video" ? 50 * 1024 ** 2 : 15 * 1024 ** 2) : verified;
+    // Overwrite untrusted browser metadata before the references reach Agent tools.
+    Object.assign(ref, { contentType: metadata.contentType, sizeBytes: metadata.sizeBytes,
+      ...( "durationSeconds" in metadata ? { durationSeconds: metadata.durationSeconds } : {}) });
+    media.push({ ...asset, contentType: metadata.contentType!, sizeBytes: metadata.sizeBytes! });
+  }
   return withGenerationAccount(account, async tx => {
     await expireRuns(tx, account.id);
     let c = await tx.agentConversation.findUnique({ where: { id: input.conversationId } });
@@ -69,7 +76,7 @@ export async function beginAgentTurn(account: GenerationAccount, value: unknown)
     if (!existing && (c?.revision ?? 0) !== input.revision) throw new AgentError("This conversation changed. Reload before sending.", "stale", 409);
     if (c && c.templateId !== (input.templateId ?? null)) throw new AgentError("The conversation template cannot change.");
     const busy = await tx.agentTurn.count({ where: { conversation: { userId: account.id }, status: "running", leaseUntil: { gt: new Date() } } });
-    if (busy) throw new AgentError("Wait for your current Agent reply or stop it first.", "busy", 429);
+    if (busy) throw new AgentError("Wait for your current Agent reply to finish.", "busy", 429);
     const day = usageDay(), rights = await accountEntitlements(tx, account.id);
     const usage = await tx.agentUsage.upsert({ where: { userId_day: { userId: account.id, day } }, create: { userId: account.id, day }, update: {} });
     if (usage.used >= rights.limit) throw new AgentError("Today's Agent replies are used. Your draft is saved. You can still create with Image or Video.", "daily_limit", 429);
@@ -127,7 +134,7 @@ export async function finishAgentTurn(account: GenerationAccount, turn: AgentTur
       if (!asset) throw new AgentError("A reference is no longer available. Choose another image.");
       await tx.agentAttachment.upsert({ where: { conversationId_mediaAssetId: { conversationId: turn.conversationId, mediaAssetId: asset.id } }, create: { conversationId: turn.conversationId, mediaAssetId: asset.id }, update: {} });
     }
-    await tx.agentTurn.update({ where: { id: turn.id }, data: { status: "completed", response: result.response, responseKind: result.kind ?? (result.quote ? "quote" : "text"), suggestions: result.suggestions, quote: result.quote ? json(result.quote) : Prisma.DbNull, quoteExpiresAt: result.quote ? new Date(Date.now() + 600_000) : null, leaseUntil: null } });
+    await tx.agentTurn.update({ where: { id: turn.id }, data: { status: "completed", response: result.response, responseKind: result.kind ?? (result.quote ? "quote" : "text"), suggestions: result.suggestions, quote: result.quote ? json(result.quote) : Prisma.DbNull, quoteExpiresAt: null, leaseUntil: null } });
     if (turn.revision === 1 && result.title?.trim()) {
       await tx.agentConversation.updateMany({ where: { id: turn.conversationId, userId: account.id, deletedAt: null, title: turn.prompt.slice(0, 60) }, data: { title: result.title.trim().slice(0, 60) } });
     }
@@ -139,14 +146,47 @@ export async function failAgentTurn(account: GenerationAccount, id: string, atte
   return withGenerationAccount(account, tx => tx.agentTurn.updateMany({ where: { id, conversation: { userId: account.id }, status: "running", ...(attempt ? { attempt } : {}) }, data: { status: stopped ? "stopped" : "failed", leaseUntil: null, error: stopped ? "Reply stopped. No reply allowance used." : message ?? "The reply could not be completed. Your message is saved; retry to continue." } }));
 }
 
+export async function repriceAgentQuote(account: GenerationAccount, id: string, turnId: string, value: unknown) {
+  return withGenerationAccount(account, async tx => {
+    const c = await conversation(tx, account, id);
+    const turn = await tx.agentTurn.findFirst({ where: { id: turnId, conversationId: id } });
+    if (!turn?.quote || turn.generationIds.length || turn.revision !== c.revision || turn.status !== "completed") throw new AgentError("This quote has changed. Ask Agent for a new plan.", "stale_quote", 409);
+    const previous = turn.quote as unknown as AgentQuote;
+    const proposal = proposalSchema.parse(value);
+    if (proposal.type !== previous.type) throw new AgentError("Create a new request to change media type.");
+    const rights = await accountEntitlements(tx, account.id);
+    const history = await tx.agentTurn.findMany({ where: { conversationId: id }, orderBy: { createdAt: "asc" }, select: { prompt: true } });
+    const quote = buildQuote({ ...proposal, directions: [] }, previous.inputs, {
+      userText: history.map(item => item.prompt).join("\n"), maxVideoResolution: rights.maxVideoResolution,
+      templateId: previous.templateId, templateVersion: previous.templateVersion,
+    });
+    await tx.agentTurn.update({ where: { id: turn.id }, data: { quote: json(quote), quoteExpiresAt: null, response: quoteFeedback(quote) } });
+    return quote;
+  });
+}
+
 export async function confirmAgentQuote(account: GenerationAccount, id: string, turnId: string) {
+  // Download validation runs before the account transaction; that transaction still
+  // rechecks revision, ownership, entitlement and price before any charge.
+  const preflight = await prisma.agentTurn.findFirst({ where: { id: turnId, conversationId: id, conversation: { userId: account.id, deletedAt: null } } });
+  if (preflight?.quote && !preflight.generationIds.length) {
+    const q = preflight.quote as unknown as AgentQuote;
+    if (q.type === "video") {
+      for (const ref of q.inputs) {
+        const owned = await prisma.mediaAsset.findUnique({ where: { userId_url: { userId: account.id, url: ref.url } } });
+        if (!owned || owned.type !== (ref.kind === "audio" ? "music" : ref.kind)) throw new AgentError("A reference is no longer available.");
+      }
+      try { await validateReferenceDurations(getVideoInputCapabilities(q.model), q.inputs); }
+      catch (e) { throw new AgentError(e instanceof Error ? e.message : "Could not verify references."); }
+    }
+  }
   await recoverGenerationObligations(account);
   return withGenerationAccount(account, async tx => {
     const c = await conversation(tx, account, id);
     const turn = await tx.agentTurn.findFirst({ where: { id: turnId, conversationId: id } });
     if (!turn) throw new AgentError("Quote not found.", "not_found", 404);
     if (turn.generationIds.length) return { outputs: [], replay: true, generationIds: turn.generationIds };
-    if (turn.revision !== c.revision || turn.status !== "completed" || !turn.quote || !turn.quoteExpiresAt || turn.quoteExpiresAt <= new Date()) throw new AgentError("This quote has expired or changed. Ask Agent to update it before generating.", "stale_quote", 409);
+    if (turn.revision !== c.revision || turn.status !== "completed" || !turn.quote) throw new AgentError("This quote changed. Ask Agent for a new plan.", "stale_quote", 409);
     const quote = turn.quote as unknown as AgentQuote;
     const rights = await accountEntitlements(tx, account.id);
     const fresh = buildQuote(quote, quote.inputs, { userText: quote.exactText.join("\n"), maxVideoResolution: rights.maxVideoResolution, templateId: quote.templateId, templateVersion: quote.templateVersion });
@@ -156,11 +196,13 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
     if (active + quote.count > MAX_ACTIVE_OUTPUTS) throw new AgentError("Wait for your current media tasks to finish. This batch exceeds the five-output limit.", "active_limit", 429);
     const assets = await Promise.all(quote.inputs.map(ref => tx.mediaAsset.findUnique({ where: { userId_url: { userId: account.id, url: ref.url } } })));
     if (assets.some(a => !a)) throw new AgentError("A reference is missing. Update the quote.");
+    for (const asset of assets) {
+      if (asset?.origin === "generated" && !await tx.generation.findFirst({ where: { userId: account.id, status: "success", urls: { has: asset.url } }, select: { id: true } })) throw new AgentError("An Asset was deleted. Replace it and update the quote.");
+    }
     validateInputMetadata(quote, assets.map(a => a!));
     const outputs = [];
     for (let index = 0; index < quote.count; index++) {
-      const direction = quote.directions[index];
-      const prompt = `${quote.prompt}${direction ? `\nDirection: ${direction.prompt}` : ""}${quote.exactText.length ? `\nExact visible text: ${quote.exactText.join(" | ")}` : ""}`;
+      const prompt = `${quote.prompt}${quote.exactText.length ? `\nExact visible text: ${quote.exactText.join(" | ")}` : ""}`;
       if (prompt.length > 5000) throw new AgentError("The image brief is too long. Shorten it first.");
       const consumed = await consumeCreditsFIFOWithClient(tx, account.id, quote.unitCredits);
       const imageModel = quote.type === "image" ? IMAGE_MODEL_OPTION_MAP[quote.modelId as ImageModelOptionId] : null;
@@ -170,7 +212,7 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
           agentConversationId: id, agentTurnId: turn.id, ...(imageModel ? { agentImageModel: imageModel.id } : { provider: "kie" }),
           model: quote.model, resolution: quote.resolution, aspectRatio: quote.aspectRatio, ...(quote.type === "video" ? { duration: quote.duration!, audio: quote.sound ? "On" : "Off" } : {}),
           runId: turn.id, outputIndex: index, outputCount: quote.count, inputKinds: quote.inputs.map(i => i.kind),
-          ...(quote.templateId ? { templateId: quote.templateId, templateVersion: quote.templateVersion!, templateDirection: direction?.title ?? "Selected direction" } : {}),
+          ...(quote.templateId ? { templateId: quote.templateId, templateVersion: quote.templateVersion! } : {}),
         } } });
       await syncGenerationMediaAssets({ generationId: g.id, userId: account.id, tx, assets: assets.map((a, position) => ({ media: { url: a!.url, contentType: a!.contentType ?? undefined, sizeBytes: a!.sizeBytes ?? undefined }, role: "input", type: a!.type as "image" | "video" | "music", position })) });
       outputs.push(g);
@@ -225,14 +267,12 @@ export async function prepareAgentMediaRetry(account: GenerationAccount, id: str
     const source = await tx.agentTurn.findFirst({ where: { conversationId: id, generationIds: { has: generationId } } });
     if (!source?.quote) throw new AgentError("Original quote is unavailable.");
     const original = source.quote as unknown as AgentQuote;
-    const index = Number(generationParameters(g.parameters).outputIndex ?? 0);
-    const directions = original.type === "image" ? [original.directions[index]] : original.directions;
     const rights = await accountEntitlements(tx, account.id);
-    const quote = buildQuote({ ...original, count: 1, directions }, original.inputs, { userText: original.exactText.join("\n"), maxVideoResolution: rights.maxVideoResolution, templateId: original.templateId, templateVersion: original.templateVersion });
+    const quote = buildQuote({ ...original, count: 1, directions: [] }, original.inputs, { userText: original.exactText.join("\n"), maxVideoResolution: rights.maxVideoResolution, templateId: original.templateId, templateVersion: original.templateVersion });
     if (await tx.agentTurn.count({ where: { conversationId: id, status: "running", leaseUntil: { gt: new Date() } } })) throw new AgentError("Wait for the current reply before reviewing a retry.");
     const revision = c.revision + 1;
     await tx.agentConversation.update({ where: { id }, data: { revision } });
-    return tx.agentTurn.create({ data: { id: retryId, conversationId: id, revision, prompt: "Retry the failed output", inputs: json(original.inputs), response: "Review the price before retrying this output. Successful outputs remain unchanged.", quote: json(quote), quoteExpiresAt: new Date(Date.now() + 600_000), status: "completed", day: usageDay() } });
+    return tx.agentTurn.create({ data: { id: retryId, conversationId: id, revision, prompt: "Retry the failed output", inputs: json(original.inputs), response: "Review the price before retrying this output. Successful outputs remain unchanged.", quote: json(quote), quoteExpiresAt: null, status: "completed", day: usageDay() } });
   });
 }
 

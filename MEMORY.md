@@ -1,5 +1,484 @@
 # Flownana 工程记忆
 
+## 2026-09-17 Composer 引用缩略图与上传占位（已发布，待提交）
+
+- Image/Video Composer 的参考图片和视频统一为 80px 的 1:1 缩略图，移除名称文字；删除
+  `X` 改为与结果 Download 一致的深色圆形悬浮控件，桌面 hover/focus 后出现，触控常显。
+  横向素材列表使用低对比度细滚动条。视频引用在右下角显示已有元数据的时长；旧草稿
+  缺少元数据时，缩略图加载后从浏览器媒体元数据补齐显示。
+- 已发布至生产部署 `dpl_XahcmzkESw5YRH8LTPB3qaewKyhw`，状态 READY，绑定
+  `https://www.flownana.com`。本地 `npm run design:check`、`npm run lint -- --quiet`、
+  `npm run test`（393 passed、11 skipped、0 failed）、`npm run build` 和 `git diff --check`
+  通过；生产冒烟的页面、旧路由、视频演示、未登录 API 边界、Suno 410 和 Veo options
+  已逐项通过。仍需登录态手测实际文件上传中的占位动画与上传成功替换。
+
+## 2026-09-17 素材选择即时 Toast（已发布，待提交）
+
+- 上传或从 Assets 选择素材遇到类型、数量、大小或时长限制时统一显示 Toast，不再在
+  `+` 菜单或 Composer 展示上传中、失败卡、红点和行内限制提示；通过校验的素材仍在后台
+  上传/检查后自动加入草稿，生成操作在此期间继续被安全阻止。通过本地校验且开始上传的
+  素材在 Composer 中显示 loading 占位；视频占位显示已取得的时长。
+
+## 2026-09-17 引用提前校验与 Toast（本地，待发布）
+
+- 从 Create 结果或 Assets 点击 `@` 添加引用时，按当前模型限制先校验；不支持素材不会
+  加入 Composer，而是立即显示 Toast。移除 Composer 中的红色引用状态和 Resolve 提示。
+- 首次生产部署被 Agent 结果引用的 TypeScript 类型收窄错误阻断；改用显式 image/video
+  判断后再重新验证与部署。
+- 生产部署 `dpl_AmE8wVX39JFEetBdswTUsNoZjCE2` 已 READY 并绑定主域名；
+  `npm run smoke:prod` 全部通过。线上冒烟未包含登录态点击 `@` 的视觉交互，仍需手测。
+- `npm run test`：393 passed、11 skipped、0 failed；`npm run design:check`、
+  `npm run lint -- --quiet`、`npm run build` 与 `git diff --check` 通过。仍需登录态
+  手测单引用模型连续点击两个结果时的 Toast、草稿不变及 Assets 入口。
+
+## 2026-09-17 Agent 与 Image 结果操作统一（已发布，待提交）
+
+- Agent 的图片和视频结果不再维护独立的悬浮操作按钮，改为直接复用 Image 结果的
+  `ResultOverlayActions`：Reference、下载、删除的 36px 按钮、16px 图标、间距、右上角
+  定位、阴影及桌面悬浮/移动端常显规则完全一致。视频点击 `@` 会以普通视频参考预填到
+  Agent Composer，随后可描述需要保留或改变的内容；视频与图片均支持纯参考消息。
+- `npm run test`：393 passed、11 skipped、0 failed；`npm run lint`：0 errors、25 条既有
+  warning；`npm run design:check`、`npm run build` 与 `git diff --check` 通过。仍需登录态
+  对比 Agent 与 Image 的图片/视频结果悬浮按钮（桌面 hover、键盘 focus、移动端）。生产部署
+  `dpl_nAtasbFDcae6EKp3KgsjywE18dJG` 已 READY 并绑定主域名，`npm run smoke:prod` 通过。
+
+## 2026-09-17 Composer 引用缩略图精简（本地，待发布）
+
+- Image/Video Composer 的引用图片和视频改为无外层卡片边框的直接缩略图；删除 `X`
+  固定覆盖在右上角。移除左右排序按钮及对应的重排逻辑，引用继续按添加顺序提交。
+- `npm run test`：393 passed、11 skipped、0 failed；`npm run design:check`、
+  `npm run lint -- --quiet`、`npm run build` 与 `git diff --check` 通过。仍需在登录态
+  手测图片与视频引用、多个引用的横向滚动及缩略图右上角删除按钮。
+
+## 2026-09-17 Agent 报价与引用闭环（已发布，待提交）
+
+- Agent 报价不再使用 10 分钟时间有效期；点击 Generate 时服务端继续重新校验会话 revision、
+  模型/参数、素材、价格和积分余额，只有需求或可用条件发生变化才要求新方案。
+- `@` Reference 预填到底部 Composer 后，即使没有文字也可发送；服务端拒绝真正的空消息。
+  旧报价卡同时移除内部 Exact text 与重复参考素材，保持最终 Prompt、参数和积分主操作。
+- 移除仍要求用户 Stop reply 的并发提示文案，保持 UI 不展示 Stop reply 的既定体验。
+- `npm run test`：393 passed、11 skipped、0 failed；`npm run design:check` 与 `npm run build`
+  通过；`npm run lint`：0 errors、25 条既有 warning；`git diff --check` 通过。生产部署
+  `dpl_DLVZofxbjZP6moGiy7UDcxurXGYJ` 已 READY 并绑定主域名，`npm run smoke:prod` 通过。
+  仍需登录态手测超过 10 分钟的报价、纯引用消息、参数重算和 390/768/1440px 菜单布局。
+
+## 2026-09-16 当前工作区完整检查与生产发布
+
+- 用户确认“再次完整的检查下，没有问题的话就上线”后，从当前工作区发布
+  `dpl_Fz8eyMEtkhDByk1RE7eHKvUBAJnx`。状态为 production/READY，已绑定
+  `https://www.flownana.com`；Vercel 远端 Next.js 构建与 Prisma Client 生成均通过。
+- 发布前完整检查通过：`npm run test` 为 392 passed、11 skipped、0 failed（共 403 个），
+  `npm run design:check`、`npm run build` 与 `git diff --check` 均通过；`npm run lint` 为
+  0 errors、26 条既有 warnings。测试输出曾记录一条既有 provider disconnected 诊断，未导致
+  用例失败。
+- 发布后 `npm run smoke:prod` 全部通过：首页、Image、Video、Assets、旧 AI 路由重定向、
+  视频静态资源、未登录账单/作品/生成 API 边界、Suno 410 与视频选项接口均符合预期。
+- 本次包含 Image/Video 切换 Agent 时改为前往 `/?mode=agent` 且 Home 初始选中 Agent 的修复，
+  以及当前工作区内此前已检查的改动。仍需在真实登录态手测该入口和实际生成承接；真实
+  Provider、Stripe 与数据库付费链路未在本次线上冒烟中执行。未提交或推送 Git。
+
+## 2026-09-16 Agent Composer 与视频报价精简（本地）
+
+- 回复准备中只显示加载状态，不再显示 Stop reply。Agent Composer 的参考素材默认普通 Reference，移除用途标签/下拉选择；用户通过对话文字表达用途。
+- 会话内的参考素材统一显示在文字上方，使用紧凑缩略图；发送成功后清空 Prompt 和所有临时素材，修复选图生成视频后附件残留。
+- 图片/视频引用已有生成结果时，最终报价 Prompt 不再拼接原图约束、方向或请求变更。报价参数入口和积分主按钮改为同一行；参数面板以 Agent 内容滚动区的上下边界计算可用空间，避免被底部 Composer 遮挡。
+- PRODUCT、DESIGN、AGENT-SPEC 已同步；`npm run test` 392 passed、11 skipped、0 failed，`npm run lint` 0 error、26 条既有 warning，`npm run design:check` 与 `npm run build` 通过。待真实登录态手测后发布。
+
+## 2026-09-16 Agent 历史报价与图片操作精简（本地）
+
+- 已被替代、过期或已提交的报价不再显示状态标题、查看详情、失效提示或不可用按钮，仅保留必要 Prompt 摘要。
+- Agent 图片右上角操作补回 `@` Reference；点击会把该图作为参考素材预填到底部 Composer，不发送。暂时移除图片结果下方的 Edit image 和 Make video 操作；Download、Delete、预览与失败重试保持。
+- PRODUCT、DESIGN、AGENT-SPEC 已同步；`npm run test` 392 passed、11 skipped、0 failed，`npm run lint` 0 error、26 条既有 warning，`npm run design:check` 与 `npm run build` 通过。待登录态手测后发布。
+
+## 2026-09-16 Agent 报价卡轻量化（本地）
+
+- 有效报价反馈移除需求概括两侧的中文书名号；报价卡不再显示“Ready to generate”标题，外层卡片边框也不再包住 Prompt。Prompt 使用单层柔和输入面，避免框套框。
+- Generate 主按钮与 Image/Video Composer 一致，只显示 `N credits` 和 Send 图标。模型参数面板改为按触发器上下可用空间自动选择展开方向，并限制高度在可见区域内；空间充足时优先向下。
+- PRODUCT 第 18.6、DESIGN 和 AGENT-SPEC 已同步；`npm run test` 392 passed、11 skipped、0 failed，`npm run lint` 0 error、26 条既有 warning，`npm run design:check` 与 `npm run build` 通过。待真实登录态的桌面/手机菜单位置验收后发布。
+
+## 2026-09-16 Agent Composer 底部提示移除（本地）
+
+- Agent Composer 下方不再展示“剩余回复次数／重置时间／媒体消耗积分”提示，避免与界面内的生成积分信息重复；报价和生成按钮内的积分展示不受影响。
+- 待本地设计检查后发布；需在登录态 Agent 空会话和已有会话确认 Composer 底部无残留间距或提示。
+
+## 2026-09-16 Agent 可编辑报价卡与同 Prompt 四图（本地）
+
+- 用户确认 Agent 图片方案默认创建 4 张，共用同一份优化 Prompt、参考素材和参数；不再为每张注入不同方向 Prompt。图片编辑保留默认 1 张，视频仍单输出。
+- Agent 形成报价后的反馈改为“已为你准备好「需求概括」生成方案，点击 Generate 即可生成。”；概括来自 Agent 的简短目标摘要，模型与参数留在卡片中，不在反馈重复。
+- 当前有效报价卡可直接编辑优化 Prompt，并复用普通生成的模型/参数面板；编辑后服务端重算、保存合法规格与价格，按钮同步显示 `Generate · N credits`，重算完成前禁止生成。没有独立总积分或“修改要求”按钮。
+- 新增 Agent `reprice` 服务端动作，确认前仍重验账号、会话 revision、素材、白名单、价格与余额，避免卡内编辑或重复点击造成按旧报价扣费。PRODUCT 第 18.6、DESIGN、AGENT-SPEC 已同步。
+- `npm run test` 392 passed、11 skipped、0 failed；`npm run build` 与 `npm run design:check` 通过；`npm run lint` 0 error、26 条既有 warning。未做真实 Provider 调用、未部署；仍需登录态手测新建图片/视频报价、Prompt/模型/参数编辑、变价、过期报价、重复 Generate、积分不足及 390/768/1440px 布局。
+
+## 2026-09-16 Agent 空会话底部菜单锚定修复（本地）
+
+- `/agent` 空会话的 Composer 位于视口底部，但模式选择器和“+”素材菜单此前按向下展开配置，导致模式菜单落到输入框下方并可能超出视口。
+- 两个菜单现在始终向上展开；不改变模式切换、草稿、上传或发送行为。`npm run design:check` 与 `npm run lint`（0 errors、26 条已有 warning）通过；本地浏览器已检查桌面和 390px 手机视口，菜单均完整显示在输入框上方。未部署。
+
+## 2026-09-16 Agent 交互与媒体统一生产发布
+
+- 用户明确授权“发布上线吧”。当前工作区通过 Vercel 生产部署
+  `dpl_7kFvbB94TkKhv2EKWujxEasA6tyF`，状态 READY，已绑定
+  `https://www.flownana.com`、根域名和 Vercel 别名；云端 Next.js 构建与 Prisma Client
+  生成通过。
+- 发布后 `npm run smoke:prod` 全部通过：首页、Image、Video、Assets、旧 AI 路由重定向、
+  视频静态资源、未登录账单/作品/图片/视频 API 边界、Suno 410 与视频选项接口均正常。
+- 本次未提交或推送 Git。真实 Agent 成功媒体生成、成功态浏览器预览/播放/下载仍需要有
+  合规 KIE 或 Volcengine 凭据的隔离验收；此前本地测试账号已删除，后续应新建账号。
+
+## 2026-09-16 Agent 对话交互与媒体结果统一（本地完成，未发布）
+
+- 用户确认按 ChatGPT 式选择/确认习惯收敛 Agent。快捷单选答案点击后立即作为右侧
+  用户消息发送；自由输入仍可覆盖。报价里的多个方向明确标为一次任务的变体说明，
+  不是可点选项；只有“Generate”会执行已展示积分的整份报价。
+- 当前有效报价默认展开；已过期或被新请求替代的报价收起为摘要，已提交报价也以
+  紧凑规格摘要展示，避免在会话中重复完整方案。修改要求继续预填 Composer，等待
+  用户自行发送。
+- Agent 图片改为保持原始比例，不再以 `aspect-square` 黑底框显示；视频复用普通
+  Create 的播放、进度、静音和预览组件。图片/视频继续走共享全屏预览与下载；图片
+  的 Edit image / Make video 只预填文本和素材，不自动创建任务或扣费。Agent 成功
+  结果增加与普通工作台一致的下载/删除悬停操作及删除确认。
+- PRODUCT 第 18.6、DESIGN 和 AGENT-SPEC 已同步。`npm run design:check`、`npm run lint`
+  （0 error、26 条已有/`img` 相关 warning）、`npm run test`（392 passed、11 skipped、0 failed）
+  和 `npm run build` 均通过。本地模板空会话桌面页已视觉检查；待登录态手测
+  390/768/1440px 下追问、报价、图片、视频和删除；未部署、未提交。
+
+## 2026-09-16 Agent 独立账号真实链路验证（本地）
+
+- 使用仅当前本地 `next start` 进程的 Credentials 测试身份创建
+  `agent-ui-test-20260916`，初始 1000 测试积分；未触及生产账号或生产部署。
+- 真实 OpenRouter Agent 流程已验证：模板首轮提出带 5 项快捷答案的 question；提交
+  “限时优惠”后，用户消息、会话 revision 和后续精确文案追问均持久化；补全文案后得到
+  4 个方向的 Flare 2K / 16:9 / 12 credits 报价。第二个会话从 1:1 报价修改为 9:16
+  新报价，旧 quote revision 小于会话 revision，满足 UI 的 Previous quote 判定。
+- 已真实确认四图报价。当前本地没有 KIE 或 Volcengine 凭据（只有不被运行时代码接受的
+  Nano Banana 变量），所以 4 个任务均失败并自动退款；账单回到 1000 credits、无活跃
+  媒体任务。成功图片/视频、播放器、预览、编辑预填和删除成功态仍需在配置合规媒体
+  Provider 凭据的隔离环境手测；不得把失败退款测试表述为成功媒体验证。
+- 为单独验证已实现的成功态结果 UI，在同一隔离账号内短暂创建并明确标记 `fixture: true`
+  的本地图片和视频记录；真实 Agent 读接口按账号 scope 返回这两种 `success` 输出，图片
+  静态资源为 200，视频资源为 `206 Partial Content`、`video/mp4` 且支持 byte range。随后
+  通过真实 `/api/creations` 删除接口分别删除两项，记录均变为 `deleted` 且 URL 为空；fixture
+  会话已软删除、无待清理 URL。该夹具不涉及 Provider 调用或积分，不能替代真实出图/出视频验收。
+- CUA 浏览器服务在登录态页面检查时超时并重置，故没有把浏览器截图、点击播放、全屏预览、
+  Edit image / Make video 预填或下载交互记为已通过。静态 fixture 的下载 API 对相对路径返回
+  500（生产只应接收受控 Blob URL），也不作为生产下载失败结论；仍需有合规媒体凭据的隔离环境
+  完成成功媒体的视觉与交互验收。
+- 补充：本地 `next start` 以 production NODE_ENV 启动时，原实现会为显式启用的
+  Test Login 使用 secure Cookie，导致 localhost HTTP 浏览器登录后仍为未登录。现在仅在
+  `testAuthEnabled` 时关闭 secure Cookie；正式生产未启用该测试 Provider 时不变。`npm run build`、
+  `npm run test`（392 passed、11 skipped、0 failed）、`npm run lint`（0 error、26 warnings）及
+  `npm run design:check` 均通过。内嵌浏览器仍隔离/拦截该会话，独立 Chrome 自动化连接超时，
+  因此浏览器成功态验收仍未完成。
+- 本地认证响应已核对为普通 localhost Cookie；用于该诊断的独立测试账号随后删除，
+  使测试会话失效。真实成功媒体测试目前被明确阻断：运行时没有 KIE 或 Volcengine
+  凭据，Nano Banana 变量不参与 Agent 执行；需要新的隔离 Provider 凭据后再创建新测试账号继续。
+
+## 2026-09-15 全局媒体预览规范统一（已发布生产）
+
+- 预览统一使用原生 Modal 时，媒体预览此前只给 dialog 内容层设置背景，`::backdrop` 保持透明，部分浏览器布局下视口顶部页面内容会露出。
+- Create、Assets、Explore 和 Agent 的普通媒体预览统一到 `components/ui/media-preview-modal.tsx`，共享全视口遮罩、右上角关闭、遮罩点击、Esc、媒体尺寸、原始比例、视频 controls/autoPlay/playsInline 和媒体重试；My Creations 保留详情侧栏但同步关闭、遮罩、滚动和媒体尺寸规则。
+- PRODUCT/DESIGN 已写入全局预览规范。`npm run design:check`、`npm run lint`、`npm run build` 和 `npm run test` 已通过（测试 392 通过、11 跳过、0 失败；lint 为 26 条 warning，均为现有 img/Hook/导航规则）。
+- 用户要求上线后部署 `dpl_GmEdoZ6yAqXESgY2egXKwpcWZ1ac` 为 production/READY，已绑定 `https://www.flownana.com`；`npm run smoke:prod` 全部通过。
+- 本地 agent-browser 不可用，未完成截图级视觉验收；仍需登录态在 390/1440px 手测 Image/Video/Assets/Explore/Agent/My Creations 的图片、视频和 Esc/遮罩点击关闭。未提交或推送 Git。
+
+## 2026-09-15 当前工作区改动生产发布
+
+- 用户确认“上线”后，重新完成 Vercel CLI 授权，从当前工作区发布部署
+  `dpl_B8s62hQoHrs5Bg28PQTCo3ZUNc8X`，状态为 production/READY，已绑定
+  `https://www.flownana.com`。
+- Vercel 远端构建成功；`npm run smoke:prod` 全部通过：首页、Image、Video、Assets、旧路由
+  重定向、未登录 API 边界及视频选项接口均正常。
+- 本次发布包含当前工作区中此前已确认但未发布的改动，包括 Image/Video 切换 Agent 返回 Home、
+  Home 生成后进入对应工作台及 Prompt 区移除自动参数提示。仍需登录态人工验证 Agent 入口、
+  生成承接、真实 Provider/Stripe/数据库付费链路；未提交或推送 Git。
+
+
+## 2026-09-15 Image/Video 切换 Agent 返回 Home 并选中 Agent（本地修复，未发布）
+
+- Image/Video Composer 的 Agent 模式入口不再跳转 `/agent`，改为返回 `/?mode=agent`，由 Home
+  承载并初始选中 Agent；Home 内原有 Agent 模式和模板进入独立会话的路径保持不变。
+- PRODUCT 已同步，新增导航回归测试；待运行检查和登录态手测，未发布生产。
+
+## 2026-09-15 移除自动参数提示进入 Prompt 区（本地修复，未发布）
+
+- Image/Video 的 `settingsNotice` 原本同时显示在参数面板和 Composer 文本区；引用图片后自动调整比例时，
+  因此会在 Prompt 上方出现 “Adjusted ... to match this model and its inputs.”。
+- 现在仅在模型/参数面板保留该说明，Prompt 区恢复纯输入，不影响参数自动修正、提交校验或必要的上传/错误反馈。
+- DESIGN 已同步；待运行 UI 检查和登录态手测，未发布生产。
+
+## 2026-09-15 Home 生成后进入对应工作台（本地修复，未发布）
+
+- Home 的 Image/Video 普通生成在服务端接受任务或同步返回成功结果时，分别显式进入
+  `/image` 或 `/video`；失败、积分不足和状态不确定时保留在 Home 并保留输入反馈。
+- 跳转继续使用 Next 集成的原生 History，保留当前页面中的乐观生成记录、草稿和轮询状态；
+  处理器不再依赖可能过期的 `composerType` 闭包。
+- 现有 Home 提交回调回归覆盖已通过；待登录态手测，未发布生产。
+
+## 2026-09-15 Toast 展示规则调整（已发布生产）
+
+- 全局 Toast 水平居中、垂直起点位于视口约三分之一处；只展示简短正文，不展示标题。
+- 默认 3 秒自动消失，移除手动关闭按钮，最多同时保留最近 3 条；弹窗内仍通过 portal
+  到最上层原生 dialog，避免被遮挡。
+- PRODUCT/DESIGN 已同步；检查通过。用户确认发布后部署 `dpl_CGfguHahMGsTYBA5Co7DzpnWUZ6V` 为
+  production/READY，绑定 `https://www.flownana.com`（iad1）；`npm run smoke:prod` 全部通过。
+
+## 2026-09-15 Toast 覆盖原生弹窗（已发布生产）
+
+- 原生 `dialog.showModal()` 位于浏览器 top layer，普通固定层级的全局 Toast 会被上传弹窗遮住。
+- AppToastProvider 发现打开的 dialog 后，将 Toast portal 到最上层 dialog 内；无弹窗时仍挂在全局层，
+  保持屏幕中央和统一样式。
+- PRODUCT/DESIGN 已补充 Toast 必须高于当前弹窗的规则；`npm run design:check`、`npm run build`、
+  `npm run lint` 和 `npm run test` 已通过（测试 391 通过、11 跳过、0 失败）。
+- 用户确认发布后部署 `dpl_Cri6zRaQvh6316vb8JwtkcHVXpLT` 为 production/READY，
+  绑定 `https://www.flownana.com`（iad1）；`npm run smoke:prod` 全部通过。
+
+## 2026-09-15 Assets 不兼容素材正常显示与点击防闪（已发布生产）
+
+- ReferencePicker 不兼容图片/视频恢复正常显示，不置灰、不覆盖；点击时不选中，
+  通过 Toast 说明当前模型限制。
+- 素材点击改为即时临时选中、后台检查，检查失败时回滚并提示；移除原先 per-card
+  checking 遮罩，避免点击时整卡闪烁。固定 All/Images/Videos/Audio 分类保持不变。
+- 用户确认发布后部署 `dpl_CkgMm4UTtwi6TEh7YzeVi6FcU8Jc` 为 production/READY，
+  绑定 `https://www.flownana.com`（iad1）；`npm run smoke:prod` 全部通过。
+- 未提交或推送 Git；仍需登录态手测超限素材 Toast、支持素材无闪烁及检查失败回滚。
+
+## 2026-09-15 移除 Grok 视频无图提示（已发布生产）
+
+- 移除选择 `Grok Imagine Video 1.5` 且无图片时在输入框显示的“Add an image reference to use this model.”；
+  同步不再注入设置面板。`imageRequired` 的提交前校验和禁用生成逻辑保持不变。
+- `npm run design:check`、`npm run build` 已通过；lint 0 错误、29 条既有警告。
+- 用户确认发布后部署 `dpl_4PXPrX3rJZuAE9AvraaeJGtudxZd` 为 production/READY，
+  绑定 `https://www.flownana.com`（hnd1）；`npm run smoke:prod` 全部通过。
+  未提交或推送 Git；仍需登录态手测 Grok 与其他视频模型切换。
+
+## 2026-09-15 Assets 固定媒体分类与防闪（本地完成，未发布）
+
+- ReferencePicker 顶部筛选固定显示 All、Images、Videos、Audio，不再根据当前模型隐藏类别；
+  不支持的媒体仍在对应分类中正常展示，不置灰或覆盖，点击以 Toast 说明限制，不放宽模型校验。
+- 点击素材先即时进入临时选中态，元数据检查在后台完成；检查失败时回滚选中并提示，避免
+  原先 per-card checking 遮罩造成的点击闪烁。
+- PRODUCT 第 21.2 节与 DESIGN 已同步；待运行检查并手测登录态资料库。
+
+## 2026-09-15 Toast 与不兼容素材反馈（已由后续交互修订）
+
+- 全局 AppToastProvider 改为屏幕中央紧凑浮层，统一标题/说明、语义图标、自动消失和手动关闭；
+  现有 Toast 调用无需逐页调整。
+- ReferencePicker 在资料库网格中保留当前模型不支持的素材并正常显示；点击不会选中，
+  而是使用 Toast 展示具体限制原因。上传与服务端校验规则未改变。
+- `npm run design:check`、`npm run build` 和 `npm run test` 已通过；lint 0 错误、29 条既有警告。
+  尚未发布生产，仍需手测 390/768/1440px 下 Toast 居中和不兼容素材点击反馈。
+
+## 2026-09-15 Assets 选择卡片交互（已发布生产）
+
+- 用户确认将资料库选择窗对齐 ChatGPT 式直接选中交互。ReferencePicker 的图片、
+  视频和音频卡片点击即切换临时选中，选中使用品牌蓝描边与勾选；移除预览/放大、
+  眼睛按钮、Prompt/名称及卡片内 Select 操作。底部 Add N assets 仍是唯一写入
+  Composer 草稿的确认操作。
+- 选择将超过当前模型输入限制时，保持已有临时选择并通过 warning toast 显示具体
+  限制；媒体元数据检查失败也使用 toast，服务端添加前的所有权、可用性和输入约束
+  复核保持不变。PRODUCT 第 21 节与 DESIGN 已同步。
+- 待验证：登录账号下分别测试图片、视频、音频多选/取消、模型上限与上限+1、
+  已添加素材、检查失败/失效素材，以及 390/768/1440px 下键盘和触控选择；
+  未执行真实 Provider 或付费链路。
+- 用户明确“好的发布”后重新完成 Vercel CLI 授权并部署当前工作区。部署
+  `dpl_AeLGdqLa73usQ2ZuZUVu833jMtSE` 为 production/READY，绑定
+  `https://www.flownana.com`（函数区域 hnd1）。`npm run smoke:prod` 全部通过；
+  未提交或推送 Git。登录态 Assets 选择与真实 Provider/付费链路仍待人工验收。
+
+## 2026-09-14 Grok切换防跳动修复生产发布
+
+- 用户明确“发布”后从当前工作区部署，未提交或推送Git。
+- 部署dpl_HjsgS5R1CUsJkFJbZGBzNvygJePa，production/READY；inspect确认
+  www.flownana.com与flownana.com绑定flownana-abi1yacrx-liangchusans-projects.vercel.app。
+- 本次发布包含上一条Grok模型提示固定文本区修复；本地build/design:check已通过，
+  云端构建成功，npm run smoke:prod全部通过。
+- 建议刷新线上，在MiniMax与Grok 1.5之间切换检查外框高度；未执行真实付费生成。
+
+## 2026-09-14 Grok 1.5 模型切换防跳动（本地完成，未发布）
+
+- Grok Imagine Video 1.5 无输入图时会显示“Add an image reference”提示；此前提示
+  作为独立行插入，将Composer撑高并推动页面。Image/Video模型提示现改为固定
+  80px文本区内的绝对定位状态文字，最多两行；出现或消失不改变外框高度。
+- DESIGN已同步；design:check、build通过。浏览器实测切换前后Composer外框均
+  175px，Grok提示仍显示，文本区仍为80px。本地3117预览已更新，未发布生产。
+- 手测Home与Video页在MiniMax、Grok及其他需要输入素材的模型间切换；较长的
+  两行提示会占用部分输入文字可视高度，但文本区可正常滚动。生成逻辑未改。
+
+## 2026-09-14 输入框与下拉界面迭代生产发布
+
+- 用户明确“好的，发布”后，通过npx vercel --prod --yes从当前工作区发布已确认
+  的界面迭代：680×360锚定面板、底部向上展开、模型对齐与通用勾选、移除菜单
+  数量大小提示、切换闪动优化、三种模式空态输入框等高。未提交或推送Git。
+- 部署dpl_2MeRrBFv8NRC5VPPFAKLN1EPB3Q6，production/READY，inspect确认
+  www.flownana.com和flownana.com已绑定flownana-lbsg1lv74-liangchusans-projects.vercel.app。
+- 当前版本本地build/design:check通过；发布前测试402项，391通过、11数据库相关
+  跳过、零失败；lint零错误、30既有警告。云端构建成功，npm run smoke:prod全通过。
+- 建议线上手测三种模式切换、等高输入框、上下展开与素材菜单；未触发真实付费
+  生成或Stripe交易。慢网预加载未完成时跨路由仍可能出现正常加载状态。
+
+## 2026-09-14 三种模式输入框等高（本地完成，未发布）
+
+- AgentComposer与Image/Video统一80px固定文本区、8px间距和带分隔线的工具栏；
+  移除仅Agent可拖动文本区的差异，无障碍名称改用aria-label保留。Agent独立页面
+  外框同步手机10px、sm起12px内边距。附件和提示按内容扩展，DESIGN已同步。
+- build、design:check通过；桌面实测Image/Video/Agent空态外框均175px，手机
+  Video/Agent均171px，手机截图已检查。3117预览已更新，未发布。
+- 手测三种模式切换、多行文字内部滚动和附件展开；未改生成逻辑，无新增已知风险。
+
+## 2026-09-14 页面切换闪动修复（本地完成，未发布）
+
+- 浏览器复现首次Home到Video时输入框和结果区出现两块Loading骨架；原因是
+  VideoCreationForm/CreationStream动态加载，首页AgentComposer同样延迟加载。
+  三个核心组件改为静态导入，AssetsLibrary仍按需加载。
+- 进入Agent曾显示Loading page；新会话入口增加完整prefetch，Agent工作区
+  侧栏跨路由入口完整prefetch，减少只有loading边界被预取造成的闪动。
+- build、design:check、5项workspace-navigation测试通过；lint零错误、30既有警告。
+  浏览器修复后首次Video直接出现表单和结果空态，Video到Agent再到Image未观察到
+  加载骨架；390px手机Image到Video直接切换。预览3117已更新，未发布。
+- 手测刷新后首次切换三种模式、Agent页面往返和带草稿切换。首屏包含更多核心组件；
+  慢网或预加载尚未完成时跨路由仍可能出现正常加载状态。未测试登录账号真实生成，
+  生成、积分或埋点规则未改。
+
+## 2026-09-14 移除素材菜单底部提示（本地完成，未发布）
+
+- ReferencePicker移除数量/单文件大小说明，仅保留Upload files和Choose from Assets；
+  Image/Video/Agent共用，输入限制及错误提示保持。PRODUCT/DESIGN同步。
+- design:check、build通过；桌面及390px手机浏览器确认菜单只有两个操作，本地3117已更新。
+- 手测刷新后展开“+”菜单即可；未改校验逻辑，无新增已知风险，未发布生产。
+
+## 2026-09-14 恢复通用勾选图标（本地完成，未发布）
+
+- 模型列表恢复与模式菜单一致的16px Lucide Check；Models标题、模型名称与描述
+  统一右移12px，保持左对齐，勾选图标与文字间距8px。DESIGN/PRODUCT同步。
+- design:check、build通过；浏览器检查桌面文字x均529.09、手机x均57，图标
+  均16px；桌面截图已检查。本地3117预览已更新，未发布。
+- 建议刷新后手测切换模型的勾选状态；仅样式变更，较长介绍因宽度减少可能多换一行。
+
+## 2026-09-14 模型列表对齐与底部向上展开（本地完成，未发布）
+
+- 模型名称与Models标题左对齐；收紧左侧留白与勾选图标，模型行垂直内边距缩小。
+- GenerationSettings使用placement属性，Home向下、Image/Video底部Composer向上，
+  距入口12px；移除占位空间，打开面板不移动输入框。680×360外框和内部滚动保持。
+- PRODUCT 22.1、DESIGN同步。design:check、build通过；浏览器验证首页向下，
+  Image/Video向上（入口y639，面板底y627），展开前后入口位置不变；标题文字与
+  模型名称x均517.09。390px手机面板358×360、x16，已检查桌面/手机截图。
+- 本地预览3117已更新，未发布生产。手测重点：模型滚动、底部展开及手机参数区
+  滚动；本轮仅布局改动，未调用付费生成，极矮视口/手机软键盘仍建议真机验证。
+
+## 2026-09-14 下拉面板尺寸压缩（本地完成，未发布）
+
+- 用户要求整体缩小、高约360px；桌面从768×480改为680×360，模型/参数仍为
+  40%/60%，独立滚动。底部Composer预留空间同步缩小，DESIGN同步新尺寸。
+- build、design:check通过；浏览器恢复连接，实际测量桌面680×360、小屏390宽时
+  358×360。已查看两端布局；手机上下两区需分别滚动查看完整选项。
+- 预览 http://localhost:3117/ 已更新。建议手测模型列表与手机参数滚动；未改
+  生成/计费逻辑，未发布生产。
+
+## 2026-09-14 下拉面板简洁样式（本地完成，未发布）
+
+- 按用户截图反馈移除整个顶部标题/关闭行与底部说明/积分行；保留非视觉无障碍
+  名称、入口/外部点击/Esc关闭，积分仍由生成按钮展示。固定尺寸和独立滚动保持。
+- 右侧比例高80→56px，图标缩至12–20px，标签12px；桌面分段按钮高44→32px，
+  小屏保留44px触控高度。时长区缩小内边距与字号，仍只选择合法档位。
+- PRODUCT 22.1、DESIGN 已同步。npm run build、design:check通过；lint无错误、
+  30既有警告。最新构建已启动在 http://localhost:3117/。
+- 本轮浏览器连接两次失败（超时及 nodeRepl.fetch request failed），没有声称
+  完成新版本桌面/手机视觉验收。需手动刷新预览，检查两行移除、右侧紧凑控件、
+  独立滚动与Esc收起；生成/计费逻辑未改。本轮未发布生产。
+
+## 2026-09-14 模型参数面板改为入口下拉（本地完成，未再次发布）
+
+- 用户指出应在选项入口下方展开，不能是居中独立浮窗。GenerationSettings 已
+  移除 Modal/遮罩，改为锚定入口下方 12px 的非模态面板；桌面 768×480，宽高
+  受视口限制。模型列表、参数区独立滚动，标题/底栏固定，模型切换不撑高外框。
+- Home 面板覆盖下方内容且不遮暗页面；底部 Composer 为面板预留空间，使入口
+  上移、面板仍位于其下方。点击外部、再次点击入口、Esc/关闭按钮均可收起，
+  参数即时保留；键盘离开面板时收起。PRODUCT 22.1 和 DESIGN 已同步。
+- npm run build、design:check 通过；lint 0 错误、30 既有警告。内置浏览器检查
+  1440/768/390px：桌面面板480高；768视口面板736宽480高、左侧内容713高可滚动；
+  手机面板358宽，边界x16到374，无横向溢出。已验证底部入口在面板上方及Esc。
+- 手测重点：Home/Image/Video 的展开位置、长模型列表滚动、模型切换时尺寸稳定、
+  手机参数区滚动。纯布局修正未改生成与计费逻辑；本轮尚未再次部署生产。
+
+## 2026-09-14 统一素材入口与合并设置生产发布
+
+- 用户明确“发布”后从当前工作区部署（基线 HEAD 2c9af01，加本轮尚未提交的
+  代码与文档改动）；未执行 Git 提交或推送。最初 CLI 授权失效，重新登录成功后
+  使用已有 Vercel CLI 59.7.0 完成部署；未改变环境变量或数据库结构。
+- 部署 dpl_VxJxEUPh6Qbnp2mD9Tbd9tQpAGMh，状态 READY，target production；
+  https://flownana-hk3oqi87l-liangchusans-projects.vercel.app 。inspect 确认
+  https://www.flownana.com 与 flownana.com 均绑定该部署。
+- npm run smoke:prod 全部通过；新增 /api/creations/inspect 未登录 POST 返回401。
+  本部署发布后 10 分钟范围内 error 日志查询未返回记录；这只覆盖短观察窗口，
+  不代表真实付费生成链路已经验收。
+- 仍需人工检查登录后的 Assets 多选、上传失败恢复、模型切换及 Agent 声音，
+  真实 Provider 输出尺寸/声音、Stripe/数据库付费链路未在本轮执行。
+
+## 2026-09-14 统一素材入口与合并设置（本地实现，未发布）
+
+- 用户明确“可以，开干”后实现 PRODUCT 21/22。下方同日“需求阶段”条目为此前
+  文档记录，本条覆盖其尚未开发状态；不改变生产部署状态，不授权发布。
+- Home/Image/Video/Agent 复用 ReferencePicker 与 CreationModeSelector；模式菜单
+  固定勾选/图标/文字列。Assets 支持搜索、类型筛选、多选确认、独立预览、去重，
+  不新增上传素材库。每个上传单独失败/重试/取消，检查失败保留已上传 URL，
+  数量超限整批拒绝，待处理文件阻止生成。账号或组件失效中止旧操作。
+- GenerationSettings 合并模型/参数入口与面板，桌面分栏、手机上下排列；图片
+  数量 1–4，视频时长以合法档位索引驱动滑块。比例/分辨率白名单统一到服务端
+  和 Agent，旧规格不再接受。MiniMax/HappyHorse 有图跟图；Grok 保留比例选择。
+- 移除声音控件，按实际能力默认有声；Agent 默认有声，支持开关的模型允许明确
+  无声要求。Kie MiniMax H3 官方页确认原生声音且当前接口无开关，修正本地
+  hasAudio 标记，未改变供应商请求或积分公式。720P → 768P 映射沿用既有实现。
+- 新 /api/creations/inspect 在所有权验证后检查真实媒体字节、格式与时长，Assets
+  检查前后核对作品可用性及账号。直接生成及 Agent 扣费事务中检查 generated
+  来源仍有有效作品，避免历史引用保留底层文件后绕过删除状态。视频/音频生成前
+  再次检查单文件与合计时长；
+  Agent 添加阶段只限平台大小与 22 个附件，生成阶段执行模型限制。
+  MP4/MOV 读取 mvhd（含无声视频），MP3/WAV 使用 music-metadata；下载有超时与
+  字节上限，Agent 顺序读取避免 22 个大文件并发占用内存，无数据库迁移。
+- 本地验证：npm run test 402 项，391 通过、11 数据库集成测试跳过；lint 0 错误、
+  30 警告（主要现有 img 和导航）；npm run build 与 design:check 通过。新增
+  所有权/删除竞态/元数据失败路由测试、大小数量时长边界、无音轨 MP4/MOV、
+  WAV、声音及白名单回归。检查为模拟边界+真实源码执行，未付费调用 Provider。
+- 内置浏览器检查 390/768/1440px：设置布局无横向溢出、菜单两入口、模式列对齐、
+  关闭焦点恢复、Gemini 键盘 4/6/8/10 秒及积分更新。当前浏览器为未登录状态，
+  真实 Assets、上传断网/换账号和 Agent 付费确认仍需账号端人工验收。
+- 剩余风险：真实供应商声音/输出尺寸和素材组合未生成验证；存量或特殊编码视频
+  无有效 movie duration 时会明确拒绝，需用户重新导出；大量参考文件需逐个验证，
+  慢网可能超时后重试。本轮未执行生产 Stripe/数据库/Provider 集成或生产部署。
+
+## 2026-09-14 合并模型参数与 Agent 默认有声（需求阶段）
+
+- PRODUCT 第 22 节记录用户的合并面板、选项白名单、时长滑块、移除声音开关
+  需求；用户明确白名单和默认有声同步 Agent。PRODUCT 第 18 节、AGENT-SPEC
+  的默认无声改为有声，DESIGN 补面板布局。本轮仍仅文档，应用代码未修改。
+- 图生视频需按实际接口区分比例可控与跟随输入；分辨率独立。当前 MiniMax/
+  HappyHorse 有图不传比例，Grok 会传，与旧产品统一跟图描述有差异。
+- 2026-09-14 实时查看 https://kie.ai/minimax-h3：图生视频无比例字段，有分辨率，
+  当前列 768P/2K。用户随后明确批准 768P 显示为 720P，直接创作与 Agent 一致。
+  复核 lib/kie-video-request.ts 的 getKieVideoResolution 已将 MiniMax 的 720P
+  档位映射为 Provider 768P，tests/kie-video-request.test.ts 已有对应测试。
+  上轮将标签差异列为待修请求风险不准确，已纠正文档；不需要新增该映射，
+  也不需要降采样或改价。本轮未运行测试、未验证真实输出尺寸，仍仅修改文档。
+- 剩余人工验收：面板/摘要一致性、模型切换、旧草稿/Reprompt、离散时长、
+  真实图生视频尺寸、Agent 默认有声和显式无声、声音报价及实际输出。播放器
+  默认静音保持。本轮未执行代码测试、真实付费或部署。
+
+## 2026-09-14 统一素材入口与模式菜单（需求已确认，尚未开发）
+
+- 用户要求先讨论需求、形成产品文档再开发，并确认推荐方案。PRODUCT 第 21 节
+  与 DESIGN 对应章节已落文档；本轮仅修改文档，没有改应用代码、测试或部署。
+- Home/Image/Video/Agent 共用“+”两项菜单、本地上传与 Assets 选择窗；Assets
+  继续仅收录成功生成作品，上传参考文件不自动入库。多选确认、异常反馈、
+  Agent 两阶段校验及三模式勾选/图标/文字对齐均作为后续验收要求。
+- 当前实现仍为分开的 Composer 与 Agent 附件交互，Agent 独立 Assets 按钮和
+  原生模式 select 等尚未统一，不能将文档状态表述为已修复。
+- 待开发前核对逐模型输入约束，尤其单文件/合计时长及组合；Seedance 图片配置
+  30 MB 与平台上传 20 MB 存在差异，本地上传按平台 20 MB 执行。Assets 引用也需
+  验证实际模型输入限制，未知元数据不能默认通过。上游范围变更另行确认。
+- 后续人工验收：三模式草稿保留、Assets 多选/取消/搜索、超限与失效、上传
+  部分失败/重试、登录及换账号、Agent 实际参考与重新报价、390/768/1440px
+  弹窗和模式对齐。未运行代码测试或真实付费链路；本条不改变既有生产状态。
+
 ## 2026-09-14 性能修复第一批（已获发布授权，后台事务方案待确认）
 
 - 用户要求“全部修复”。先完成不改变后台生命周期的改动：根 `app/loading.tsx`

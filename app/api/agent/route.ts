@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { ACCOUNT_SCOPE_HEADER, getAccountScope } from "@/lib/account-scope";
 import { AgentError } from "@/lib/agent/contract";
-import { beginAgentTurn, readAgent, prepareAgentMediaRetry, failAgentTurn, confirmAgentQuote, renameAgent, deleteAgent } from "@/lib/agent/service";
+import { beginAgentTurn, readAgent, prepareAgentMediaRetry, failAgentTurn, confirmAgentQuote, repriceAgentQuote, renameAgent, deleteAgent } from "@/lib/agent/service";
 import { understandAgent, stopLocalAgent } from "@/lib/agent/understand";
 import { executeAgentOutput } from "@/lib/agent/worker";
 import { GenerationRequestError } from "@/lib/generation-lifecycle";
@@ -57,6 +57,11 @@ export async function POST(request: NextRequest) {
       const result = await confirmAgentQuote(account, data.conversationId, data.turnId);
       if (!result.replay) after(async () => { await Promise.allSettled(result.outputs.map(g => executeAgentOutput(account, g))); });
       return reply({ generationIds: result.generationIds, replay: result.replay });
+    }
+    if (data.action === "reprice") {
+      if (typeof data.turnId !== "string") throw new AgentError("Invalid quote.");
+      const quote = await repriceAgentQuote(account, data.conversationId, data.turnId, data.quote);
+      return reply({ quote });
     }
     if (data.action === "retry_media") {
       if (typeof data.generationId !== "string" || typeof data.retryId !== "string") throw new AgentError("Invalid retry.");

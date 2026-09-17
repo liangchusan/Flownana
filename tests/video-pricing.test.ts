@@ -79,12 +79,12 @@ test("video parameter display rules keep only canonical aspect ratios", () => {
   );
   assert.deepEqual(getDisplayAspectRatios(happyHorseOptions), [
     "Auto",
-    "16:9",
-    "9:16",
-    "1:1",
-    "4:3",
-    "3:4",
     "21:9",
+    "16:9",
+    "4:3",
+    "1:1",
+    "3:4",
+    "9:16",
   ]);
 });
 
@@ -97,7 +97,7 @@ test("video parameter display rules keep only canonical resolutions", () => {
   const minimaxOptions = VIDEO_MODEL_OPTIONS.filter(
     (option) => option.providerModel === "minimax-h3/text-to-video"
   );
-  assert.deepEqual(getDisplayResolutions(minimaxOptions), ["720P", "2K"]);
+  assert.deepEqual(getDisplayResolutions(minimaxOptions), ["720P"]);
 
   const geminiOptions = VIDEO_MODEL_OPTIONS.filter(
     (option) => option.providerModel === "gemini-omni-video"

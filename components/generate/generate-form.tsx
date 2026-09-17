@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
+import { GenerationSettings } from "@/components/blocks/generation-settings";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, ChevronDown, Send, SlidersHorizontal, Upload, X } from "lucide-react";
+import { Send, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { useAccountOperation } from "@/lib/use-account-operation";
@@ -27,11 +28,6 @@ import {
   getImageInputCapabilities,
   type GenerationInputCapabilities,
 } from "@/lib/generation-input-capabilities";
-
-const MODEL_POPUP_CLS =
-  "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
-const OPTIONS_POPUP_CLS =
-  "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 
 interface GenerateFormProps {
   onGenerationUncertain?: (data: { optimisticId: string; outputIndex?: number }) => void;
@@ -112,6 +108,7 @@ export function GenerateForm({
   const { status } = useSession();
   const { accountScope, capture } = useAccountOperation();
   const { showToast } = useToast();
+  const [settingsNotice, setSettingsNotice] = useState("");
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImages, setUploadedImages] = useState<string[]>(
     initialImages || (initialImage ? [initialImage] : [])
@@ -128,13 +125,7 @@ export function GenerateForm({
     Math.min(4, Math.max(1, initialParameters?.outputCount || 1))
   );
 
-  const [modelOpen, setModelOpen] = useState(false);
-  const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const modelPopupRef = useRef<HTMLDivElement | null>(null);
 
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const optionsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const optionsPopupRef = useRef<HTMLDivElement | null>(null);
   const submitLockRef = useRef(false);
   const capabilityChangeRef = useRef(onInputCapabilityChange);
   const parametersChangeRef = useRef(onParametersChange);
@@ -181,14 +172,17 @@ export function GenerateForm({
   useEffect(() => { parametersChangeRef.current = onParametersChange; }, [onParametersChange]);
   useEffect(() => {
     if (!ratioOptions.includes(aspectRatio)) {
-      setAspectRatio(ratioOptions[0] || "1:1");
+      const next = ratioOptions[0] || "1:1";
+      setSettingsNotice(`Aspect ratio changed to ${next} to match this model.`);
+      setAspectRatio(next);
     }
   }, [aspectRatio, ratioOptions]);
   useEffect(() => {
-    if (!resolutionOptions.includes(resolution)) {
+    if (hasResolution && !resolutionOptions.includes(resolution)) {
+      setSettingsNotice(`Resolution changed to ${resolutionOptions[0]} to match this model.`);
       setResolution(resolutionOptions[0] || "1K");
     }
-  }, [resolution, resolutionOptions]);
+  }, [resolution, resolutionOptions, hasResolution]);
   useEffect(() => {
     capabilityChangeRef.current?.(inputCapabilities);
   }, [inputCapabilities]);
@@ -200,28 +194,6 @@ export function GenerateForm({
       outputCount,
     });
   }, [aspectRatio, currentModelLabel, outputCount, resolution, hasResolution]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (!modelTriggerRef.current?.contains(t) && !modelPopupRef.current?.contains(t))
-        setModelOpen(false);
-      if (!optionsTriggerRef.current?.contains(t) && !optionsPopupRef.current?.contains(t))
-        setOptionsOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const openModel = () => {
-    setModelOpen((p) => !p);
-    setOptionsOpen(false);
-  };
-
-  const openOptions = () => {
-    setOptionsOpen((p) => !p);
-    setModelOpen(false);
-  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
@@ -425,43 +397,24 @@ export function GenerateForm({
     }
   };
 
-  // ── Shared classes ───────────────────────────────────────────────────────
-  const triggerCls =
-    "flex h-full w-full items-center justify-between rounded-xl border border-stone-200/50 bg-white px-3 py-[7px] text-left text-xs text-stone-900 transition-all duration-300 hover:border-stone-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-stone-500";
-
-  const chipCls = (active: boolean) =>
-    `rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-300 active:scale-[0.98] ${
-      active
-        ? "border-stone-300 bg-stone-100 text-stone-900"
-        : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-    }`;
+  const settingsControl = <GenerationSettings placement={menuPlacement} models={imageModels} model={model} onModel={v => setModel(v as ImageModelOptionId)} ratios={ratioOptions} ratio={aspectRatio} onRatio={setAspectRatio} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as ImageResolutionKey)} count={outputCount} onCount={setOutputCount} notice={settingsNotice} />;
 
   if (variant === "composer") {
     return (
       <div className="mt-2 space-y-2">
-        <Textarea
-          value={prompt}
-          onChange={(event) => updatePrompt(event.target.value)}
-          placeholder="Describe the image you want to create..."
-          className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
-          minLength={getImagePromptMinLength(model)}
-          maxLength={IMAGE_PROMPT_MAX_LENGTH}
-        />
-        <div className="flex min-h-12 flex-wrap items-center gap-1 border-t border-border pt-2">
+        <div className="relative h-20">
+          <Textarea
+            value={prompt}
+            onChange={(event) => updatePrompt(event.target.value)}
+            placeholder="Describe the image you want to create..."
+            className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 pb-1 pt-1 shadow-none focus-visible:ring-0"
+            minLength={getImagePromptMinLength(model)}
+            maxLength={IMAGE_PROMPT_MAX_LENGTH}
+          />
+        </div>
+        <div className="flex min-h-12 items-start gap-1 border-t border-border pt-2">
           {toolbarLeading}
-          <div className="relative w-36 sm:w-40">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
-              <span className="truncate">{currentModelLabel}</span><ChevronDown className="h-3.5 w-3.5" />
-            </button>
-            {renderModelPopup()}
-          </div>
-          <div className="relative w-40 sm:w-48">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
-              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{aspectRatio}{hasResolution ? ` · ${resolution}` : ""} · {outputCount}</span>
-            </button>
-            {renderOptionsPopup()}
-          </div>
+          {settingsControl}
           <Button type="button" onClick={handleGenerate} disabled={!creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
             <span>{creditsCost ? `${creditsCost * outputCount} credits` : needsReferenceForPricing ? "Add a reference image" : "Temporarily unavailable"}</span><Send className="h-4 w-4" />
           </Button>
@@ -470,88 +423,17 @@ export function GenerateForm({
     );
   }
 
-  // ── Model popup ──────────────────────────────────────────────────────────
-  function renderModelPopup() {
-    return modelOpen && (
-    <div
-      ref={modelPopupRef}
-      className={`${menuPlacement === "below" ? "absolute top-[calc(100%+0.5rem)] right-0 z-50 max-h-[60vh] overflow-y-auto rounded-ui-lg border border-border bg-background shadow-float sm:left-0 sm:right-auto" : MODEL_POPUP_CLS} w-[min(220px,calc(100vw-2rem))] py-1.5`}
-    >
-      <p className="px-3 pb-1.5 pt-1 text-xs font-medium text-stone-400">Model</p>
-      {imageModels.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          onClick={() => { setModel(m.id); setModelOpen(false); }}
-          className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-all duration-300 ${
-            model === m.id
-              ? "bg-stone-100 text-stone-900"
-              : "text-stone-700 hover:bg-stone-50"
-          }`}
-        >
-          <Check className={`h-3.5 w-3.5 shrink-0 ${model === m.id ? "text-stone-500" : "text-transparent"}`} />
-          <span>{m.label}{Object.keys(m.credits).length === 0 && !m.flatCredits && <span className="block text-xs text-muted-foreground">{m.imageToImagePricing ? "Image to image" : "Temporarily unavailable"}</span>}</span>
-        </button>
-      ))}
-    </div>
-    );
-  }
-
-  // ── Options popup ────────────────────────────────────────────────────────
-  function renderOptionsPopup() {
-    return optionsOpen && (
-    <div
-      ref={optionsPopupRef}
-      className={`${menuPlacement === "below" ? "absolute top-[calc(100%+0.5rem)] left-0 z-50 max-h-[60vh] overflow-y-auto rounded-ui-lg border border-border bg-background shadow-float sm:left-auto sm:right-0" : OPTIONS_POPUP_CLS} w-[min(280px,calc(100vw-2rem))] px-4 py-3`}
-    >
-      <div className="divide-y divide-stone-100">
-        <div className="pb-3">
-          <p className="mb-2 text-xs font-medium text-stone-400">Aspect Ratio</p>
-          <div className="flex flex-wrap gap-1.5">
-            {ratioOptions.map((r) => (
-              <button key={r} type="button" onClick={() => setAspectRatio(r)} className={chipCls(aspectRatio === r)}>{r}</button>
-            ))}
-          </div>
-        </div>
-        {hasResolution && <div className="py-3">
-          <p className="mb-2 text-xs font-medium text-stone-400">Resolution</p>
-          <div className="flex flex-wrap gap-1.5">
-            {resolutionOptions.map((r) => (
-              <button key={r} type="button" onClick={() => setResolution(r)} className={chipCls(resolution === r)}>{r}</button>
-            ))}
-          </div>
-        </div>}
-        <div className="pt-3">
-          <p className="mb-2 text-xs font-medium text-stone-400">Results</p>
-          <div className="flex flex-wrap gap-1.5">
-            {[1, 2, 3, 4].map((count) => (
-              <button
-                key={count}
-                type="button"
-                onClick={() => setOutputCount(count)}
-                className={chipCls(outputCount === count)}
-              >
-                {count}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Image Upload */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-stone-900">Image</label>
+        <label className="block text-sm font-medium text-foreground">Image</label>
         {uploadedImages.length > 0 ? (
-          <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-stone-200/50 bg-stone-50 shadow-sm">
+          <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-border/50 bg-surface-soft shadow-sm">
             <img src={uploadedImages[0]} alt="Uploaded" className="w-full h-full object-contain" />
             <button
               onClick={() => updateImages([])}
-              className="absolute right-2 top-2 rounded-full border border-stone-200/50 bg-white p-1.5 text-stone-600 shadow-sm transition-all duration-300 hover:text-stone-900 hover:shadow-md active:scale-[0.98]"
+              className="absolute right-2 top-2 rounded-full border border-border/50 bg-background p-1.5 text-muted-foreground shadow-sm transition-all duration-300 hover:text-foreground hover:shadow-md active:scale-[0.98]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -559,13 +441,13 @@ export function GenerateForm({
         ) : (
           <div
             {...getRootProps()}
-            className={`aspect-video flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50/70 transition-all duration-300 ${
-              isDragActive ? "border-stone-500 bg-stone-100" : "hover:border-stone-400 hover:bg-stone-100/60"
+            className={`aspect-video flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-input bg-surface-soft/70 transition-all duration-300 ${
+              isDragActive ? "border-muted-foreground bg-surface-strong" : "hover:border-muted-foreground hover:bg-surface-strong/60"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="mb-3 h-9 w-9 text-stone-400" />
-            <p className="text-sm text-stone-600">
+            <Upload className="mb-3 h-9 w-9 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
               {isDragActive ? "Drop image file" : "Click or drop an image to upload"}
             </p>
           </div>
@@ -574,7 +456,7 @@ export function GenerateForm({
 
       {/* Prompt */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-stone-900">Prompt</label>
+        <label className="block text-sm font-medium text-foreground">Prompt</label>
         <Textarea
           value={prompt}
           onChange={(e) => updatePrompt(e.target.value)}
@@ -586,22 +468,7 @@ export function GenerateForm({
       </div>
 
       <div className="space-y-4">
-        <div className="flex gap-3">
-          <div className="relative flex-[1.5]">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className={triggerCls}>
-              <span className="truncate">{currentModelLabel}</span>
-              <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
-            </button>
-            {renderModelPopup()}
-          </div>
-          <div className="relative flex-1">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className={triggerCls}>
-              <span className="truncate">{aspectRatio}{hasResolution ? ` | ${resolution}` : ""}</span>
-              <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
-            </button>
-            {renderOptionsPopup()}
-          </div>
-        </div>
+        <div className="flex">{settingsControl}</div>
 
         <Button
           onClick={handleGenerate}
@@ -612,7 +479,7 @@ export function GenerateForm({
           {generationLimitReached ? `Generating ${maxConcurrentGenerations}/${maxConcurrentGenerations}` : "Generate"}
         </Button>
 
-        <p className="text-xs text-stone-600">
+        <p className="text-xs text-muted-foreground">
           {creditsCost ? `This generation will cost ${creditsCost * outputCount} credits.` : needsReferenceForPricing ? "Add a reference image to use this model." : "This model is temporarily unavailable."}
         </p>
       </div>

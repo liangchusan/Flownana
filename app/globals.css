@@ -85,6 +85,21 @@ body {
   .no-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
+
+  .subtle-horizontal-scrollbar {
+    scrollbar-color: rgb(var(--border)) transparent;
+    scrollbar-width: thin;
+  }
+  .subtle-horizontal-scrollbar::-webkit-scrollbar {
+    height: 4px;
+  }
+  .subtle-horizontal-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(var(--border));
+    border-radius: 9999px;
+  }
+  .subtle-horizontal-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 @keyframes gradient-flow {

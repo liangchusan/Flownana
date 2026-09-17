@@ -22,7 +22,7 @@ test("Agent: real database allowance, idempotent quotes, refunds, isolation and 
   await assert.rejects(service.readAgent(stranger, conversationId));
   await assert.rejects(service.beginAgentTurn(account, { ...message, id: randomUUID(), revision: 1 }));
   assert.equal((await service.readAgent(account, conversationId)).usage.used, 0);
-  const quote = contract.buildQuote({ type: "image", summary: "Four symbols", prompt: message.prompt, exactText: [], count: 4, directions: ["A", "B", "C", "D"].map(title => ({ title, prompt: `${title} distinct leaf` })) }, [], { userText: message.prompt });
+  const quote = contract.buildQuote({ type: "image", summary: "Four symbols", prompt: message.prompt, exactText: [], count: 4, directions: [] }, [], { userText: message.prompt });
   const finishes = await Promise.all([service.finishAgentTurn(account, turn, { response: "Review", suggestions: [], quote }), service.finishAgentTurn(account, turn, { response: "Review", suggestions: [], quote })]);
   assert.equal(finishes.filter(Boolean).length, 1);
   assert.equal((await service.readAgent(account, conversationId)).usage.used, 1);
@@ -34,7 +34,7 @@ test("Agent: real database allowance, idempotent quotes, refunds, isolation and 
   await lifecycle.failGeneration({ account, id: outputs[0].id, error: { errorCode: "generation_failed" } });
   assert.equal((await db.creditBatch.findFirstOrThrow({ where: { userId: user.id } })).remaining, 1000);
   const retryId = randomUUID(), retry = await service.prepareAgentMediaRetry(account, conversationId, outputs[1].id, retryId);
-  assert.equal(retry.quote.count, 1); assert.equal(retry.quote.directions[0].title, "B");
+  assert.equal(retry.quote.count, 1); assert.deepEqual(retry.quote.directions, []);
   assert.equal((await service.prepareAgentMediaRetry(account, conversationId, outputs[1].id, retryId)).id, retry.id);
   assert.equal((await service.readAgent(account)).usage.used, 1);
   // A new request invalidates the unconfirmed retry quote. A failed reply uses no allowance.
@@ -91,20 +91,20 @@ test("Agent references retain selected-image constraints and protect live attach
   await assert.rejects(service.beginAgentTurn(account, { ...message, id: randomUUID(), conversationId: randomUUID() }));
 });
 
-test("Agent expired or underfunded quotes never partially reserve a batch", { skip: !url }, async t => {
+test("Agent changed or underfunded quotes never partially reserve a batch", { skip: !url }, async t => {
   const db = isolatedTestDatabase(url!); t.after(() => db.$disconnect());
   const user = await db.user.create({ data: { id: `agent_quote_${randomUUID()}`, email: `${randomUUID()}@example.test` } });
   t.after(() => db.user.delete({ where: { id: user.id } }));
   const account = { id: user.id, accountCreatedAt: user.createdAt.toISOString() };
   const load = createSourceLoader({ "@/lib/prisma": { prisma: db } }), service = load<any>("lib/agent/service.ts");
   const started = await service.beginAgentTurn(account, { id: randomUUID(), conversationId: randomUUID(), revision: 0, prompt: "Four abstract symbols", inputs: [] });
-  const quote = load<any>("lib/agent/contract.ts").buildQuote({ type: "image", summary: "Four symbols", prompt: "Four abstract symbols", exactText: [], count: 4, directions: Array(4).fill({ title: "Symbol", prompt: "An abstract symbol" }) }, [], { userText: "" });
+  const quote = load<any>("lib/agent/contract.ts").buildQuote({ type: "image", summary: "Four symbols", prompt: "Four abstract symbols", exactText: [], count: 4, directions: [] }, [], { userText: "" });
   await service.finishAgentTurn(account, started.turn, { response: "Review", suggestions: [], quote });
   const batch = await db.creditBatch.create({ data: { userId: user.id, amount: quote.unitCredits + 1, remaining: quote.unitCredits + 1, source: "test", expiresAt: new Date(Date.now() + 86400000) } });
   await assert.rejects(service.confirmAgentQuote(account, started.turn.conversationId, started.turn.id));
   assert.equal(await db.generation.count({ where: { userId: user.id } }), 0);
   assert.equal((await db.creditBatch.findUniqueOrThrow({ where: { id: batch.id } })).remaining, batch.remaining);
-  await db.agentTurn.update({ where: { id: started.turn.id }, data: { quoteExpiresAt: new Date(0) } });
+  await db.agentConversation.update({ where: { id: started.turn.conversationId }, data: { revision: 2 } });
   await assert.rejects(service.confirmAgentQuote(account, started.turn.conversationId, started.turn.id), (e: any) => e.code === "stale_quote");
 });
 

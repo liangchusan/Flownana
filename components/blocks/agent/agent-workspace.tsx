@@ -2,13 +2,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Pencil, Trash2, X, Download, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { MediaPreviewModal } from "@/components/ui/media-preview-modal";
+import { GenerationSettings } from "@/components/blocks/generation-settings";
 import { WorkspaceMobileHeader, WorkspaceSidebar } from "@/components/blocks/workspace-sidebar";
 import { LegacyAgentDraft } from "./legacy-draft";
 import { ResilientMedia } from "@/components/ui/resilient-media";
 import { AgentComposer, type AgentDraft } from "./agent-composer";
+import { ResultOverlayActions, VideoResult } from "@/components/blocks/creation-stream";
 import { getAccountScope } from "@/lib/account-scope";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { imageTemplates } from "@/lib/image-templates/catalog";
@@ -17,6 +20,9 @@ import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import type { AgentSnapshot, AgentTurnView, AgentOutput } from "./types";
 import { fetchAgentSnapshot } from "@/lib/shared-agent-read";
+import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, getVideoModelName } from "@/lib/generation-pricing";
+import { getImageAspectRatios } from "@/lib/image-model-capabilities";
+import type { AgentQuote } from "@/lib/agent/contract";
 
 export function AgentWorkspace(props: { id?: string; templateId?: string; sourceId?: string }) {
   const { data: session } = useSession();
@@ -30,7 +36,8 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
   const [snapshot, setSnapshot] = useState<AgentSnapshot | null>(null), [error, setError] = useState("");
   const [collapsed, setCollapsed] = useState(false), [mobileOpen, setMobileOpen] = useState(false);
   const [busy, setBusy] = useState(false), [editingTitle, setEditingTitle] = useState<string | null>(null), [deleting, setDeleting] = useState(false);
-  const [preview, setPreview] = useState<AgentOutput | null>(null), [seed, setSeed] = useState<(AgentDraft & { key: string }) | undefined>();
+  const [preview, setPreview] = useState<AgentOutput | null>(null), [seed, setSeed] = useState<(AgentDraft & { key: string; autoSend?: boolean }) | undefined>();
+  const [pendingOutputDelete, setPendingOutputDelete] = useState<AgentOutput | null>(null);
   const observedTurns = useRef(new Set<string>());
   const retryIds = useRef(new Map<string, string>());
   const bottom = useRef<HTMLDivElement>(null), observed = useRef(new Set<string>()), ended = useRef(new Set<string>());
@@ -103,15 +110,35 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
     } catch (e) { if (!op.signal.aborted) setError(e instanceof Error ? e.message : "Request failed."); }
     finally { setBusy(false); }
   };
-  const editOutput = (output: AgentOutput, video: boolean) => {
-    const parent = snapshot?.turns.find(t => t.generationIds.includes(output.id));
-    setSeed({ key: crypto.randomUUID(), prompt: video ? "Use this image to create a video. " : "Edit this image: ", sourceGenerationId: output.id,
-      inputs: [{ url: output.urls[0], kind: "image", role: video ? "subject" : "edit" }, ...(parent?.quote?.inputs.filter(i => i.url !== output.urls[0]) ?? [])] });
-    if (!video && template) { trackEvent("variant_selected", { template_id: template.id }); trackEvent("continued_edit", { template_id: template.id }); }
+  const repriceQuote = async (turnId: string, quote: AgentQuote) => {
+    if (!scope || !id) throw new Error("Sign in to update this quote.");
+    const op = capture();
+    const res = await fetch("/api/agent", { method: "POST", headers: { ...op.headers, "Content-Type": "application/json" }, signal: op.signal,
+      body: JSON.stringify({ action: "reprice", conversationId: id, turnId, quote }) });
+    const data = await res.json(); op.assertCurrent();
+    if (!res.ok) throw new Error(data.error || "Could not update this quote.");
+    void poll();
+    return data.quote as AgentQuote;
+  };
+  const referenceOutput = (output: AgentOutput) => {
+    if (!output.urls[0] || (output.type !== "image" && output.type !== "video")) return;
+    setSeed({ key: crypto.randomUUID(), prompt: "", inputs: [{ url: output.urls[0], kind: output.type, role: "reference" }] });
   };
   const download = (output: AgentOutput) => {
     trackEvent("result_download_clicked", { type: output.type, source: "agent", template_id: template?.id });
     const link = document.createElement("a"); link.href = buildCreationDownloadPath(output.id, output.urls[0]); link.download = ""; document.body.appendChild(link); link.click(); link.remove();
+  };
+  const deleteOutput = async () => {
+    if (!scope || !pendingOutputDelete || busy) return;
+    setBusy(true); setError(""); const op = capture();
+    try {
+      const response = await fetch("/api/creations", { method: "PATCH", headers: { ...op.headers, "Content-Type": "application/json" }, signal: op.signal,
+        body: JSON.stringify({ id: pendingOutputDelete.taskId || pendingOutputDelete.id, action: "delete-media", url: pendingOutputDelete.urls[0] }) });
+      const data = await response.json(); op.assertCurrent();
+      if (!response.ok || !Array.isArray(data.urls)) throw new Error(data.error || "Could not delete this result.");
+      setPreview(null); setPendingOutputDelete(null); await poll();
+    } catch (e) { if (!op.signal.aborted) setError(e instanceof Error ? e.message : "Could not delete this result."); }
+    finally { setBusy(false); }
   };
   const retryReply = async (turn: AgentTurnView) => {
     if (!scope || busy) return;
@@ -130,58 +157,93 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
         <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{snapshot?.conversation?.title ?? (template ? `${template.title} · Agent` : "Agent")}</h1>
         {id && snapshot?.conversation && <><Button variant="ghost" aria-label="Rename conversation" onClick={() => setEditingTitle(snapshot.conversation!.title)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" aria-label="Delete conversation" onClick={() => setDeleting(true)}><Trash2 className="h-4 w-4" /></Button></>}
       </header>
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+      <main data-settings-boundary className="relative z-10 min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         <div className="mx-auto w-full max-w-3xl space-y-8">
           {!id && <div className="py-10 text-center"><h2 className="font-display text-3xl font-medium">{template ? `Let's create your ${template.title.toLowerCase()}` : "What would you like to create?"}</h2><p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground">{template ? template.rules.objective : "Explore an idea, create images or make a video. Describe your goal and add any references. You review the credits before generating."}</p>{template && <><p className="mt-3 text-xs text-muted-foreground">{template.reference === "required" ? "Upload a clear reference photo to get started." : "Reference photos and brand assets are optional."}</p><p className="mt-3 text-sm text-muted-foreground">Example: {template.id === "headshot" ? "Create a clean professional portrait for my profile." : `Create a minimalist ${template.title.toLowerCase()} for a coffee brand, using cream and green.`}</p></>}</div>}
           {!id && template && !sourceId && <LegacyAgentDraft templateId={template.id} onContinue={setSeed} />}
           {id && !snapshot && status === "authenticated" && !error && <p role="status" className="text-sm text-muted-foreground">Loading conversation…</p>}
           {id && status === "unauthenticated" && <Button onClick={() => void signInForCurrentEnvironment()}>Sign in to open this conversation</Button>}
           {snapshot?.turns.map(turn => <section key={turn.id} className="space-y-4" aria-label="Conversation turn">
-            <div className="ml-auto max-w-xl rounded-ui-xl bg-surface-soft px-4 py-3"><p className="whitespace-pre-wrap break-words text-sm">{turn.prompt}</p>{!!turn.inputs.length && <div className="mt-2 flex flex-wrap gap-2">{turn.inputs.map((input, i) => input.kind === "image" ? <img key={i} src={input.url} alt={`Reference ${i + 1}: ${input.role}`} className="h-16 w-16 rounded-ui object-contain" /> : <span key={i} className="text-xs text-muted-foreground">{input.kind} · {input.role}</span>)}</div>}</div>
+            <div className="ml-auto max-w-xl rounded-ui-xl bg-surface-soft px-4 py-3">{!!turn.inputs.length && <div className="mb-2 flex flex-wrap gap-2">{turn.inputs.map((input, i) => input.kind === "image" ? <img key={i} src={input.url} alt={`Reference ${i + 1}`} className="h-16 w-16 rounded-ui object-cover" /> : <span key={i} className="rounded-ui bg-background px-2 py-1 text-xs text-muted-foreground">{input.kind} reference</span>)}</div>}<p className="whitespace-pre-wrap break-words text-sm">{turn.prompt}</p></div>
             {turn.response && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{turn.response}</p>}
-            {turn.status === "running" && <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Preparing your reply…<Button variant="ghost" disabled={busy} onClick={() => void action("stop", { turnId: turn.id })}>Stop reply</Button></div>}
+            {turn.status === "running" && <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Preparing your reply…</div>}
             {turn.error && <div className="space-y-2"><p className="text-sm text-destructive">{turn.error}</p>{turn.id === latest?.id && <Button variant="outline" disabled={busy} onClick={() => void retryReply(turn)}>Retry reply</Button>}</div>}
-            {turn.id === latest?.id && turn.suggestions.length > 0 && <div className="flex flex-wrap gap-2">{turn.suggestions.map(answer => <Button key={answer} variant="outline" onClick={() => setSeed({ key: crypto.randomUUID(), prompt: answer, inputs: turn.inputs })}>{answer}</Button>)}</div>}
-            {turn.quote && <QuoteCard turn={turn} current={turn.revision === snapshot.conversation?.revision} busy={busy} onConfirm={() => void action("confirm", { turnId: turn.id })} onEdit={() => setSeed({ key: crypto.randomUUID(), prompt: "Update the plan: ", inputs: turn.inputs })} />}
-            {!!turn.generationIds.length && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{snapshot.outputs.filter(o => turn.generationIds.includes(o.id)).map(output => <div key={output.id} className="min-w-0 space-y-2">
-              {output.urls[0] ? <ResilientMedia creationId={output.id} url={output.urls[0]} label="Generated result">{({ src, onError, onReady }) => <button type="button" onClick={() => setPreview(output)} className="block w-full overflow-hidden rounded-ui-lg bg-surface-dark transition-all duration-300 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary" aria-label="Preview result">{output.type === "image" ? <img src={src} onError={onError} onLoad={onReady} alt="Generated image" className="aspect-square max-h-96 w-full object-contain" /> : <video src={src} onError={onError} onLoadedData={onReady} muted playsInline preload="metadata" className="aspect-video max-h-96 w-full" />}</button>}</ResilientMedia> : <div className="flex min-h-44 items-center justify-center rounded-ui-lg bg-surface-soft p-4 text-sm" role="status">{output.status === "failed" ? "Generation failed" : output.status === "deleted" ? "Result deleted" : <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Generating {output.type}…</>}</div>}
-              {output.error && <p className="text-xs text-destructive">{output.error}</p>}{output.status === "failed" && <p className="text-xs text-muted-foreground">{output.parameters.creditOutcome === "pending" ? "Refund is being processed. Please wait before retrying." : "Credit settlement completed. Review a new quote to retry."}</p>}
-              <div className="flex flex-wrap gap-2">{output.status === "success" && <><Button variant="ghost" onClick={() => download(output)} aria-label="Download result"><Download className="h-4 w-4" /></Button>{output.type === "image" && <><Button variant="outline" onClick={() => editOutput(output, false)}>Edit image</Button><Button variant="outline" onClick={() => editOutput(output, true)}>Make video</Button></>}</>}
-              {output.status === "failed" && <Button variant="outline" disabled={busy} onClick={() => void action("retry_media", { generationId: output.id })}>Review retry cost</Button>}</div>
-            </div>)}</div>}
+            {turn.id === latest?.id && turn.suggestions.length > 0 && <div className="flex flex-wrap gap-2" aria-label="Quick answers">{turn.suggestions.map(answer => <Button key={answer} variant="outline" disabled={busy || latest.status === "running"} onClick={() => setSeed({ key: crypto.randomUUID(), prompt: answer, inputs: turn.inputs, autoSend: true })}>{answer}</Button>)}</div>}
+            {turn.quote && <QuoteCard turn={turn} current={turn.revision === snapshot.conversation?.revision} busy={busy} onConfirm={() => void action("confirm", { turnId: turn.id })} onReprice={repriceQuote} />}
+            {!!turn.generationIds.length && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{snapshot.outputs.filter(o => turn.generationIds.includes(o.id)).map(output => <AgentResultCard key={output.id} output={output} prompt={turn.prompt} busy={busy} onPreview={() => setPreview(output)} onReference={() => referenceOutput(output)} onDownload={() => download(output)} onDelete={() => setPendingOutputDelete(output)} onRetry={() => void action("retry_media", { generationId: output.id })} />)}</div>}
           </section>)}
           <div ref={bottom} />
         </div>
       </main>
-      <div className="shrink-0 px-3 pb-3 sm:px-6 sm:pb-5"><div className="mx-auto max-w-3xl space-y-2">
+      <div className="relative z-0 shrink-0 px-3 pb-3 sm:px-6 sm:pb-5"><div className="mx-auto max-w-3xl space-y-2">
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {cleanupPending && <Button variant="outline" disabled={busy} onClick={() => void action("delete")}>Retry attachment cleanup</Button>}
-        <div className="rounded-ui-xl border border-border bg-background p-3 shadow-soft"><AgentComposer key={id ? (snapshot ? "ready" : "loading") : "new"} initialInputs={latest?.inputs} conversationId={id} revision={snapshot?.conversation?.revision ?? 0} templateId={template?.id} seed={seed} disabled={latest?.status === "running" || (!!id && !snapshot)} onSent={() => void poll()} /></div>
-        {snapshot?.usage && <p className="text-center text-xs text-muted-foreground">{Math.max(0, snapshot.usage.limit - snapshot.usage.used)} of {snapshot.usage.limit} replies left · Resets {new Date(snapshot.usage.resetAt).toLocaleString()} · Media uses credits</p>}
+        <div className="rounded-ui-xl border border-border bg-background p-2.5 shadow-soft sm:p-3"><AgentComposer key={id ? (snapshot ? "ready" : "loading") : "new"} initialInputs={latest?.inputs} conversationId={id} revision={snapshot?.conversation?.revision ?? 0} templateId={template?.id} seed={seed} disabled={latest?.status === "running" || (!!id && !snapshot)} onSent={() => void poll()} /></div>
       </div></div>
     </div>
     {editingTitle !== null && <Modal onClose={() => setEditingTitle(null)} aria-label="Rename conversation" className="flex items-center justify-center bg-surface-dark/30 p-4"><div className="w-full max-w-sm space-y-4 rounded-ui-xl bg-background p-5"><label className="block text-sm" htmlFor="conversation-title">Conversation title</label><input id="conversation-title" value={editingTitle} maxLength={100} onChange={e => setEditingTitle(e.target.value)} className="h-11 w-full rounded-ui border border-border bg-background px-3 transition-all duration-300 focus-visible:ring-2 focus-visible:ring-primary" /><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setEditingTitle(null)}>Cancel</Button><Button disabled={busy || !editingTitle.trim()} onClick={() => void action("rename", { title: editingTitle })}>Save</Button></div></div></Modal>}
     {deleting && <Modal onClose={() => setDeleting(false)} aria-label="Delete conversation" className="flex items-center justify-center bg-surface-dark/30 p-4"><div className="w-full max-w-sm space-y-4 rounded-ui-xl bg-background p-5"><p className="text-sm">Delete this conversation? Generated work stays in Assets. Wait for any generation or refund to finish first.</p><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDeleting(false)}>Cancel</Button><Button disabled={busy} onClick={() => void action("delete")}>Delete conversation</Button></div></div></Modal>}
-    {preview && <Modal onClose={() => setPreview(null)} aria-label="Result preview" className="flex items-center justify-center bg-surface-dark/90 p-4"><div className="relative w-full max-w-5xl"><Button variant="outline" className="absolute right-0 top-0 z-10" aria-label="Close preview" onClick={() => setPreview(null)}><X className="h-4 w-4" /></Button>{preview.type === "image" ? <img src={preview.urls[0]} alt="Generated image preview" className="max-h-[85dvh] w-full object-contain" /> : <video src={preview.urls[0]} controls autoPlay muted playsInline className="max-h-[85dvh] w-full" />}</div></Modal>}
+    {pendingOutputDelete && <Modal onClose={() => setPendingOutputDelete(null)} aria-label="Delete generated result" className="flex items-center justify-center bg-surface-dark/30 p-4"><div className="w-full max-w-sm space-y-4 rounded-ui-xl bg-background p-5"><p className="text-sm">Delete this generated result? This also removes it from Assets.</p><div className="flex justify-end gap-2"><Button variant="ghost" disabled={busy} onClick={() => setPendingOutputDelete(null)}>Cancel</Button><Button disabled={busy} onClick={() => void deleteOutput()}>Delete result</Button></div></div></Modal>}
+    {preview && <MediaPreviewModal creationId={preview.id} url={preview.urls[0]} type={preview.type === "video" ? "video" : "image"} alt="Generated media preview" onClose={() => setPreview(null)} />}
   </div>;
 }
-function QuoteCard({ turn, current, busy, onConfirm, onEdit }: { turn: AgentTurnView; current: boolean; busy: boolean; onConfirm: () => void; onEdit: () => void }) {
+function AgentResultCard({ output, prompt, busy, onPreview, onReference, onDownload, onDelete, onRetry }: {
+  output: AgentOutput; prompt: string; busy: boolean; onPreview: () => void; onDownload: () => void; onDelete: () => void;
+  onReference: () => void; onRetry: () => void;
+}) {
+  const url = output.urls[0];
+  const audioDisabled = String(output.parameters.audio ?? output.parameters.sound ?? "").toLowerCase() === "off";
+  if (!url) return <div className="flex min-h-44 items-center justify-center rounded-ui-lg bg-surface-soft p-4 text-sm" role="status">{output.status === "failed" ? "Generation failed" : output.status === "deleted" ? "Result deleted" : <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Generating {output.type}…</>}</div>;
+  return <div className={`group/result relative min-w-0 space-y-2 ${output.type === "video" ? "w-full max-w-lg" : "w-fit max-w-full"}`}>
+    {output.status === "success" && <ResultOverlayActions showReference={["image", "video"].includes(output.type)} onReference={onReference} onDownload={onDownload} onDelete={onDelete} />}
+    {output.type === "image" ? <ResilientMedia creationId={output.id} url={url} label="Generated image" className="max-w-lg rounded-ui-lg">{({ src, onError, onReady }) => <button type="button" onClick={onPreview} className="inline-flex max-w-full overflow-hidden rounded-ui-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Preview generated image"><img src={src} onError={onError} onLoad={onReady} alt="Generated image" className="h-auto max-h-[30rem] max-w-full w-auto object-contain" /></button>}</ResilientMedia> : <VideoResult creationId={output.id} url={url} prompt={prompt} audioDisabled={audioDisabled} onOpen={onPreview} />}
+    {output.error && <p className="text-xs text-destructive">{output.error}</p>}
+    {output.status === "failed" && <p className="text-xs text-muted-foreground">{output.parameters.creditOutcome === "pending" ? "Refund is being processed. Please wait before retrying." : "Credit settlement completed. Review a new quote to retry."}</p>}
+    {output.status === "failed" && <div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy} onClick={onRetry}>Review retry cost</Button></div>}
+  </div>;
+}
+
+function QuoteCard({ turn, current, busy, onConfirm, onReprice }: { turn: AgentTurnView; current: boolean; busy: boolean; onConfirm: () => void; onReprice: (turnId: string, quote: AgentQuote) => Promise<AgentQuote> }) {
   const ref = useRef<HTMLDivElement>(null), seen = useRef(false);
   const q = turn.quote!;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
-  const expired = !turn.quoteExpiresAt || Date.parse(turn.quoteExpiresAt) <= now;
+  const [draft, setDraft] = useState(q);
+  const [repricing, setRepricing] = useState(false), [editError, setEditError] = useState("");
+  useEffect(() => { setDraft(q); }, [q, turn.id]);
+  const submitted = turn.generationIds.length > 0;
+  const compact = submitted || !current;
+  const updateQuote = async (next: AgentQuote) => {
+    if (repricing || busy) return;
+    setDraft(next); setRepricing(true); setEditError("");
+    try { setDraft(await onReprice(turn.id, next)); }
+    catch (error) { setDraft(q); setEditError(error instanceof Error ? error.message : "Could not update this quote."); }
+    finally { setRepricing(false); }
+  };
+  const imageModel = draft.type === "image" ? IMAGE_MODEL_OPTION_MAP[draft.modelId as keyof typeof IMAGE_MODEL_OPTION_MAP] : null;
+  const imageReferences = draft.inputs.filter(input => input.kind === "image").length;
+  const imageResolutions = imageModel ? imageModel.flatCredits ? [] : (imageModel.resolutions ?? Object.keys(imageModel.credits)) : [];
+  const imageRatios = imageModel ? getImageAspectRatios(imageModel.id, draft.resolution as never, imageReferences) : [];
+  const videoModels = [...new Map(VIDEO_MODEL_OPTIONS.map(option => [getVideoModelName(option), { id: getVideoModelName(option), label: getVideoModelName(option) }])).values()];
+  const videoOptions = draft.type === "video" ? VIDEO_MODEL_OPTIONS.filter(option => getVideoModelName(option) === draft.model) : [];
+  const videoResolutions = [...new Set(videoOptions.map(option => option.resolution))];
+  const videoAtResolution = videoOptions.filter(option => option.resolution === draft.resolution);
+  const videoRatios = [...new Set(videoAtResolution.flatMap(option => option.aspectRatios ?? []))];
+  const videoDurations = [...new Set(videoAtResolution.map(option => option.duration))].sort((a, b) => a - b);
   useEffect(() => {
-    if (!ref.current || !current || expired || turn.generationIds.length) return;
+    if (!ref.current || !current || submitted) return;
     const observer = new IntersectionObserver(entries => { if (seen.current || !entries.some(e => e.isIntersecting && e.intersectionRatio >= .5)) return; seen.current = true; const key = `agent-quote:${turn.id}`; try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* Local fallback. */ } trackEvent("agent_quote_viewed", { type: q.type, model: q.model, template_id: q.templateId, credits_cost: q.credits }); }, { threshold: .5 });
     observer.observe(ref.current); return () => observer.disconnect();
-  }, [current, expired, turn.id, turn.generationIds.length, q]);
-  return <div ref={ref} className="space-y-3 rounded-ui-xl border border-border p-4">
-    <p className="text-sm font-medium">{turn.generationIds.length ? "Submitted plan" : "Review before generating"}</p>
-    <p className="text-xs leading-relaxed text-muted-foreground">{q.model} · {q.resolution} · {q.aspectRatio} · {q.count} {q.type === "image" ? (q.count === 1 ? "image" : "images") : "video"}{q.type === "video" ? ` · ${q.duration}s · Sound ${q.sound ? "On" : "Off"}` : ""}</p>
-    {!!q.exactText.length && <p className="whitespace-pre-wrap text-sm">Exact text: {q.exactText.join(" · ")}</p>}
-    {!!q.inputs.length && <div className="flex flex-wrap gap-2">{q.inputs.map((input, i) => input.kind === "image" ? <img key={i} src={input.url} alt={`Quoted reference ${i + 1}`} className="h-16 w-16 rounded-ui object-contain" /> : <span key={i} className="text-xs">{input.kind} reference {i + 1}</span>)}</div>}
-    {q.directions.map((direction, i) => <p key={i} className="text-sm"><strong>{i + 1}. {direction.title}</strong><span className="mt-1 block text-muted-foreground">{direction.prompt}</span></p>)}
-    {!turn.generationIds.length && <div className="flex flex-wrap items-center gap-2"><Button disabled={busy || !current || expired} onClick={onConfirm}>Generate · {q.credits} credits</Button><Button variant="ghost" disabled={busy} onClick={onEdit}>{expired ? "Update expired quote" : "Change requirements"}</Button>{!current && <span className="text-xs text-muted-foreground">Replaced by a newer request</span>}</div>}
+  }, [current, turn.id, submitted, q]);
+  return <div ref={ref} className={compact ? "" : "space-y-4"}>
+    {compact ? <p className="whitespace-pre-wrap text-sm">{q.prompt}</p> : <>
+      <textarea aria-label="Optimized prompt" value={draft.prompt} disabled={repricing || busy} onChange={event => setDraft(current => ({ ...current, prompt: event.target.value }))} onBlur={() => { if (draft.prompt.trim() && draft.prompt !== q.prompt) void updateQuote({ ...draft, prompt: draft.prompt.trim() }); }} className="min-h-24 w-full resize-y rounded-ui-xl bg-surface-soft px-4 py-3 text-sm leading-relaxed transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" />
+      <div className="flex min-w-0 items-center gap-2"><GenerationSettings models={draft.type === "image" ? IMAGE_MODEL_OPTIONS.map(model => ({ id: model.id, label: model.label })) : videoModels} model={draft.type === "image" ? draft.modelId : draft.model} onModel={value => {
+        if (draft.type === "image") { const model = IMAGE_MODEL_OPTION_MAP[value as keyof typeof IMAGE_MODEL_OPTION_MAP]; const resolution = model.flatCredits ? "Auto" : (model.resolutions ?? Object.keys(model.credits))[0]; void updateQuote({ ...draft, model: value, modelId: value, resolution, aspectRatio: getImageAspectRatios(value as never, resolution as never, imageReferences)[0] ?? "1:1" }); return; }
+        const option = VIDEO_MODEL_OPTIONS.find(item => getVideoModelName(item) === value)!; void updateQuote({ ...draft, model: value, resolution: option.resolution, duration: option.duration, aspectRatio: (option.aspectRatios ?? ["Auto"])[0], sound: !!option.hasAudio });
+      }} ratios={draft.type === "image" ? imageRatios : videoRatios} ratio={draft.aspectRatio} onRatio={value => void updateQuote({ ...draft, aspectRatio: value })} resolutions={draft.type === "image" ? imageResolutions : videoResolutions} resolution={draft.resolution} onResolution={value => {
+        if (draft.type === "image") { const ratio = getImageAspectRatios(draft.modelId as never, value as never, imageReferences).includes(draft.aspectRatio) ? draft.aspectRatio : getImageAspectRatios(draft.modelId as never, value as never, imageReferences)[0]; void updateQuote({ ...draft, resolution: value, aspectRatio: ratio }); return; }
+        const option = videoOptions.find(item => item.resolution === value)!; void updateQuote({ ...draft, resolution: value, duration: option.duration, aspectRatio: (option.aspectRatios ?? ["Auto"])[0], sound: !!option.hasAudio });
+      }} count={draft.type === "image" ? draft.count : undefined} onCount={draft.type === "image" ? value => void updateQuote({ ...draft, count: value }) : undefined} durations={draft.type === "video" ? videoDurations : undefined} duration={draft.type === "video" ? draft.duration : undefined} onDuration={draft.type === "video" ? value => void updateQuote({ ...draft, duration: value }) : undefined} placement="auto" /><Button className="shrink-0 gap-2" disabled={busy || repricing || draft.prompt !== q.prompt || !current} onClick={onConfirm}><span>{draft.credits} credits</span><Send className="h-4 w-4" /></Button></div>
+      {editError && <p role="alert" className="text-xs text-destructive">{editError}</p>}
+    </>}
   </div>;
 }

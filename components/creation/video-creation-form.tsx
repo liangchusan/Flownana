@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useDropzone } from "react-dropzone";
+import { GenerationSettings } from "@/components/blocks/generation-settings";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, ChevronDown, Loader2, Send, SlidersHorizontal, Upload, X } from "lucide-react";
+import { Loader2, Send, Upload, X } from "lucide-react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { useAccountOperation } from "@/lib/use-account-operation";
@@ -15,12 +16,12 @@ import {
   formatVideoResolution,
   getDisplayAspectRatios,
   getDisplayResolutions,
-  getDisplaySoundOptions,
+  videoFollowsInputRatio,
+  DEFAULT_VIDEO_RESOLUTIONS,
   getVideoModelName,
   type VideoAspectRatio,
   type VideoModelOption,
   type VideoResolutionOption,
-  type VideoSoundOption,
 } from "@/lib/generation-pricing";
 import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
@@ -32,11 +33,6 @@ import {
   getVideoInputCapabilities,
   type GenerationInputCapabilities,
 } from "@/lib/generation-input-capabilities";
-
-const MODEL_POPUP_CLS =
-  "absolute bottom-[calc(100%+0.5rem)] left-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
-const OPTIONS_POPUP_CLS =
-  "absolute bottom-[calc(100%+0.5rem)] right-0 z-50 rounded-xl border border-stone-200/50 bg-white shadow-lg";
 
 interface VideoCreationFormProps {
   onGenerationUncertain?: (data: { optimisticId: string }) => void;
@@ -118,6 +114,7 @@ export function VideoCreationForm({
   const { data: session, status } = useSession();
   const { capture } = useAccountOperation();
   const defaultOption = VIDEO_MODEL_OPTIONS[0];
+  const [settingsNotice, setSettingsNotice] = useState("");
   const [prompt, setPrompt] = useState(initialPrompt || "");
   const [uploadedImages, setUploadedImages] = useState<string[]>(
     initialImages || (initialImage ? [initialImage] : [])
@@ -138,18 +135,10 @@ export function VideoCreationForm({
   const [duration, setDuration] = useState<VideoModelOption["duration"]>(
     initialParameters?.duration || defaultOption.duration
   );
-  const [sound, setSound] = useState<VideoSoundOption>(
-    (initialParameters?.audio as VideoSoundOption) || "Auto"
-  );
 
-  const [modelOpen, setModelOpen] = useState(false);
+
   const localActiveGenerationCountRef = useRef(activeGenerationCount ?? 0);
-  const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const modelPopupRef = useRef<HTMLDivElement | null>(null);
 
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const optionsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const optionsPopupRef = useRef<HTMLDivElement | null>(null);
   const capabilityChangeRef = useRef(onInputCapabilityChange);
   const parametersChangeRef = useRef(onParametersChange);
   const initialImagesKey = initialImages?.join("\u0000");
@@ -168,27 +157,26 @@ export function VideoCreationForm({
     const seen = new Set<string>();
     const names: string[] = [];
     for (const option of VIDEO_MODEL_OPTIONS) {
-      if (option.requiresImageInput && inputImageCount === 0) continue;
+
       const name = getVideoModelName(option);
       if (!seen.has(name)) { seen.add(name); names.push(name); }
     }
     return names;
-  }, [inputImageCount]);
+  }, []);
 
   const optionsForModel = useMemo(
     () =>
       VIDEO_MODEL_OPTIONS.filter(
         (o) =>
           getVideoModelName(o) === selectedModelName &&
-          (!o.requiresImageInput || inputImageCount > 0) &&
+          DEFAULT_VIDEO_RESOLUTIONS.includes(formatVideoResolution(o.resolution)) &&
           !(o.family === "wan" && hasVideoInput && o.duration > 15)
       ),
-    [selectedModelName, inputImageCount, hasVideoInput]
+    [selectedModelName, hasVideoInput]
   );
 
-  const aspectRatioOptions = useMemo(() => {
-    return getDisplayAspectRatios(optionsForModel);
-  }, [optionsForModel]);
+  const followsImage = videoFollowsInputRatio(selectedModelName, inputImageCount);
+  const aspectRatioOptions = useMemo(() => followsImage ? ["Auto" as VideoAspectRatio] : getDisplayAspectRatios(optionsForModel), [optionsForModel, followsImage]);
   const resolutionOptions = useMemo(
     () => getDisplayResolutions(optionsForModel),
     [optionsForModel]
@@ -197,51 +185,15 @@ export function VideoCreationForm({
     () => [...new Set(optionsForModel.map((o) => o.duration))].sort((a, b) => a - b),
     [optionsForModel]
   );
-  const durationMin = durationOptions[0] ?? duration;
-  const durationMax = durationOptions[durationOptions.length - 1] ?? duration;
-  const useDurationSlider =
-    durationOptions.length > 2 &&
-    durationOptions.every((value, index) => index === 0 || value === durationOptions[index - 1] + 1);
-  const soundOptions = useMemo(() => getDisplaySoundOptions(optionsForModel), [optionsForModel]);
-  const showSound = soundOptions.length > 0;
   const inputCapabilities = useMemo(
     () => getVideoInputCapabilities(selectedModelName),
     [selectedModelName]
   );
-  const imagesOverLimit = inputImageCount > inputCapabilities.maxImages;
+  const imagesOverLimit = inputImageCount > inputCapabilities.maxImages || (inputCapabilities.imageRequired && inputImageCount === 0);
 
-  const selectedOption = useMemo(() => {
-    const matchingSettingOptions = optionsForModel.filter(
-      (o) =>
-        formatVideoResolution(o.resolution) === resolution &&
-        o.duration === duration
-    );
-    if (matchingSettingOptions.length > 0) {
-      if (sound === "On") {
-        return (
-          matchingSettingOptions.find((o) => o.hasAudio) ??
-          matchingSettingOptions[0]
-        );
-      }
-      if (sound === "Off") {
-        return (
-          matchingSettingOptions.find((o) => !o.hasAudio) ??
-          matchingSettingOptions[0]
-        );
-      }
-      return (
-        matchingSettingOptions.find((o) => o.hasAudio) ??
-        matchingSettingOptions[0]
-      );
-    }
-
-    return (
-      optionsForModel.find(
-        (o) => formatVideoResolution(o.resolution) === resolution && o.duration === duration
-      ) ??
-      optionsForModel[0]
-    );
-  }, [duration, optionsForModel, resolution, sound]);
+  const selectedOption = optionsForModel.find(o => formatVideoResolution(o.resolution) === resolution && o.duration === duration);
+  const showSound = !!selectedOption?.hasAudio;
+  const sound = showSound ? "On" : "Off";
   const usesConcurrentGenerationLimit = activeGenerationCount !== undefined;
   const generationLimitReached = usesConcurrentGenerationLimit
     ? activeGenerationCount >= maxConcurrentGenerations
@@ -252,24 +204,18 @@ export function VideoCreationForm({
       setSelectedModelName(modelNameOptions[0]);
   }, [modelNameOptions, selectedModelName]);
   useEffect(() => {
-    if (resolutionOptions.length > 0 && !resolutionOptions.includes(resolution))
-      setResolution(resolutionOptions[0]);
-  }, [resolutionOptions, resolution]);
-  useEffect(() => {
-    if (durationOptions.length > 0 && !durationOptions.includes(duration))
-      setDuration(durationOptions[0]);
-  }, [durationOptions, duration]);
-  useEffect(() => {
-    if (aspectRatioOptions.length > 0 && !aspectRatioOptions.includes(aspectRatio))
-      setAspectRatio(aspectRatioOptions[0]);
-  }, [aspectRatioOptions, aspectRatio]);
-  useEffect(() => {
-    if (soundOptions.length > 0 && !soundOptions.includes(sound))
-      setSound(soundOptions[0]);
-  }, [soundOptions, sound]);
-  useEffect(() => {
-    setSound(soundOptions.includes("On") ? "On" : soundOptions[0] ?? "Auto");
-  }, [selectedModelName, soundOptions]);
+    const changes: string[] = [];
+    if (resolutionOptions.length && !resolutionOptions.includes(resolution)) {
+      setResolution(resolutionOptions[0]); changes.push(`resolution to ${resolutionOptions[0]}`);
+    }
+    if (durationOptions.length && !durationOptions.includes(duration)) {
+      setDuration(durationOptions[0]); changes.push(`duration to ${durationOptions[0]}s`);
+    }
+    if (aspectRatioOptions.length && !aspectRatioOptions.includes(aspectRatio)) {
+      setAspectRatio(aspectRatioOptions[0]); changes.push(`aspect ratio to ${followsImage ? "follow the input image" : aspectRatioOptions[0]}`);
+    }
+    if (changes.length) setSettingsNotice(`Adjusted ${changes.join(", ")} to match this model and its inputs.`);
+  }, [resolutionOptions, resolution, durationOptions, duration, aspectRatioOptions, aspectRatio, followsImage]);
   useEffect(() => {
     if (activeGenerationCount !== undefined) {
       localActiveGenerationCountRef.current = activeGenerationCount;
@@ -297,28 +243,6 @@ export function VideoCreationForm({
       audio: showSound ? sound : undefined,
     });
   }, [aspectRatio, duration, resolution, selectedModelName, showSound, sound]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (!modelTriggerRef.current?.contains(t) && !modelPopupRef.current?.contains(t))
-        setModelOpen(false);
-      if (!optionsTriggerRef.current?.contains(t) && !optionsPopupRef.current?.contains(t))
-        setOptionsOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const openModel = () => {
-    setModelOpen((p) => !p);
-    setOptionsOpen(false);
-  };
-
-  const openOptions = () => {
-    setOptionsOpen((p) => !p);
-    setModelOpen(false);
-  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
@@ -571,146 +495,23 @@ export function VideoCreationForm({
   };
 
   // ── Trigger button shared class ──────────────────────────────────────────
-  const triggerCls =
-    "flex h-full w-full items-center justify-between rounded-xl border border-stone-200/50 bg-white px-3 py-[7px] text-left text-xs text-stone-900 transition-all duration-300 hover:border-stone-300 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-stone-500";
-
-  // ── Option chip shared class ─────────────────────────────────────────────
-  const chipCls = (active: boolean) =>
-    `rounded-xl border px-3 py-1.5 text-sm font-medium transition-all duration-300 active:scale-[0.98] ${
-      active
-        ? "border-stone-300 bg-stone-100 text-stone-900"
-        : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-    }`;
-
-  // ── Model popup ──────────────────────────────────────────────────────────
-  const modelPopup = modelOpen && (
-    <div
-      ref={modelPopupRef}
-      className={`${menuPlacement === "below" ? "absolute top-[calc(100%+0.5rem)] right-0 z-50 max-h-[60vh] overflow-y-auto rounded-ui-lg border border-border bg-background shadow-float sm:left-0 sm:right-auto" : MODEL_POPUP_CLS} w-56 max-w-[calc(100vw-2rem)] py-1.5`}
-    >
-      <p className="px-3 pb-1.5 pt-1 text-xs font-medium text-stone-400">Model</p>
-      {modelNameOptions.map((name) => (
-        <button
-          key={name}
-          type="button"
-          onClick={() => { setSelectedModelName(name); setModelOpen(false); }}
-          className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-all duration-300 ${
-            selectedModelName === name
-              ? "bg-stone-100 text-stone-900"
-              : "text-stone-700 hover:bg-stone-50"
-          }`}
-        >
-          <Check className={`h-3.5 w-3.5 shrink-0 ${selectedModelName === name ? "text-stone-500" : "text-transparent"}`} />
-          {name}
-        </button>
-      ))}
-    </div>
-  );
-
-  // ── Options popup ────────────────────────────────────────────────────────
-  const optionsPopup = optionsOpen && (
-    <div
-      ref={optionsPopupRef}
-      className={`${menuPlacement === "below" ? "absolute top-[calc(100%+0.5rem)] left-0 z-50 max-h-[60vh] overflow-y-auto rounded-ui-lg border border-border bg-background shadow-float sm:left-auto sm:right-0" : OPTIONS_POPUP_CLS} w-72 max-w-[calc(100vw-2rem)] px-4 py-3`}
-    >
-      <div className="divide-y divide-stone-100">
-        <div className="pb-3">
-          <p className="mb-2 text-xs font-medium text-stone-400">Aspect Ratio</p>
-          <div className="flex flex-wrap gap-1.5">
-            {aspectRatioOptions.map((r) => (
-              <button key={r} type="button" onClick={() => setAspectRatio(r)} className={chipCls(aspectRatio === r)}>{r}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="py-3">
-          <p className="mb-2 text-xs font-medium text-stone-400">Resolution</p>
-          <div className="flex flex-wrap gap-1.5">
-            {resolutionOptions.length > 0
-              ? resolutionOptions.map((r) => (
-                  <button key={r} type="button" onClick={() => setResolution(r)} className={chipCls(resolution === r)}>{r}</button>
-                ))
-              : <span className="text-sm text-stone-400">Auto</span>}
-          </div>
-        </div>
-
-        <div className={showSound ? "py-3" : "pt-3"}>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-medium text-stone-400">Duration</p>
-            {useDurationSlider && (
-              <span className="text-sm font-semibold text-stone-900">{duration}s</span>
-            )}
-          </div>
-          {useDurationSlider ? (
-            <div className="rounded-2xl bg-stone-50 px-4 py-4">
-              <input
-                type="range"
-                min={durationMin}
-                max={durationMax}
-                step={1}
-                value={duration}
-                onInput={(event) => setDuration(Number(event.currentTarget.value))}
-                onChange={(event) => setDuration(Number(event.target.value))}
-                className="h-2 w-full cursor-pointer accent-stone-900"
-                aria-label="Duration"
-              />
-              <div className="mt-2 flex justify-between text-[11px] font-medium text-stone-400">
-                <span>{durationMin}s</span>
-                <span>{durationMax}s</span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {durationOptions.length > 0
-                ? durationOptions.map((d) => (
-                    <button key={d} type="button" onClick={() => setDuration(d)} className={chipCls(duration === d)}>{d}s</button>
-                  ))
-                : <span className="text-sm text-stone-400">-</span>}
-            </div>
-          )}
-        </div>
-
-        {showSound && (
-          <div className="pt-3">
-            <p className="mb-2 text-xs font-medium text-stone-400">Native Audio</p>
-            <div className="flex flex-wrap gap-1.5">
-              {soundOptions.map((s) => (
-                <button key={s} type="button" onClick={() => setSound(s)} className={chipCls(sound === s)}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const settingsControl = <GenerationSettings placement={menuPlacement} models={modelNameOptions.map(name => ({ id: name, label: name }))} model={selectedModelName} onModel={setSelectedModelName} ratios={aspectRatioOptions} ratio={aspectRatio} onRatio={v => setAspectRatio(v as VideoAspectRatio)} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as VideoResolutionOption)} durations={durationOptions} duration={duration} onDuration={setDuration} followsImage={followsImage} notice={[settingsNotice, hasVideoInput && selectedModelName === "Wan 3.0 Video" ? "With a reference video, output is limited to 15 seconds." : ""].filter(Boolean).join(" ")} />;
 
   if (variant === "composer") {
     return (
       <div className="mt-2 space-y-2">
-        <Textarea
-          value={prompt}
-          onChange={(event) => updatePrompt(event.target.value)}
-          placeholder="Describe the video you want to create..."
-          className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 py-1 shadow-none focus-visible:ring-0"
-          maxLength={500}
-        />
-        <div className="flex min-h-12 flex-wrap items-center gap-1 border-t border-border pt-2">
+        <div className="relative h-20">
+          <Textarea
+            value={prompt}
+            onChange={(event) => updatePrompt(event.target.value)}
+            placeholder="Describe the video you want to create..."
+            className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 pb-1 pt-1 shadow-none focus-visible:ring-0"
+            maxLength={500}
+          />
+        </div>
+        <div className="flex min-h-12 items-start gap-1 border-t border-border pt-2">
           {toolbarLeading}
-          <div className="relative w-36 sm:w-40">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
-              <span className="truncate">{selectedModelName}</span><ChevronDown className="h-3.5 w-3.5" />
-            </button>
-            {modelPopup}
-          </div>
-          <div className="relative w-40 sm:w-48">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className="flex h-9 w-full items-center gap-1.5 rounded-ui px-2 text-xs text-foreground transition-colors duration-300 hover:bg-surface-soft">
-              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{aspectRatio} · {resolution} · {duration}s</span>
-            </button>
-            {optionsPopup}
-          </div>
+          {settingsControl}
           <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || !prompt.trim() || !selectedOption || submissionBlocked || imagesOverLimit))} className="ml-auto h-10 gap-2 px-4">
             {!session ? getSignInLabel() : <><span>{selectedOption?.credits ?? 0} credits</span><Send className="h-4 w-4" /></>}
           </Button>
@@ -723,13 +524,13 @@ export function VideoCreationForm({
     <div className="space-y-6">
       {/* Image Upload */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-stone-900">Image</label>
+        <label className="block text-sm font-medium text-foreground">Image</label>
         {uploadedImages.length > 0 ? (
-          <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-stone-200/50 bg-stone-50 shadow-sm">
+          <div className="relative w-full aspect-video overflow-hidden rounded-2xl border border-border/50 bg-surface-soft shadow-sm">
             <img src={uploadedImages[0]} alt="Uploaded" className="w-full h-full object-contain" />
             <button
               onClick={() => updateImages([])}
-              className="absolute right-2 top-2 rounded-full border border-stone-200/50 bg-white p-1.5 text-stone-600 shadow-sm transition-all duration-300 hover:text-stone-900 hover:shadow-md active:scale-[0.98]"
+              className="absolute right-2 top-2 rounded-full border border-border/50 bg-background p-1.5 text-muted-foreground shadow-sm transition-all duration-300 hover:text-foreground hover:shadow-md active:scale-[0.98]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -737,13 +538,13 @@ export function VideoCreationForm({
         ) : (
           <div
             {...getRootProps()}
-            className={`aspect-video flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50/70 transition-all duration-300 ${
-              isDragActive ? "border-stone-500 bg-stone-100" : "hover:border-stone-400 hover:bg-stone-100/60"
+            className={`aspect-video flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-input bg-surface-soft/70 transition-all duration-300 ${
+              isDragActive ? "border-muted-foreground bg-surface-strong" : "hover:border-muted-foreground hover:bg-surface-strong/60"
             }`}
           >
             <input {...getInputProps()} />
-            <Upload className="mb-3 h-9 w-9 text-stone-400" />
-            <p className="text-sm text-stone-600">
+            <Upload className="mb-3 h-9 w-9 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
               {isDragActive ? "Drop image file" : "Click or drop an image to upload"}
             </p>
           </div>
@@ -752,35 +553,18 @@ export function VideoCreationForm({
 
       {/* Prompt */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-stone-900">Prompt</label>
+        <label className="block text-sm font-medium text-foreground">Prompt</label>
         <textarea
           value={prompt}
           onChange={(e) => updatePrompt(e.target.value)}
           placeholder="Describe the video you want to create..."
-          className="h-36 w-full resize-none rounded-2xl border border-stone-200/50 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm transition-all duration-300 placeholder:text-stone-400 focus:border-stone-300 focus:outline-none focus:ring-2 focus:ring-stone-300"
+          className="h-36 w-full resize-none rounded-2xl border border-border/50 bg-background px-4 py-3 text-sm text-foreground shadow-sm transition-all duration-300 placeholder:text-muted-foreground focus:border-input focus:outline-none focus:ring-2 focus:ring-input"
           maxLength={500}
         />
       </div>
 
       <div className="space-y-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative min-w-24 flex-[1.25]">
-            <button ref={modelTriggerRef} type="button" onClick={openModel} className={triggerCls}>
-              <span className="truncate">{selectedModelName}</span>
-              <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
-            </button>
-            {modelPopup}
-          </div>
-          <div className="relative min-w-44 flex-[1.75]">
-            <button ref={optionsTriggerRef} type="button" onClick={openOptions} className={triggerCls}>
-              <span className="truncate">
-                {aspectRatio} | {resolution} | {duration}s{showSound ? ` | ${sound}` : ""}
-              </span>
-              <ChevronDown className="ml-1 h-3.5 w-3.5 shrink-0 text-stone-500" />
-            </button>
-            {optionsPopup}
-          </div>
-        </div>
+        <div className="flex">{settingsControl}</div>
 
         <Button
           onClick={handleGenerate}
@@ -788,7 +572,7 @@ export function VideoCreationForm({
             status === "loading" ||
             (!!session && (generationLimitReached || !prompt.trim() || !selectedOption || imagesOverLimit))
           }
-          className="w-full rounded-xl border-0 bg-stone-800 text-white shadow-sm transition-all duration-300 hover:bg-stone-800/90 active:scale-[0.98] disabled:opacity-50"
+          className="w-full rounded-xl border-0 bg-primary text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
           size="lg"
         >
           {status === "loading" ? (
@@ -802,7 +586,7 @@ export function VideoCreationForm({
           ) : "Generate"}
         </Button>
 
-        <p className="text-xs text-stone-600">
+        <p className="text-xs text-muted-foreground">
           This generation will cost {selectedOption?.credits ?? 0} credits.
         </p>
       </div>

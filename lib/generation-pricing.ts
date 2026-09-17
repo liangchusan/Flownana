@@ -64,23 +64,11 @@ const MINIMAX_H3_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4)
 const SEEDANCE_MINI_DURATIONS = Array.from({ length: 12 }, (_, index) => index + 4);
 const GEMINI_OMNI_DURATIONS = [4, 6, 8, 10];
 const WAN_30_DURATIONS = Array.from({ length: 29 }, (_, index) => index + 2);
-export const DEFAULT_VIDEO_ASPECT_RATIOS: VideoAspectRatio[] = [
-  "Auto",
-  "16:9",
-  "9:16",
-  "1:1",
-  "4:3",
-  "3:4",
-  "21:9",
-];
-export const DEFAULT_VIDEO_RESOLUTIONS: VideoResolutionOption[] = [
-  "Auto",
-  "480P",
-  "720P",
-  "1080P",
-  "2K",
-  "4K",
-];
+export const DEFAULT_VIDEO_ASPECT_RATIOS: VideoAspectRatio[] = ["Auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"];
+export const DEFAULT_VIDEO_RESOLUTIONS: VideoResolutionOption[] = ["480P", "720P", "1080P", "4K"];
+export function videoFollowsInputRatio(modelName: string, imageCount: number) {
+  return imageCount > 0 && ["MiniMax H3", "HappyHorse 1.1"].includes(modelName);
+}
 export const DEFAULT_VIDEO_SOUND_OPTIONS: VideoSoundOption[] = ["Auto", "On", "Off"];
 
 function unique<T>(items: T[]) {
@@ -183,6 +171,8 @@ function createMiniMaxH3Options(): VideoModelOption[] {
         provider: "kie",
         providerModel: "minimax-h3/text-to-video",
         imageToVideoProviderModel: "minimax-h3/image-to-video",
+        // Native stereo audio; this provider route has no mute parameter.
+        hasAudio: true,
         resolution: resolution as VideoModelOption["resolution"],
         duration,
         aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,

@@ -70,7 +70,10 @@ export function CreationPreviewDialog({
 
   return (
     <Modal onClose={onClose}
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-stone-950 text-stone-100"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-stone-950 text-stone-100 backdrop:bg-stone-950"
       aria-label={`${creation.type} preview`}
     >
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-3 sm:px-5">

@@ -7,7 +7,7 @@ export function getImagePromptMinLength(model: ImageModelOptionId) {
 
 const STANDARD_RATIOS = ["9:16", "16:9", "1:1", "3:4", "4:3"];
 
-export function getImageAspectRatios(model: ImageModelOptionId, resolution: ImageResolutionKey, imageCount: number): string[] {
+function getModelImageAspectRatios(model: ImageModelOptionId, resolution: ImageResolutionKey, imageCount: number): string[] {
   if (model === "gpt-image-2-5-flare" || model === "gpt-image-2-5-sunburst") {
     return ["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "21:9", ...(resolution === "1K" ? ["27:16", "16:27", "9:8", "8:9"] : [])];
   }
@@ -30,4 +30,11 @@ export function getImageInputTypes(model: ImageModelOptionId): string[] {
   const types = ["image/jpeg", "image/png", "image/webp"];
   if (model === "qwen-image-3-pro") types.push("image/bmp", "image/gif", "image/tiff");
   return types;
+}
+
+// Product whitelist and ordering apply to UI, direct generation and Agent alike.
+export const CREATION_ASPECT_RATIOS = ["auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"];
+export function getImageAspectRatios(model: ImageModelOptionId, resolution: ImageResolutionKey, imageCount: number): string[] {
+  const supported = getModelImageAspectRatios(model, resolution, imageCount);
+  return CREATION_ASPECT_RATIOS.filter(ratio => supported.includes(ratio));
 }

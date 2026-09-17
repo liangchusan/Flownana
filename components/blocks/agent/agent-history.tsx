@@ -57,7 +57,7 @@ export function AgentHistory({ onNavigate }: { onNavigate: () => void }) {
   return <section className="mt-6" aria-label="Recent conversations">
     <div className="flex items-center gap-1 px-1">
       <button type="button" aria-expanded={!collapsed} aria-controls="recent-agent-conversations" onClick={() => { setCollapsed(!collapsed); setMenu(null); }} className="flex min-h-11 min-w-0 flex-1 items-center gap-1 rounded-ui px-2 text-xs text-muted-foreground transition-all duration-300 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary">Recent conversations<ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-all duration-300 ${collapsed ? "-rotate-90" : ""}`} /></button>
-      <Link href="/agent" onClick={onNavigate} aria-label="New conversation" title="New conversation" className={iconClass}><SquarePen className="h-4 w-4" /></Link>
+      <Link prefetch={true} href="/agent" onClick={onNavigate} aria-label="New conversation" title="New conversation" className={iconClass}><SquarePen className="h-4 w-4" /></Link>
     </div>
     <div id="recent-agent-conversations" hidden={collapsed} className="space-y-1">
       {(loadedScope === scope ? rows : []).map(row => <div key={row.id} className={`group relative flex min-h-11 items-center rounded-ui transition-all duration-300 hover:bg-background ${path === `/agent/${row.id}` ? "bg-background" : ""}`}>

@@ -14,10 +14,12 @@ type WorkspaceSearchParams = Promise<Record<string, string | string[] | undefine
 export async function MediaWorkspacePage({
   initialType,
   initialView = "create",
+  initialAgentMode = false,
   searchParams,
 }: {
   initialType: ActiveComposerType;
   initialView?: WorkspaceView;
+  initialAgentMode?: boolean;
   searchParams?: WorkspaceSearchParams;
 }) {
   const session = await getServerSession(authOptions);
@@ -40,6 +42,7 @@ export async function MediaWorkspacePage({
           initialHistoryLoadedAt={historyLoadedAt}
           initialAccountScope={getAccountScope(session?.user)}
           initialPrompt={prompt}
+          initialAgentMode={initialAgentMode}
         />
       </Suspense>
     </SessionBoundary>

@@ -110,7 +110,10 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  useSecureCookies: process.env.NODE_ENV === "development" ? false : undefined,
+  // `next start` always sets NODE_ENV=production, including isolated local
+  // verification runs. The explicit test-only provider must still work over
+  // localhost HTTP in that environment; production never enables it.
+  useSecureCookies: process.env.NODE_ENV === "development" || testAuthEnabled ? false : undefined,
   providers: [
     GoogleProvider({
       clientId: googleClientId || "",

@@ -65,7 +65,7 @@ test("GPT 2.5 variants retain distinct IDs, prices and resolution-specific ratio
     for (const resolution of ["1K", "2K", "4K"] as const) {
       const ratios = getImageAspectRatios(id, resolution, 0);
       assert.ok(ratios.includes("auto") && ratios.includes("1:1"));
-      for (const ratio of ["27:16", "16:27", "9:8", "8:9"]) assert.equal(ratios.includes(ratio), resolution === "1K");
+      for (const ratio of ["27:16", "16:27", "9:8", "8:9"]) assert.equal(ratios.includes(ratio), false);
       assert.equal(getImageGenerationCredits(id, resolution, 16), { "1K": 2, "2K": 3, "4K": 5 }[resolution]);
       const refs = Array.from({ length: 16 }, (_, i) => `https://example.test/${i}.png`);
       assert.deepEqual(build({ modelId: id, prompt: "Landscape", aspectRatio: "auto", resolution, inputUrls: refs }), {
