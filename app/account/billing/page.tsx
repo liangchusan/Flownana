@@ -2,9 +2,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { getBillingSummary } from "@/lib/billing-summary";
 import { PLAN_DISPLAY } from "@/lib/plans";
-import { finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
+import { CheckoutPaymentIncompleteError, finalizeCheckoutSession } from "@/lib/stripe-checkout-finalization";
+import { reconcilePendingPayment } from "@/lib/payment-reconciliation";
 import { BillingClient, type UpgradeInfo } from "./billing-client";
 import { getAccountScope } from "@/lib/account-scope";
+import type { VerifiedPurchase } from "@/lib/verified-purchase-display";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,8 @@ export default async function BillingPage({
   const sessionId = getParam(resolvedSearchParams, "session_id");
   let isNewCheckout = false;
   let upgradeInfo = EMPTY_UPGRADE_INFO;
-  let isPaymentSyncPending = false;
+  let paymentNotice: "missing_session" | "unpaid" | "syncing" | "unconfirmed" | null = null;
+  let verifiedPurchase: VerifiedPurchase | null = null;
 
   if (!session?.user?.id) {
     return (
@@ -46,14 +49,15 @@ export default async function BillingPage({
         summary={null}
         isNewCheckout={isNewCheckout}
         upgradeInfo={upgradeInfo}
-        isPaymentSyncPending={false}
+        paymentNotice={null}
+        verifiedPurchase={null}
       />
     );
   }
 
   if (requestedCompletion) {
     if (!sessionId) {
-      isPaymentSyncPending = true;
+      paymentNotice = "missing_session";
     } else {
       try {
         const completion = await finalizeCheckoutSession({
@@ -62,25 +66,49 @@ export default async function BillingPage({
           expectedAccountCreatedAt: session.user.accountCreatedAt,
           source: "checkout_return_verified",
         });
-        isNewCheckout = !completion.isUpgrade;
-        if (completion.isUpgrade) {
-          upgradeInfo = {
-            success: true,
-            toLabel: PLAN_DISPLAY[completion.priceKey].label,
-            creditCents: completion.creditAmountCents,
+        if (!completion.entitlementsReady) {
+          paymentNotice = "syncing";
+        } else {
+          isNewCheckout = !completion.isUpgrade;
+          verifiedPurchase = {
+            transactionId: sessionId,
+            purchaseType: completion.isUpgrade ? "upgrade" : "new_subscription",
+            to: completion.priceKey,
             payableCents: completion.payableAmountCents,
+            creditCents: completion.creditAmountCents,
             currency: completion.currency,
           };
+          if (completion.isUpgrade) {
+            upgradeInfo = {
+              success: true,
+              toLabel: PLAN_DISPLAY[completion.priceKey].label,
+              creditCents: completion.creditAmountCents,
+              payableCents: completion.payableAmountCents,
+              currency: completion.currency,
+            };
+          }
         }
       } catch (error) {
-        isPaymentSyncPending = true;
-        console.error("Checkout return verification failed:", error);
+        paymentNotice = error instanceof CheckoutPaymentIncompleteError ? "unpaid" : "unconfirmed";
+        if (paymentNotice === "unconfirmed") console.error("Checkout return verification failed:", error);
       }
     }
   }
 
   try {
+    try {
+      await reconcilePendingPayment(session.user.id, session.user.accountCreatedAt);
+    } catch (error) {
+      console.error("Billing payment reconciliation failed:", error);
+    }
     const summary = await getBillingSummary(session.user.id, session.user.accountCreatedAt);
+    if (verifiedPurchase && (!summary.subscription ||
+      verifiedPurchase.to !== `${summary.subscription.planType}_${summary.subscription.billingCycle}`)) {
+      verifiedPurchase = null;
+      isNewCheckout = false;
+      upgradeInfo = EMPTY_UPGRADE_INFO;
+      paymentNotice = "syncing";
+    }
     return (
       <BillingClient
         initialAccountScope={getAccountScope(session.user)}
@@ -88,7 +116,8 @@ export default async function BillingPage({
         summary={summary}
         isNewCheckout={isNewCheckout}
         upgradeInfo={upgradeInfo}
-        isPaymentSyncPending={isPaymentSyncPending}
+        paymentNotice={paymentNotice}
+        verifiedPurchase={verifiedPurchase}
       />
     );
   } catch {
@@ -98,9 +127,10 @@ export default async function BillingPage({
         signedIn
         summary={null}
         error="Could not load billing data"
-        isNewCheckout={isNewCheckout}
-        upgradeInfo={upgradeInfo}
-        isPaymentSyncPending={isPaymentSyncPending}
+        isNewCheckout={false}
+        upgradeInfo={EMPTY_UPGRADE_INFO}
+        paymentNotice={paymentNotice || (verifiedPurchase ? "syncing" : null)}
+        verifiedPurchase={null}
       />
     );
   }

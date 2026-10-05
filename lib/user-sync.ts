@@ -1,3 +1,5 @@
+import { queueAnalyticsReport, serverMeasurementId } from "@/lib/analytics-server";
+import type { AnalyticsContext } from "@/lib/analytics-policy";
 import { prisma } from "@/lib/prisma";
 import { isMissingProfileSchemaError } from "@/lib/account-profile";
 
@@ -6,6 +8,7 @@ export async function upsertAppUser(params: {
   email: string;
   name?: string | null;
   image?: string | null;
+  analyticsContext?: AnalyticsContext | null;
 }) {
   try {
     const existing = await prisma.user.findUnique({
@@ -17,14 +20,17 @@ export async function upsertAppUser(params: {
     });
 
     if (!existing) {
-      return prisma.user.create({
-        data: {
-          id: params.id,
-          email: params.email,
-          name: params.name ?? undefined,
-          image: params.image ?? undefined,
-          providerImage: params.image ?? undefined,
-        },
+      const data = {
+        id: params.id, email: params.email, name: params.name ?? undefined,
+        image: params.image ?? undefined, providerImage: params.image ?? undefined,
+      };
+      if (!serverMeasurementId()) return prisma.user.create({ data });
+      return prisma.$transaction(async tx => {
+        const created = await tx.user.createMany({ data, skipDuplicates: true });
+        const user = await tx.user.findUniqueOrThrow({ where: { id: params.id } });
+        if (created.count) await queueAnalyticsReport(tx, { userId: user.id, key: `${user.id}:${user.createdAt.toISOString()}`,
+          name: "sign_up", params: { method: "google" }, context: params.analyticsContext || null, occurredAt: user.createdAt });
+        return user;
       });
     }
 

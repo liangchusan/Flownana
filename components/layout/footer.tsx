@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PricingTrigger } from "@/components/pricing/pricing-trigger";
 import { Logo } from "@/components/ui/logo";
 
 export function Footer({ variant = "dark" }: { variant?: "dark" | "light" }) {
@@ -42,9 +43,7 @@ export function Footer({ variant = "dark" }: { variant?: "dark" | "light" }) {
             <h3 className={`mb-4 font-semibold ${light ? "text-foreground" : "text-white"}`}>Company</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/pricing" className={linkClassName}>
-                  Pricing
-                </Link>
+                <PricingTrigger className={linkClassName}>Pricing</PricingTrigger>
               </li>
               <li>
                 <Link href="/contact" className={linkClassName}>

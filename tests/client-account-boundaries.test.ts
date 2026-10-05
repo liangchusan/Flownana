@@ -33,7 +33,8 @@ test("actual workspace and home entrypoints never relabel an old RSC seed as a n
 
 test("pricing resets private state only when the account epoch changes", () => {
   let user: typeof a & { name?: string } = a;
-  const load = createSourceLoader({ "next-auth/react": { useSession: () => ({ data: { user }, status: "authenticated" }) } });
+  const load = createSourceLoader({
+    react: { ...React, useRef: (value: unknown) => ({ current: value }) }, "next-auth/react": { useSession: () => ({ data: { user }, status: "authenticated" }) } });
   const component = load<any>("components/pricing/pricing-plans.tsx").PricingPlans;
   user = a;
   const first = component({ mode: "image" });

@@ -5,7 +5,7 @@ export const metadata = {
 };
 
 export default function PrivacyPolicyPage() {
-  const lastUpdated = "January 20, 2026";
+  const lastUpdated = "October 5, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,6 +55,27 @@ export default function PrivacyPolicyPage() {
               <strong>Cookies and similar technologies</strong>: used to operate the Services and remember preferences.
             </li>
           </ul>
+
+          <h2 id="analytics">Google Analytics and your choices</h2>
+          <p>
+            We use Google Analytics to measure visits, account creation, pricing interest, checkout, verified
+            purchases, and successful image or video creation. Google receives cookie identifiers, session
+            identifiers, limited page information, and relevant transaction amounts and product names.
+            We do not send your prompts, uploaded content, email address, payment card details, or account ID to Analytics.
+            Google signals and ad personalization are disabled in this measurement setup.
+          </p>
+          <p>
+            Basic analytics is enabled by default for visits identified as coming from the United States, Japan,
+            or Taiwan, unless you have rejected it. For other or unidentified regions, we ask you to choose first.
+            Global Privacy Control turns analytics off. Use the Privacy button to allow, reject, or withdraw analytics
+            at any time. This does not disable essential sign-in or payment functionality. Withdrawal stops future
+            collection; it does not automatically delete information already sent. If you are offline, we retry the
+            server withdrawal when your connection returns.
+          </p>
+          <p>
+            Google processes analytics information under its own policies. Learn more about
+            {" "}<a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">how Google uses information from partner sites</a>.
+          </p>
 
           <h2 id="how-we-use">2. How We Use Information</h2>
           <ul>

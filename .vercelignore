@@ -1,0 +1,4 @@
+# Deployment configuration comes from scoped Vercel variables only.
+.env
+.env.*
+!.env.example

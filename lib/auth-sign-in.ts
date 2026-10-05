@@ -1,5 +1,6 @@
 "use client";
 
+import { syncAnalyticsContext } from "@/lib/analytics";
 import { signIn } from "next-auth/react";
 import { getCurrentAuthCallbackUrl } from "@/lib/auth-callback";
 
@@ -20,12 +21,15 @@ export function getSignInLabel() {
   return isTestAuthEnabled() ? "Sign in as Test User" : "Sign in with Google";
 }
 
-export function signInForCurrentEnvironment() {
+export async function signInForCurrentEnvironment(reopenPricing = false) {
   const callbackUrl =
-    isTestAuthEnabled() && typeof window !== "undefined"
+    reopenPricing && typeof window !== "undefined"
+      ? `${window.location.origin}${window.location.pathname}${window.location.search}#pricing`
+      : isTestAuthEnabled() && typeof window !== "undefined"
       ? window.location.href
       : getCurrentAuthCallbackUrl();
 
+  await syncAnalyticsContext();
   return signIn(getSignInProviderId(), {
     callbackUrl,
   });

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Check } from "lucide-react";
+import { Sparkles, ImagePlus, WandSparkles, Film, MessageSquare, LayoutTemplate, Layers, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UpgradeModal } from "@/components/billing/upgrade-modal";
 import { useToast } from "@/components/blocks/app-toast-provider";
@@ -18,18 +18,32 @@ import {
   type PlanKey,
   type PriceKey,
 } from "@/lib/plans";
-import { trackEvent } from "@/lib/analytics";
+import { trackCheckout, syncAnalyticsContext } from "@/lib/analytics";
+import { PricingExposure } from "@/components/analytics/pricing-exposure";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { fetchBillingSummary } from "@/lib/billing-summary-client";
 import { getAccountScope } from "@/lib/account-scope";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { isAccountOperationCancelled } from "@/lib/account-operation";
+import { clearPricingLoginIntent, readPricingLoginIntent, savePricingLoginIntent } from "@/lib/pricing-login-intent";
 
 const SHARED_FEATURES = [
-  "All available image and video models",
-  "Private creations with no watermarks",
-  "Credits refresh every month",
+  { icon: Sparkles, label: "All available image and video models" },
+  { icon: ImagePlus, label: "Turn your words into original images" },
+  { icon: WandSparkles, label: "Refine images with your own references" },
+  { icon: Film, label: "Create videos from text or images" },
+  { icon: MessageSquare, label: "Plan and create with your AI Agent" },
+  { icon: LayoutTemplate, label: "16 creative templates to get you started" },
+  { icon: Layers, label: "Explore up to 4 images per generation" },
+  { icon: RefreshCw, label: "Reuse your creations as references" },
+  { icon: ShieldCheck, label: "Private creations, watermark-free downloads" },
 ];
+
+const PLAN_POSITIONING: Record<PlanKey, string> = {
+  starter: "Bring your ideas to life",
+  pro: "Power your everyday creativity",
+  max: "More room for your biggest ideas",
+};
 
 const PLANS = PLAN_KEYS.map((planKey) => ({
   planKey,
@@ -40,7 +54,6 @@ const PLANS = PLAN_KEYS.map((planKey) => ({
 type PricingPlansProps = {
   stripeEnabled: boolean;
   initialBilling?: BillingKey;
-  variant?: "page" | "modal";
 };
 
 type UpgradeDetails = {
@@ -54,23 +67,26 @@ type UpgradeDetails = {
 
 export function PricingPlans(props: PricingPlansProps) {
   const { data: session } = useSession();
-  return <ScopedPricingPlans key={getAccountScope(session?.user) || "anonymous"} {...props} />;
+  const exposureReported = useRef(false);
+  return <ScopedPricingPlans exposureReported={exposureReported} key={getAccountScope(session?.user) || "anonymous"} {...props} />;
 }
 
 function ScopedPricingPlans({
   stripeEnabled,
   initialBilling = "monthly",
-  variant = "page",
-}: PricingPlansProps) {
+  exposureReported,
+}: PricingPlansProps & { exposureReported: { current: boolean } }) {
   const { data: session, status } = useSession();
   const { accountScope, capture } = useAccountOperation();
   const { showToast } = useToast();
   const [billing, setBilling] = useState<BillingKey>(initialBilling);
+  const [pendingPlan, setPendingPlan] = useState<PriceKey | null>(null);
   const [summary, setSummary] = useState<{
     subscription: {
       planType: string;
       billingCycle: string;
     } | null;
+    paymentIssue: { status: string; plan: string | null } | null;
   } | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeKey, setUpgradeKey] = useState<PriceKey | null>(null);
@@ -82,6 +98,14 @@ function ScopedPricingPlans({
   const [summaryState, setSummaryState] = useState<"loading" | "ready" | "error">("loading");
   const [summaryRetry, setSummaryRetry] = useState(0);
   const quoteRevision = useRef(0);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const pending = readPricingLoginIntent();
+    if (!pending) return;
+    setBilling(PLAN_DISPLAY[pending].billing);
+    setPendingPlan(pending);
+  }, [status]);
 
   useEffect(() => {
     if (!accountScope) {
@@ -108,8 +132,9 @@ function ScopedPricingPlans({
   const subscribe = async (priceKey: PriceKey) => {
     if (loading || status === "loading" || (accountScope && summaryState !== "ready")) return;
     if (!session) {
-      trackEvent("signup_started", { source: "pricing", price_key: priceKey });
-      await signInForCurrentEnvironment();
+
+      savePricingLoginIntent(priceKey);
+      await signInForCurrentEnvironment(true);
       return;
     }
     if (!stripeEnabled) {
@@ -122,22 +147,23 @@ function ScopedPricingPlans({
     }
 
     setLoading(priceKey);
-    trackEvent("checkout_started", {
-      price_key: priceKey,
-      checkout_type: "new_subscription",
-    });
+    clearPricingLoginIntent();
+    setPendingPlan(null);
+
     try {
       const operation = capture();
+      await syncAnalyticsContext(operation.headers);
+      operation.assertCurrent();
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...operation.headers },
         signal: operation.signal,
-        body: JSON.stringify({ priceKey }),
+        body: JSON.stringify({ priceKey, returnTo: `${window.location.pathname}${window.location.search}` }),
       });
       const data = await response.json();
       operation.assertCurrent();
       if (!response.ok) throw new Error(data.error || "Checkout failed");
-      if (data.url) window.location.href = data.url;
+      if (data.url) { trackCheckout(data.checkout || {}); window.location.href = data.url; }
     } catch (error) {
       if (isAccountOperationCancelled(error)) return;
       showToast({
@@ -153,31 +179,29 @@ function ScopedPricingPlans({
   const upgradeNow = async (priceKey: PriceKey) => {
     if (loading || status === "loading" || (accountScope && summaryState !== "ready")) return;
     if (!session) {
-      trackEvent("signup_started", {
-        source: "pricing_upgrade",
-        price_key: priceKey,
-      });
-      await signInForCurrentEnvironment();
+
+      savePricingLoginIntent(priceKey);
+      await signInForCurrentEnvironment(true);
       return;
     }
 
     setLoading(priceKey);
-    trackEvent("checkout_started", {
-      price_key: priceKey,
-      checkout_type: "upgrade",
-    });
+
     try {
       const operation = capture();
+      await syncAnalyticsContext(operation.headers);
+      operation.assertCurrent();
       const response = await fetch("/api/stripe/change-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...operation.headers },
         signal: operation.signal,
-        body: JSON.stringify({ priceKey }),
+        body: JSON.stringify({ priceKey, returnTo: `${window.location.pathname}${window.location.search}` }),
       });
       const data = await response.json();
       operation.assertCurrent();
       if (!response.ok) throw new Error(data.error || "Upgrade failed");
       if (data.url) {
+        trackCheckout(data.checkout || {});
         window.location.href = data.url;
         return;
       }
@@ -272,10 +296,18 @@ function ScopedPricingPlans({
       onClick: () => setSummaryRetry((value) => value + 1),
     };
     const priceKey = getPriceKey(plan, billing);
+    if (summary?.paymentIssue) {
+      return {
+        label: "Complete payment",
+        disabled: false,
+        note: "Finish your existing payment in Billing before choosing another plan.",
+        onClick: () => { window.location.href = "/account/billing"; },
+      };
+    }
     const subscription = summary?.subscription;
     if (!subscription) {
       return {
-        label: "Choose plan",
+        label: pendingPlan === priceKey ? "Continue with this plan" : "Choose plan",
         disabled: false,
         onClick: () => subscribe(priceKey),
       };
@@ -327,11 +359,11 @@ function ScopedPricingPlans({
 
   return (
     <>
-      <div className={variant === "modal" ? "mb-6 flex justify-center" : "mb-10 flex justify-center"}>
+      <div className="mb-6 flex justify-center">
         <div className="inline-flex items-center rounded-full border border-border bg-surface-soft p-1">
           <button
             type="button"
-            onClick={() => setBilling("monthly")}
+            onClick={() => { setBilling("monthly"); setPendingPlan(null); clearPricingLoginIntent(); }}
             className={`h-9 rounded-full px-4 text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-5 ${
               billing === "monthly"
                 ? "bg-background text-foreground shadow-soft"
@@ -343,7 +375,7 @@ function ScopedPricingPlans({
           </button>
           <button
             type="button"
-            onClick={() => setBilling("yearly")}
+            onClick={() => { setBilling("yearly"); setPendingPlan(null); clearPricingLoginIntent(); }}
             className={`flex h-9 items-center rounded-full px-4 text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:px-5 ${
               billing === "yearly"
                 ? "bg-background text-foreground shadow-soft"
@@ -352,18 +384,15 @@ function ScopedPricingPlans({
             aria-pressed={billing === "yearly"}
           >
             Yearly
-            <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-active">
+            <span className="ml-2 rounded-full bg-brand-blue px-2.5 py-1 text-xs font-semibold text-background">
               Save 50%
             </span>
           </button>
         </div>
       </div>
 
-      <div
-        className={`mx-auto grid grid-cols-1 gap-4 md:grid-cols-3 ${
-          variant === "page" ? "max-w-6xl md:gap-6" : "max-w-5xl"
-        }`}
-      >
+      <PricingExposure billing={billing} reported={exposureReported} />
+      <div data-pricing-backdrop="true" className="mx-auto grid max-w-6xl grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
         {PLANS.map((plan) => {
           const cta = ctaForPlan(plan.planKey);
           const priceKey = getPriceKey(plan.planKey, billing);
@@ -378,19 +407,19 @@ function ScopedPricingPlans({
           return (
             <article
               key={plan.planKey}
-              className={`relative flex min-w-0 flex-col rounded-ui-xl border p-5 transition-all duration-300 sm:p-6 ${
+              className={`relative flex min-w-0 flex-col rounded-ui-xl border p-6 text-foreground transition-all duration-300 lg:min-h-[49rem] ${
                 featured
-                  ? "border-surface-dark bg-surface-dark text-background shadow-float"
+                  ? "border-brand-blue/30 bg-brand-blue-soft/40"
                   : "border-border bg-background text-foreground hover:border-primary/35"
               }`}
             >
-              <div className="flex min-h-7 items-start justify-between gap-3">
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
+              <div className="flex min-h-10 items-start justify-between gap-3">
+                <h3 className="text-2xl font-medium lg:text-3xl">{plan.name}</h3>
                 {(isCurrent || featured) && (
                   <span
                     className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
                       featured
-                        ? "bg-background/10 text-background"
+                        ? "bg-brand-blue-soft text-brand-blue"
                         : "bg-surface-soft text-muted-foreground"
                     }`}
                   >
@@ -399,63 +428,49 @@ function ScopedPricingPlans({
                 )}
               </div>
 
-              <div className="mt-5 flex items-end gap-1.5">
-                <span className="font-display text-5xl font-medium leading-none">
-                  ${monthlyEquivalent.toFixed(0)}
+              <div className="mt-10 flex items-baseline gap-1 lg:mt-16">
+                <span className="self-start pt-1 text-lg text-muted-foreground">$</span>
+                <span className="font-display text-5xl font-medium leading-none tracking-tight">
+                  {monthlyEquivalent.toFixed(0)}
                 </span>
-                <span className={featured ? "pb-1 text-xs text-background/65" : "pb-1 text-xs text-muted-foreground"}>
-                  / month
-                </span>
+                <span className="ml-1 text-xs text-muted-foreground">USD / month</span>
               </div>
-              <p className={`mt-2 min-h-10 text-xs leading-relaxed ${featured ? "text-background/65" : "text-muted-foreground"}`}>
+              <p className="mt-3 min-h-10 md:min-h-16 lg:min-h-10 text-xs leading-relaxed text-muted-foreground">
                 {billing === "yearly"
                   ? `$${plan.yearlyPrice} billed yearly. Credits issued monthly.`
                   : `$${plan.monthlyPrice} billed monthly.`}
               </p>
 
-              <div className={`mt-4 rounded-ui-lg px-4 py-3 ${featured ? "bg-surface-elevated" : "bg-surface-soft"}`}>
-                <p className="text-sm font-semibold">
-                  {plan.credits.toLocaleString()} credits / month
-                </p>
-                <p className={`mt-1 text-xs ${featured ? "text-background/60" : "text-muted-foreground"}`}>
-                  Up to {plan.resolution} output
-                </p>
-              </div>
-
-              <ul className={`mt-5 flex-1 space-y-2.5 text-sm ${featured ? "text-background/80" : "text-stone-700"}`}>
-                {SHARED_FEATURES.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2.5">
-                    <Check className={`mt-0.5 h-4 w-4 shrink-0 ${featured ? "text-primary" : "text-primary-active"}`} />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {plan.credits.toLocaleString()} credits / month
+              </p>
+              <p className="mt-7 min-h-12 text-base font-semibold leading-6 lg:mt-8">
+                {PLAN_POSITIONING[plan.planKey]}
+              </p>
 
               <Button
-                className={`mt-6 w-full ${
-                  featured && !cta.disabled
-                    ? "bg-primary text-white hover:bg-primary-active"
-                    : featured
-                      ? "border-background/15 bg-background/10 text-background"
-                      : ""
-                }`}
-                variant={featured ? "default" : "outline"}
+                className={`mt-3 h-11 w-full ${featured && !cta.disabled ? "bg-brand-blue text-background hover:bg-brand-blue/90 active:bg-brand-blue/80" : ""}`}
+                variant={cta.disabled ? "outline" : "default"}
                 disabled={cta.disabled || loading !== null || status === "loading"}
                 onClick={cta.onClick}
               >
                 {loading === priceKey ? "Opening checkout…" : cta.label}
               </Button>
-              <p className={`mt-2 min-h-8 text-center text-[11px] leading-relaxed ${featured ? "text-background/55" : "text-muted-foreground"}`}>
-                {cta.note || (billing === "yearly" ? "Yearly commitment" : "Cancel in billing portal")}
-              </p>
+              {cta.note && (
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{cta.note}</p>
+              )}
+              <ul className="mt-7 flex-1 space-y-4 text-sm leading-6 text-text-secondary">
+                {SHARED_FEATURES.map(({ icon: Icon, label }) => (
+                  <li key={label} className="flex items-start gap-3">
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-foreground" strokeWidth={1.6} />
+                    <span>{label}</span>
+                  </li>
+                ))}
+              </ul>
             </article>
           );
         })}
       </div>
-
-      <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-relaxed text-muted-foreground">
-        Credits expire 30 days after each monthly grant. Payments are non-refundable.
-      </p>
 
       <UpgradeModal
         open={upgradeOpen}

@@ -25,7 +25,6 @@ import { useToast } from "@/components/blocks/app-toast-provider";
 import { creationIdentity, formatConversationTimestamp, formatProcessingDuration, getCreationRunRemovalTarget, shouldShowConversationTimestamp, type CreationHistoryItem } from "@/lib/creation-history";
 import { getCreationParameters } from "@/lib/creation-details";
 import { buildCreationDownloadPath } from "@/lib/creation-download";
-import { trackEvent } from "@/lib/analytics";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { isAccountOperationCancelled } from "@/lib/account-operation";
 
@@ -237,7 +236,7 @@ function ResultActions({
   onDelete: () => void;
 }) {
   const download = () => {
-    trackEvent("result_download_clicked", { type: creation.type, source: "create_stream", template_id: creation.parameters?.templateId });
+
     const link = document.createElement("a");
     link.href = buildCreationDownloadPath(creation.taskId || creation.id, url);
     link.download = "";

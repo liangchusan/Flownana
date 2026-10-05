@@ -1,3 +1,5 @@
+import { commerceEvent, type AnalyticsContext } from "@/lib/analytics-policy";
+import { saveAnalyticsContext } from "@/lib/analytics-server";
 import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 import { Prisma, type CheckoutReservation } from "@prisma/client";
@@ -7,6 +9,7 @@ import { BILLING_READ_OPTIONS, syncSubscriptionRecord } from "@/lib/subscription
 import { stripeObjectId } from "@/lib/stripe-billing-policy";
 import { assertStripePriceMatchesPlan, getPriceKeyFromStripePriceId, getStripePriceId, isPriceKey, isUpgradeAllowed, PLAN_DISPLAY, type PriceKey } from "@/lib/plans";
 import { buildUpgradeQuote } from "@/lib/upgrade-logic";
+import { checkoutCancelUrl } from "@/lib/checkout-return";
 
 export class CheckoutConflictError extends Error {
   constructor(message = "Your previous checkout is still being confirmed. Check Billing before trying again.") { super(message); }
@@ -14,6 +17,15 @@ export class CheckoutConflictError extends Error {
 
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const writeOptions = (idempotencyKey: string) => ({ ...BILLING_READ_OPTIONS, idempotencyKey });
+
+// Stripe supports these additive parameters on our billing API version, but
+// the installed SDK predates their TypeScript definitions.
+type SavedCardCheckoutParams = Stripe.Checkout.SessionCreateParams & {
+  saved_payment_method_options: {
+    payment_method_save: "enabled";
+    allow_redisplay_filters: ["always"];
+  };
+};
 
 function ownsCheckout(user: BillingUser, session: Stripe.Checkout.Session) {
   return session.mode === "subscription" && (session.client_reference_id || session.metadata?.userId) === user.id &&
@@ -85,7 +97,7 @@ export async function buildLockedCheckoutQuote(tx: Prisma.TransactionClient, use
   return { current, currentKey: parsed.key, quote };
 }
 
-async function prepareCheckout(tx: Prisma.TransactionClient, user: BillingUser, stripe: Stripe, params: { kind: "purchase" | "upgrade"; priceKey: PriceKey; baseUrl: string }) {
+async function prepareCheckout(tx: Prisma.TransactionClient, user: BillingUser, stripe: Stripe, params: { kind: "purchase" | "upgrade"; priceKey: PriceKey; baseUrl: string; returnTo?: string; analyticsContext?: AnalyticsContext | null }) {
   const current = params.kind === "purchase" ? await readCheckoutSubscription(tx, user, stripe) : null;
   if (params.kind === "purchase" && current) throw new CheckoutConflictError("You already have a subscription. Use the upgrade flow.");
   const upgrade = params.kind === "upgrade" ? await buildLockedCheckoutQuote(tx, user, stripe, params.priceKey) : null;
@@ -108,10 +120,12 @@ async function prepareCheckout(tx: Prisma.TransactionClient, user: BillingUser, 
       metadata.creditCouponId = couponParams.id!;
     }
   }
-  const sessionParams: Stripe.Checkout.SessionCreateParams = { mode: "subscription", client_reference_id: user.id,
+  const sessionParams: SavedCardCheckoutParams = { mode: "subscription", client_reference_id: user.id,
     line_items: [{ price: priceId, quantity: 1 }], expires_at: expiresAt.getTime() / 1000,
     success_url: `${params.baseUrl}/account/billing?${upgrade ? "upgrade" : "checkout"}=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${params.baseUrl}/pricing`, metadata, subscription_data: { metadata },
+    cancel_url: checkoutCancelUrl(params.baseUrl, params.returnTo), metadata, subscription_data: { metadata },
+    // Checkout collects opt-in consent; renewal-only cards stay hidden.
+    saved_payment_method_options: { payment_method_save: "enabled", allow_redisplay_filters: ["always"] },
     ...(user.stripeCustomerId ? { customer: user.stripeCustomerId } : { customer_email: user.email }),
     ...(couponParams ? { discounts: [{ coupon: couponParams.id! }] } : {}),
   };
@@ -154,7 +168,7 @@ async function materializeCheckout(stripe: Stripe, tx: Prisma.TransactionClient,
   return session;
 }
 
-export async function createReservedCheckout(params: { userId: string; accountCreatedAt: string; kind: "purchase" | "upgrade"; priceKey: PriceKey; baseUrl: string }) {
+export async function createReservedCheckout(params: { userId: string; accountCreatedAt: string; kind: "purchase" | "upgrade"; priceKey: PriceKey; baseUrl: string; returnTo?: string; analyticsContext?: AnalyticsContext | null }) {
   const stripe = getStripe();
   for (let attempt = 0; attempt < 3; attempt++) {
     // Commit the durable intent independently of any Stripe write or reply.
@@ -189,7 +203,11 @@ export async function createReservedCheckout(params: { userId: string; accountCr
         }
       }
       if (session.status !== "open" || !session.url) throw new CheckoutConflictError();
-      return { url: session.url };
+      if (params.analyticsContext) await saveAnalyticsContext(tx, user, params.analyticsContext, `checkout:${session.id}`);
+      const subtotal = session.amount_subtotal;
+      const discount = session.total_details?.amount_discount;
+      const event = subtotal !== null && discount !== undefined ? commerceEvent(reservation.priceKey, subtotal - discount, session.currency || "") : null;
+      return { url: session.url, checkout: { id: session.id, url: session.url, ...(event ? { event } : {}) } };
     }, params.accountCreatedAt);
     if (result) return result;
   }

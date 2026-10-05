@@ -1,3 +1,4 @@
+import { getAccountAnalyticsContext, saveAnalyticsContext, serverMeasurementId } from "@/lib/analytics-server";
 import { Prisma, type ImageTemplateRun } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { withGenerationAccount, GenerationRequestError, MAX_ACTIVE_OUTPUTS, recoverGenerationObligations, type GenerationAccount } from "@/lib/generation-lifecycle";
@@ -122,6 +123,10 @@ export async function generateTemplateRun(account: GenerationAccount, id: string
           templateId: template.id, templateVersion: template.version, templateRunId: id, templateBrief: analysis.spec.summary, templateDirection: analysis.spec.variants[directionIndex].title,
           ...(input.parentGenerationId ? { parentGenerationId: input.parentGenerationId } : {}) },
       } });
+      if (serverMeasurementId()) {
+        const context = await getAccountAnalyticsContext(tx, account.id);
+        if (context) { const user = await tx.user.findUniqueOrThrow({ where: { id: account.id } }); await saveAnalyticsContext(tx, user, context, `generation:${generation.id}`); }
+      }
       await syncGenerationMediaAssets({ generationId: generation.id, userId: account.id, tx,
         assets: assets.map((asset, position) => ({ media: { url: asset!.url, contentType: asset!.contentType ?? undefined, sizeBytes: asset!.sizeBytes ?? undefined }, role: "input", type: "image", position })) });
       outputs.push(generation);

@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -12,7 +13,6 @@ import { X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import dynamic from "next/dynamic";
 import { PanelLoading } from "@/components/ui/panel-loading";
-import { trackEvent } from "@/lib/analytics";
 
 const PricingPlans = dynamic(() => import("@/components/pricing/pricing-plans").then(m => m.PricingPlans), { loading: PanelLoading });
 
@@ -26,11 +26,25 @@ const PricingModalContext = createContext<PricingModalContextValue | null>(null)
 export function PricingModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
 
-  const closePricing = useCallback(() => setOpen(false), []);
+  const closePricing = useCallback(() => {
+    setOpen(false);
+    if (window.location.hash === "#pricing") {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+  }, []);
   const openPricing = useCallback(() => {
-    trackEvent("pricing_viewed", { source: "workspace_upgrade_modal" });
+
     setOpen(true);
   }, []);
+
+  useEffect(() => {
+    const openFromLink = () => {
+      if (window.location.hash === "#pricing") openPricing();
+    };
+    openFromLink();
+    window.addEventListener("hashchange", openFromLink);
+    return () => window.removeEventListener("hashchange", openFromLink);
+  }, [openPricing]);
 
   const value = useMemo(
     () => ({ openPricing, closePricing }),
@@ -42,42 +56,37 @@ export function PricingModalProvider({ children }: { children: ReactNode }) {
       {children}
       {open && (
         <Modal onClose={closePricing} aria-labelledby="pricing-modal-title"
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-foreground/25 backdrop-blur-sm sm:items-center sm:p-5"
+          className="fixed inset-0 z-[70] overflow-y-auto bg-surface-soft"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closePricing();
+            if (event.target === event.currentTarget ||
+              (event.target instanceof HTMLElement && event.target.dataset.pricingBackdrop === "true")) closePricing();
           }}
         >
           <section
-            className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background shadow-float sm:h-auto sm:max-h-[calc(100dvh-2.5rem)] sm:max-w-6xl sm:rounded-ui-xl sm:border sm:border-border"
+            className="mx-auto min-h-full w-full max-w-7xl px-4 pb-10 pt-16 sm:px-8 sm:pb-14 sm:pt-16"
+            data-pricing-backdrop="true"
           >
-            <header className="relative shrink-0 border-b border-border bg-background px-5 py-5 text-center sm:px-8 sm:py-6">
-              <p className="mb-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">
-                Plans and credits
-              </p>
+            <header className="mb-5 text-center">
               <h2
                 id="pricing-modal-title"
-                className="font-display text-3xl font-medium text-foreground sm:text-display-md"
+                className="font-display text-2xl font-medium text-foreground sm:text-3xl"
               >
                 Choose your plan
               </h2>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-                Save 50% with yearly billing. Credits are still added every month.
-              </p>
               <button
                 type="button"
                 onClick={closePricing}
-                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:right-5 sm:top-5"
+                className="fixed right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface-soft text-muted-foreground transition-all duration-300 hover:bg-surface-strong hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:right-5 sm:top-5"
                 aria-label="Close pricing"
               >
                 <X className="h-5 w-5" />
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-7 sm:py-7">
+            <div data-pricing-backdrop="true">
               <PricingPlans
                 stripeEnabled
                 initialBilling="yearly"
-                variant="modal"
               />
             </div>
           </section>

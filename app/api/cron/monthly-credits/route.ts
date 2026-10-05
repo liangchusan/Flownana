@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { grantDueYearlyCredits } from "@/lib/subscription-credit-grant";
 import { cleanupOrphanedMediaUploads } from "@/lib/media-upload-cleanup";
-import { canCreateStripeCheckout } from "@/lib/stripe-production-access";
+import { canProcessStripeBilling } from "@/lib/stripe-production-access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,24 +13,28 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const now = new Date();
+  const yearlyPriceIds = [
+    process.env.STRIPE_PRICE_STARTER_YEARLY,
+    process.env.STRIPE_PRICE_PRO_YEARLY,
+    process.env.STRIPE_PRICE_MAX_YEARLY,
+  ].filter((id): id is string => Boolean(id));
   const subs = await prisma.subscription.findMany({
     where: {
       billingCycle: "yearly",
       status: { in: ["active", "trialing"] },
       nextCreditAt: { lte: now },
+      stripePriceId: { in: yearlyPriceIds },
     },
-    select: { id: true, userId: true, stripeSubscriptionId: true, user: { select: { email: true } } },
+    select: { id: true, userId: true, stripeSubscriptionId: true },
   });
   let granted = 0;
   let duplicates = 0;
   let ignored = 0;
   const failed: string[] = [];
   for (const sub of subs) {
-    if (!canCreateStripeCheckout({
-      email: sub.user.email,
+    if (!canProcessStripeBilling({
       secretKey: process.env.STRIPE_SECRET_KEY,
       vercelEnv: process.env.VERCEL_ENV,
-      allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS,
     })) {
       ignored += 1;
       continue;

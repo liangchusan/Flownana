@@ -5,12 +5,17 @@ import { matchesRequestAccount } from "@/lib/account-scope";
 import { sessionAccountWhere } from "@/lib/account-session";
 import { getStripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
+import { canProcessStripeBilling } from "@/lib/stripe-production-access";
 
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id || !matchesRequestAccount(request, session.user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canProcessStripeBilling({ secretKey: process.env.STRIPE_SECRET_KEY,
+      vercelEnv: process.env.VERCEL_ENV })) {
+      return NextResponse.json({ error: "Billing is unavailable in this environment." }, { status: 503 });
     }
 
     const user = await prisma.user.findUnique({

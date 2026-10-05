@@ -1,6 +1,7 @@
 import { Prisma, type Generation } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { del } from "@vercel/blob";
+import { getAccountAnalyticsContext, queueAnalyticsReport, saveAnalyticsContext, serverMeasurementId } from "@/lib/analytics-server";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_GENERATION_STATUSES } from "@/lib/account-profile";
 import {
@@ -121,6 +122,10 @@ export async function reserveGeneration(params: {
       inputUrls: params.inputs.map((input) => input.media.url), creditsCost: params.creditsCost,
       creditConsumption: consumed as Prisma.InputJsonValue,
     } });
+    if (serverMeasurementId()) {
+      const context = await getAccountAnalyticsContext(tx, params.account.id);
+      if (context) { const user = await tx.user.findUniqueOrThrow({ where: { id: params.account.id } }); await saveAnalyticsContext(tx, user, context, `generation:${generation.id}`); }
+    }
     await syncGenerationMediaAssets({ generationId: generation.id, userId: params.account.id, assets: params.inputs, tx });
     return generation;
   });
@@ -257,6 +262,10 @@ export async function completeGeneration(params: {
       parameters: { ...saved,
         processingDurationMs: Math.max(0, Date.now() - current.createdAt.getTime()) },
     } });
+    if (serverMeasurementId()) await queueAnalyticsReport(tx, {
+      userId: current.userId, key: current.id, name: "generation_completed",
+      params: { media_type: current.type }, context: await getAccountAnalyticsContext(tx, current.userId, `generation:${current.id}`),
+    });
     return { generation, accepted: true };
   });
 }

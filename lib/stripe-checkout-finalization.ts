@@ -1,3 +1,4 @@
+import { reportVerifiedInvoice } from "@/lib/analytics-purchase";
 import type Stripe from "stripe";
 import { getCheckoutCompletionError } from "@/lib/checkout-completion-policy";
 import { prisma } from "@/lib/prisma";
@@ -12,13 +13,22 @@ import { BillingOwnershipError, getSubscriptionOwnershipError, stripeObjectId } 
 import { canFinalizeStripeCheckout } from "@/lib/stripe-production-access";
 
 export type CheckoutFinalizationResult = {
+  invoiceId: string;
   priceKey: PriceKey;
   isUpgrade: boolean;
   payableAmountCents: number;
   creditAmountCents: number;
   currency: string;
   creditsGranted: boolean;
+  entitlementsReady: boolean;
 };
+
+export class CheckoutPaymentIncompleteError extends Error {
+  constructor() {
+    super("Checkout payment is not complete");
+    this.name = "CheckoutPaymentIncompleteError";
+  }
+}
 
 export async function finalizeCheckoutSession(params: {
   sessionId: string;
@@ -44,7 +54,13 @@ export async function finalizeCheckoutSession(params: {
     },
     params.expectedUserId
   );
-  if (completionError) throw new Error(completionError);
+  if (completionError) {
+    if (checkoutSession.mode === "subscription" &&
+      (checkoutSession.status !== "complete" || checkoutSession.payment_status !== "paid")) {
+      throw new CheckoutPaymentIncompleteError();
+    }
+    throw new Error(completionError);
+  }
   if (!userId) throw new Error("Checkout Session has no user");
 
   const checkoutUser = await prisma.user.findUnique({
@@ -62,10 +78,8 @@ export async function finalizeCheckoutSession(params: {
   if (
     !checkoutUser?.email ||
     !canFinalizeStripeCheckout({
-      email: checkoutUser.email,
       livemode: checkoutSession.livemode,
       vercelEnv: process.env.VERCEL_ENV,
-      allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS,
     })
   ) {
     throw new Error("Test-mode Checkout is not allowed for this account");
@@ -102,8 +116,17 @@ export async function finalizeCheckoutSession(params: {
     expectedCustomerId: customerId,
     source: params.source,
   });
+  const entitlementsReady = creditsGranted || Boolean(await prisma.processedStripeEvent.findUnique({
+    where: { id: `grant_sub_${sub.id}_${sub.current_period_start}` },
+    select: { id: true },
+  }));
+
+  // Reporting failures must not turn a successful payment/entitlement into a failed return.
+  try { await reportVerifiedInvoice(invoiceId, userId); }
+  catch { console.error("GA invoice queue failed; signed webhook retry required"); }
 
   return {
+    invoiceId,
     priceKey: parsed.key,
     isUpgrade: Boolean(upgradeFromSubscriptionId),
     payableAmountCents: checkoutSession.amount_total ?? 0,
@@ -112,5 +135,6 @@ export async function finalizeCheckoutSession(params: {
     ),
     currency: (checkoutSession.currency || "usd").toUpperCase(),
     creditsGranted,
+    entitlementsReady,
   };
 }

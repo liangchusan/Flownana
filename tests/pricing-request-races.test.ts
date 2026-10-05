@@ -15,6 +15,7 @@ function fixture(t: TestContext, summary: unknown) {
   t.after(() => Reflect.deleteProperty(globalThis, "window"));
   const owner = createSourceLoader({})<typeof import("../lib/account-operation")>("lib/account-operation.ts").createAccountOperationOwner("fixture-a");
   const load = createSourceLoader({
+    "@/lib/analytics": { syncAnalyticsContext: async () => {}, trackCheckout: () => {} },
     react: { ...React,
       useState: (initial: any) => { const slot = index++; if (!(slot in slots)) slots[slot] = typeof initial === "function" ? initial() : initial; return [slots[slot], (next: any) => { slots[slot] = typeof next === "function" ? next(slots[slot]) : next; }]; },
       useRef: (initial: any) => { const slot = index++; return slots[slot] ??= { current: initial }; },
@@ -27,6 +28,7 @@ function fixture(t: TestContext, summary: unknown) {
   });
   const outer = load<any>("components/pricing/pricing-plans.tsx").PricingPlans;
   const inner = outer({ stripeEnabled: true }).type;
+  slots.length = 0;
   const render = () => { index = 0; const tree = inner({ stripeEnabled: true }); effects.splice(0).forEach((effect) => effect()); return tree; };
   return { render, requests, owner, location, notices };
 }
@@ -75,6 +77,7 @@ test("checkout uses the captured account and an unmounted account cannot navigat
   const f = fixture(t, { subscription: null });
   f.render(); await Promise.resolve();
   const request = buttons(f.render(), "Choose plan")[0].props.onClick();
+  await Promise.resolve();
   assert.equal(new Headers(f.requests[0].init.headers).get("x-flownana-account"), "fixture-a");
   f.owner.dispose();
   f.requests[0].resolve(Response.json({ url: "https://checkout.example/old-account" }));

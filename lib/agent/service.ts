@@ -1,3 +1,4 @@
+import { getAccountAnalyticsContext, saveAnalyticsContext, serverMeasurementId } from "@/lib/analytics-server";
 import { inspectReference, validateReferenceDurations } from "@/lib/inspect-reference";
 import { getVideoInputCapabilities } from "@/lib/generation-input-capabilities";
 import { Prisma, type AgentTurn, type MediaAsset } from "@prisma/client";
@@ -214,6 +215,10 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
           runId: turn.id, outputIndex: index, outputCount: quote.count, inputKinds: quote.inputs.map(i => i.kind),
           ...(quote.templateId ? { templateId: quote.templateId, templateVersion: quote.templateVersion! } : {}),
         } } });
+      if (serverMeasurementId()) {
+        const context = await getAccountAnalyticsContext(tx, account.id);
+        if (context) { const user = await tx.user.findUniqueOrThrow({ where: { id: account.id } }); await saveAnalyticsContext(tx, user, context, `generation:${g.id}`); }
+      }
       await syncGenerationMediaAssets({ generationId: g.id, userId: account.id, tx, assets: assets.map((a, position) => ({ media: { url: a!.url, contentType: a!.contentType ?? undefined, sizeBytes: a!.sizeBytes ?? undefined }, role: "input", type: a!.type as "image" | "video" | "music", position })) });
       outputs.push(g);
     }

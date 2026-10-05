@@ -28,6 +28,8 @@ model User {
   mediaUploadGrants MediaUploadGrant[]
   checkoutReservations CheckoutReservation[]
   upgradeConsumptions UpgradeConsumption[]
+  analyticsContexts AnalyticsContext[]
+  analyticsReports AnalyticsReport[]
 }
 
 model CheckoutReservation {
@@ -256,4 +258,36 @@ model AgentAttachment {
   mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
   @@id([conversationId, mediaAssetId])
   @@index([mediaAssetId])
+}
+
+// Backend only, environment-scoped. No browser/Data API access.
+model AnalyticsContext {
+  id               String   @id
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountCreatedAt DateTime
+  environment      String
+  context          Json
+  updatedAt        DateTime @updatedAt
+  @@index([userId, environment])
+}
+
+model AnalyticsReport {
+  id               String   @id
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  environment      String
+  name             String
+  params           Json
+  context          Json?
+  occurredAt       DateTime
+  status           String   @default("pending")
+  attempts         Int      @default(0)
+  leaseUntil       DateTime?
+  nextAttemptAt    DateTime @default(now())
+  transmittedAt    DateTime?
+  errorCode        String?
+  createdAt        DateTime @default(now())
+  @@index([environment, status, nextAttemptAt])
+  @@index([userId, name, occurredAt])
 }

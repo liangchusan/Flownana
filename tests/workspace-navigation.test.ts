@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import {
   WORKSPACE_PATHS,
@@ -19,11 +19,14 @@ test("workspace navigation uses the approved canonical routes", () => {
   assert.equal(getWorkspaceDestination("/ai-image"), null);
 });
 
-test("legacy media routes permanently redirect to the canonical routes", () => {
-  const imageRoute = readFileSync(new URL("../app/ai-image/page.tsx", import.meta.url), "utf8");
-  const videoRoute = readFileSync(new URL("../app/ai-video/page.tsx", import.meta.url), "utf8");
-  assert.match(imageRoute, /permanentRedirect\("\/image"\)/);
-  assert.match(videoRoute, /permanentRedirect\("\/video"\)/);
+test("retired media routes no longer have pages or redirects", () => {
+  const config = readFileSync(new URL("../next.config.js", import.meta.url), "utf8");
+  assert.equal(existsSync(new URL("../app/ai-image/page.tsx", import.meta.url)), false);
+  assert.equal(existsSync(new URL("../app/ai-video/page.tsx", import.meta.url)), false);
+  assert.equal(existsSync(new URL("../app/ai-music/page.tsx", import.meta.url)), false);
+  assert.doesNotMatch(config, /source: "\/ai-image"/);
+  assert.doesNotMatch(config, /source: "\/ai-video"/);
+  assert.doesNotMatch(config, /source: "\/ai-music"/);
 });
 
 test("workspace sidebar preserves the existing destinations alongside Agent", () => {
@@ -51,6 +54,12 @@ test("desktop sidebar toggles use lightweight split-panel controls", () => {
   assert.match(workspace, /<PanelRight className="h-4 w-4" strokeWidth=\{1\.5\}/);
   assert.doesNotMatch(workspace, /PanelRight(?:Open|Close)/);
   assert.match(workspace, /aria-disabled=\{!detailsRun\}/);
+});
+
+test("Agent composer menus layer above conversation media", () => {
+  const workspace = readFileSync(new URL("../components/blocks/agent/agent-workspace.tsx", import.meta.url), "utf8");
+  assert.match(workspace, /<main data-settings-boundary className="relative z-10/);
+  assert.match(workspace, /<div className="relative z-20 shrink-0 px-3 pb-3 sm:px-6 sm:pb-5">/);
 });
 
 test("sidebar upgrade is centered and has no trailing arrow", () => {

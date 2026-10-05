@@ -5,7 +5,7 @@ import { ACCOUNT_SCOPE_HEADER, getAccountScope } from "../lib/account-scope.ts";
 
 const accountA = getAccountScope({ id: "A", accountCreatedAt: "2026-08-31T00:00:00.000Z" })!;
 const accountB = getAccountScope({ id: "B", accountCreatedAt: "2026-08-31T00:00:00.000Z" })!;
-const payload = (scope: string, current = 100) => ({ accountScope: scope, subscription: null, credits: { current } });
+const payload = (scope: string, current = 100) => ({ accountScope: scope, subscription: null, paymentIssue: null, credits: { current } });
 
 function fixture(t: TestContext) {
   const storage = new Map<string, string>();
@@ -98,7 +98,7 @@ test("unscoped, malformed, mismatched and future-dated persisted summaries are i
     { scope: accountA, summary: payload(accountA), cachedAt: Date.now() + 60_000 },
     { scope: accountA, summary: {}, cachedAt: Date.now() },
   ]) {
-    storage.set("flownana_billing_summary_cache_v2", JSON.stringify(value));
+    storage.set("flownana_billing_summary_cache_v3", JSON.stringify(value));
     assert.equal(client.getCachedBillingSummary(accountA), null);
   }
 });

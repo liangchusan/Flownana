@@ -39,7 +39,7 @@ test("actual image form treats a pending reply as accepted, never successful", a
   assert.equal(f.tasks.length, 1);
   assert.equal(f.success.length, 0);
   assert.equal(f.failures.length, 0);
-  assert.deepEqual(f.events, ["generation_started"]);
+  assert.deepEqual(f.events, []);
 });
 
 test("both real forms report a lost POST reply as unknown without false failure or resubmission", async (t) => {
@@ -63,5 +63,5 @@ test("actual video form tolerates transient polling but preserves confirmed refu
   assert.equal(reads, 2);
   assert.equal(f.failures.length, 1);
   assert.match(f.notices[0].message, /contact support/);
-  assert.deepEqual(f.events, ["generation_started", "generation_failed"]);
+  assert.deepEqual(f.events, []);
 });

@@ -1,3 +1,4 @@
+import { contextFromRequest } from "@/lib/analytics-server";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
@@ -12,8 +13,9 @@ export async function POST(request: Request) {
     if (!session?.user?.id || !session.user.email || !matchesRequestAccount(request, session.user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    if (!canCreateStripeCheckout({ email: session.user.email, secretKey: process.env.STRIPE_SECRET_KEY,
-      vercelEnv: process.env.VERCEL_ENV, allowedEmails: process.env.STRIPE_TEST_MODE_ALLOWED_EMAILS })) {
+    if (!canCreateStripeCheckout({ secretKey: process.env.STRIPE_SECRET_KEY,
+      vercelEnv: process.env.VERCEL_ENV,
+      liveCheckoutEnabled: process.env.STRIPE_LIVE_CHECKOUT_ENABLED })) {
       return NextResponse.json({ error: "Checkout is unavailable until live payments are enabled." }, { status: 503 });
     }
     const body = await request.json().catch(() => null);
@@ -22,6 +24,8 @@ export async function POST(request: Request) {
       userId: session.user.id, accountCreatedAt: session.user.accountCreatedAt,
       kind: "upgrade", priceKey: body.priceKey,
       baseUrl: process.env.NEXTAUTH_URL || new URL(request.url).origin,
+      returnTo: body.returnTo,
+      analyticsContext: contextFromRequest(request),
     });
     return NextResponse.json(result);
   } catch (error) {

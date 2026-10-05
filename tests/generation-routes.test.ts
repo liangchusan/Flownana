@@ -397,6 +397,8 @@ test("generation and deletion route boundaries with an isolated database", { ski
     try {
       const media = await db.mediaAsset.create({ data: { userId: f.account.id, type: "image", origin: "generated",
         url: "https://example.test/legacy-provider.png" } });
+      await db.generation.create({ data: { userId: f.account.id, type: "image", status: "success",
+        prompt: "Legacy reference", urls: [media.url] } });
       t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => String(input).includes("createTask")
         ? Response.json({ code: 200, data: { taskId: `task_${randomUUID()}` } })
         : Response.json({ code: 200, data: { state: "success", resultJson: JSON.stringify({ resultUrls: ["https://example.test/result.png"] }) } }));

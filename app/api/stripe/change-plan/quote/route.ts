@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth-options";
 import { matchesRequestAccount } from "@/lib/account-scope";
 import { isPriceKey } from "@/lib/plans";
 import { CheckoutConflictError, getReservedUpgradeQuote } from "@/lib/checkout-reservation";
+import { canCreateStripeCheckout } from "@/lib/stripe-production-access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,11 @@ export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id || !matchesRequestAccount(request, session.user)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!canCreateStripeCheckout({ secretKey: process.env.STRIPE_SECRET_KEY,
+      vercelEnv: process.env.VERCEL_ENV,
+      liveCheckoutEnabled: process.env.STRIPE_LIVE_CHECKOUT_ENABLED })) {
+      return NextResponse.json({ error: "Checkout is unavailable until live payments are enabled." }, { status: 503 });
     }
     const targetKey = new URL(request.url).searchParams.get("priceKey");
     if (!targetKey || !isPriceKey(targetKey)) return NextResponse.json({ error: "Invalid priceKey" }, { status: 400 });

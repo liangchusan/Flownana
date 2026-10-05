@@ -23,7 +23,6 @@ import {
   type VideoModelOption,
   type VideoResolutionOption,
 } from "@/lib/generation-pricing";
-import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
@@ -298,11 +297,7 @@ export function VideoCreationForm({
         },
       }),
     });
-        trackEvent("generation_success", {
-          type: "video",
-          model_option_id: data.modelOptionId || params.modelOptionId,
-          credits_cost: data.creditsCost || params.creditsCost,
-        });
+
         onGenerate(
           data.videoUrl,
           data.taskId || params.taskId,
@@ -319,9 +314,7 @@ export function VideoCreationForm({
       return;
     }
     if (!session?.user) {
-      trackEvent("signup_started", {
-        source: "ai_video_generate",
-      });
+
       await signInForCurrentEnvironment();
       return;
     }
@@ -387,13 +380,7 @@ export function VideoCreationForm({
     onInputAttachmentsChange?.([]);
     setIsGenerating?.(true);
     const requestAspectRatio = aspectRatio === "Auto" ? undefined : aspectRatio;
-    trackEvent("generation_started", {
-      type: "video",
-      model_option_id: selectedOption.id,
-      model: selectedOption.providerModel,
-      credits_cost: selectedOption.credits,
-      aspect_ratio: aspectRatio,
-    });
+
     let accepted = false;
     try {
       const operation = (captureGeneration || capture)();
@@ -430,11 +417,7 @@ export function VideoCreationForm({
         }
 
         if (response.data.videoUrl) {
-          trackEvent("generation_success", {
-            type: "video",
-            model_option_id: response.data.modelOptionId || selectedOption.id,
-            credits_cost: response.data.creditsCost || selectedOption.credits,
-          });
+
           onGenerate(
             response.data.videoUrl,
             taskId,
@@ -461,17 +444,9 @@ export function VideoCreationForm({
       );
       const message = errorDisplay.message;
       if (error.response?.status === 402) {
-        trackEvent("insufficient_credits_shown", {
-          type: "video",
-          required: error.response?.data?.required,
-          available: error.response?.data?.available,
-        });
+
       }
-      trackEvent("generation_failed", {
-        type: "video",
-        model_option_id: selectedOption.id,
-        error: errorDisplay.code,
-      });
+
       onGenerationFailure?.({
         optimisticId,
         prompt: requestPrompt,

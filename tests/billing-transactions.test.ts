@@ -23,6 +23,7 @@ type FinalizeModule = typeof import("../lib/stripe-checkout-finalization");
 type WebhookModule = typeof import("../app/api/webhooks/stripe/route");
 
 test("billing enforcement with real isolated PostgreSQL transactions", { skip: !databaseUrl }, async (t) => {
+  process.env.VERCEL_ENV = "production";
   const db = isolatedDatabase(databaseUrl!);
   t.after(() => db.$disconnect());
   process.env.STRIPE_PRICE_STARTER_MONTHLY = "price_test_starter_monthly";
@@ -159,6 +160,7 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
         expectedAccountCreatedAt: f.user.createdAt.toISOString(), source: "test_return",
       });
       assert.equal(result.creditsGranted, false);
+      assert.equal(result.entitlementsReady, false);
       assert.equal(await f.count(), 0);
       f.sub.items.data[0].price.id = "price_test_pro_yearly";
       assert.equal(await f.grant(), false);
@@ -310,6 +312,7 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
         expectedUserId: f.user.id, source: "legacy_return",
       });
       assert.equal(completion.creditsGranted, false);
+      assert.equal(completion.entitlementsReady, true);
     } finally { await f.cleanup(); }
   });
 

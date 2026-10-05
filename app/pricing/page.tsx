@@ -1,48 +1,6 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
-import { PricingPlans } from "@/components/pricing/pricing-plans";
+import { redirect } from "next/navigation";
 
+// Compatibility for bookmarks and existing checkout cancellation URLs only.
 export default function PricingPage() {
-  const stripeEnabled = !!(
-    process.env.STRIPE_PRICE_STARTER_MONTHLY &&
-    process.env.STRIPE_PRICE_STARTER_YEARLY &&
-    process.env.STRIPE_PRICE_PRO_MONTHLY &&
-    process.env.STRIPE_PRICE_PRO_YEARLY &&
-    process.env.STRIPE_PRICE_MAX_MONTHLY &&
-    process.env.STRIPE_PRICE_MAX_YEARLY
-  );
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-surface-soft">
-      <Header showBackground />
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h1 className="mb-4 text-4xl font-bold text-stone-900 md:text-5xl">
-              Choose your plan
-            </h1>
-            <p className="mx-auto max-w-2xl text-xl text-stone-600">
-              Save 50% with yearly billing. Credits are added monthly on every plan.
-            </p>
-            {!stripeEnabled && (
-              <p className="text-sm text-amber-700 mt-4">
-                Stripe prices are not configured. Add STRIPE_PRICE_* variables to
-                enable checkout.
-              </p>
-            )}
-            <Link href="/account/billing" className="inline-block mt-4">
-              <Button variant="outline" size="sm">
-                Account & billing
-              </Button>
-            </Link>
-          </div>
-
-          <PricingPlans stripeEnabled={stripeEnabled} />
-        </div>
-      </section>
-      <Footer />
-    </div>
-  );
+  redirect("/#pricing");
 }

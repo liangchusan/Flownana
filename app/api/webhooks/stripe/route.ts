@@ -1,3 +1,4 @@
+import { reportVerifiedInvoice } from "@/lib/analytics-purchase";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
@@ -111,10 +112,11 @@ export async function POST(request: Request) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.mode !== "subscription") break;
-        await finalizeCheckoutSession({
+        const completion = await finalizeCheckoutSession({
           sessionId: session.id,
           source: "checkout_session_paid",
         });
+        await reportVerifiedInvoice(completion.invoiceId);
         break;
       }
 
@@ -130,6 +132,7 @@ export async function POST(request: Request) {
           invoiceId: invoice.id,
           source: "invoice_paid",
         });
+        await reportVerifiedInvoice(invoice.id, userId);
         break;
       }
 

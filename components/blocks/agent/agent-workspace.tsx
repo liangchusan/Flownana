@@ -15,7 +15,6 @@ import { ResultOverlayActions, VideoResult } from "@/components/blocks/creation-
 import { getAccountScope } from "@/lib/account-scope";
 import { useAccountOperation } from "@/lib/use-account-operation";
 import { imageTemplates } from "@/lib/image-templates/catalog";
-import { trackEvent } from "@/lib/analytics";
 import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import type { AgentSnapshot, AgentTurnView, AgentOutput } from "./types";
@@ -38,9 +37,8 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
   const [busy, setBusy] = useState(false), [editingTitle, setEditingTitle] = useState<string | null>(null), [deleting, setDeleting] = useState(false);
   const [preview, setPreview] = useState<AgentOutput | null>(null), [seed, setSeed] = useState<(AgentDraft & { key: string; autoSend?: boolean }) | undefined>();
   const [pendingOutputDelete, setPendingOutputDelete] = useState<AgentOutput | null>(null);
-  const observedTurns = useRef(new Set<string>());
   const retryIds = useRef(new Map<string, string>());
-  const bottom = useRef<HTMLDivElement>(null), observed = useRef(new Set<string>()), ended = useRef(new Set<string>());
+  const bottom = useRef<HTMLDivElement>(null);
   const template = imageTemplates.find(t => t.id === (snapshot?.conversation?.templateId ?? templateId));
   const poll = useCallback(async () => {
     if (!scope) return;
@@ -51,25 +49,6 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
       if (!ok) { setError(data.error ?? "Could not load conversation."); setCleanupPending(data.code === "cleanup_pending"); return; }
       if (data.accountScope !== scope) return;
       setSnapshot(data);
-      let intent = data.turns[0]?.id;
-      for (const turn of data.turns as AgentTurnView[]) {
-        if (turn.status === "running") observedTurns.current.add(turn.id);
-        if (template && turn.status === "completed" && observedTurns.current.has(turn.id)) {
-          const event = turn.responseKind === "question" ? "clarification_started" : turn.quote ? "clarification_completed" : null;
-          if (event) { const key = `agent-clarification:${scope}:${intent}:${event}`; try { if (!sessionStorage.getItem(key)) { sessionStorage.setItem(key, "1"); trackEvent(event, { template_id: template.id }); } } catch { /* Optional analytics storage. */ } }
-          observedTurns.current.delete(turn.id);
-        }
-        if (turn.quote) intent = turn.id;
-      }
-      for (const output of data.outputs as AgentOutput[]) {
-        if (["pending", "processing", "generating"].includes(output.status)) observed.current.add(output.id);
-        if (observed.current.has(output.id) && ["success", "failed"].includes(output.status) && !ended.current.has(output.id)) {
-          ended.current.add(output.id);
-          const key = `template-result:${scope}:${output.id}`;
-          let tracked = false; try { tracked = !!sessionStorage.getItem(key); sessionStorage.setItem(key, "1"); } catch { /* In-memory dedup remains. */ }
-          if (!tracked) trackEvent(output.status === "success" ? "generation_success" : "generation_failed", { type: output.type, model: String(output.parameters.model), template_id: template?.id, source: "agent" });
-        }
-      }
       await Promise.allSettled((data.outputs as AgentOutput[]).filter(o => o.type === "video" && o.taskId && ["pending", "processing", "generating"].includes(o.status)).map(o => fetch(`/api/veo/generate?taskId=${encodeURIComponent(o.taskId!)}`, { headers: op.headers, signal: op.signal })));
     } catch { /* Keep the last durable state during a transport interruption. */ }
   }, [scope, capture, id, template]);
@@ -97,12 +76,7 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
     try {
       const res = await fetch("/api/agent", { method: "POST", headers: { ...op.headers, "Content-Type": "application/json" }, signal: op.signal, body: JSON.stringify({ action: name, conversationId: id, ...extra }) });
       const data = await res.json(); op.assertCurrent();
-      if (!res.ok) { if (data.code === "insufficient_credits") trackEvent("insufficient_credits_shown", { source: "agent" }); throw new Error(data.error); }
-      if (name === "confirm" && !data.replay) {
-        const turn = snapshot?.turns.find(t => t.id === (extra as { turnId: string }).turnId);
-        data.generationIds.forEach((gid: string) => observed.current.add(gid));
-        trackEvent("generation_started", { source: "agent", type: turn?.quote?.type, model: turn?.quote?.model, template_id: template?.id, output_count: turn?.quote?.count, credits_cost: turn?.quote?.credits });
-      }
+      if (!res.ok) { throw new Error(data.error); }
       if (name === "retry_media") retryIds.current.delete((extra as { generationId: string }).generationId);
       if (name === "delete") router.push("/agent");
       setEditingTitle(null); setDeleting(false);
@@ -122,10 +96,11 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
   };
   const referenceOutput = (output: AgentOutput) => {
     if (!output.urls[0] || (output.type !== "image" && output.type !== "video")) return;
-    setSeed({ key: crypto.randomUUID(), prompt: "", inputs: [{ url: output.urls[0], kind: output.type, role: "reference" }] });
+    const durationSeconds = output.type === "video" && typeof output.parameters.duration === "number" && output.parameters.duration > 0 ? output.parameters.duration : undefined;
+    setSeed({ key: crypto.randomUUID(), prompt: "", inputs: [{ url: output.urls[0], kind: output.type, role: "reference", ...(durationSeconds ? { durationSeconds } : {}) }] });
   };
   const download = (output: AgentOutput) => {
-    trackEvent("result_download_clicked", { type: output.type, source: "agent", template_id: template?.id });
+
     const link = document.createElement("a"); link.href = buildCreationDownloadPath(output.id, output.urls[0]); link.download = ""; document.body.appendChild(link); link.click(); link.remove();
   };
   const deleteOutput = async () => {
@@ -175,7 +150,7 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
           <div ref={bottom} />
         </div>
       </main>
-      <div className="relative z-0 shrink-0 px-3 pb-3 sm:px-6 sm:pb-5"><div className="mx-auto max-w-3xl space-y-2">
+      <div className="relative z-20 shrink-0 px-3 pb-3 sm:px-6 sm:pb-5"><div className="mx-auto max-w-3xl space-y-2">
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {cleanupPending && <Button variant="outline" disabled={busy} onClick={() => void action("delete")}>Retry attachment cleanup</Button>}
         <div className="rounded-ui-xl border border-border bg-background p-2.5 shadow-soft sm:p-3"><AgentComposer key={id ? (snapshot ? "ready" : "loading") : "new"} initialInputs={latest?.inputs} conversationId={id} revision={snapshot?.conversation?.revision ?? 0} templateId={template?.id} seed={seed} disabled={latest?.status === "running" || (!!id && !snapshot)} onSent={() => void poll()} /></div>
@@ -204,7 +179,7 @@ function AgentResultCard({ output, prompt, busy, onPreview, onReference, onDownl
 }
 
 function QuoteCard({ turn, current, busy, onConfirm, onReprice }: { turn: AgentTurnView; current: boolean; busy: boolean; onConfirm: () => void; onReprice: (turnId: string, quote: AgentQuote) => Promise<AgentQuote> }) {
-  const ref = useRef<HTMLDivElement>(null), seen = useRef(false);
+
   const q = turn.quote!;
   const [draft, setDraft] = useState(q);
   const [repricing, setRepricing] = useState(false), [editError, setEditError] = useState("");
@@ -228,12 +203,7 @@ function QuoteCard({ turn, current, busy, onConfirm, onReprice }: { turn: AgentT
   const videoAtResolution = videoOptions.filter(option => option.resolution === draft.resolution);
   const videoRatios = [...new Set(videoAtResolution.flatMap(option => option.aspectRatios ?? []))];
   const videoDurations = [...new Set(videoAtResolution.map(option => option.duration))].sort((a, b) => a - b);
-  useEffect(() => {
-    if (!ref.current || !current || submitted) return;
-    const observer = new IntersectionObserver(entries => { if (seen.current || !entries.some(e => e.isIntersecting && e.intersectionRatio >= .5)) return; seen.current = true; const key = `agent-quote:${turn.id}`; try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* Local fallback. */ } trackEvent("agent_quote_viewed", { type: q.type, model: q.model, template_id: q.templateId, credits_cost: q.credits }); }, { threshold: .5 });
-    observer.observe(ref.current); return () => observer.disconnect();
-  }, [current, turn.id, submitted, q]);
-  return <div ref={ref} className={compact ? "" : "space-y-4"}>
+  return <div className={compact ? "" : "space-y-4"}>
     {compact ? <p className="whitespace-pre-wrap text-sm">{q.prompt}</p> : <>
       <textarea aria-label="Optimized prompt" value={draft.prompt} disabled={repricing || busy} onChange={event => setDraft(current => ({ ...current, prompt: event.target.value }))} onBlur={() => { if (draft.prompt.trim() && draft.prompt !== q.prompt) void updateQuote({ ...draft, prompt: draft.prompt.trim() }); }} className="min-h-24 w-full resize-y rounded-ui-xl bg-surface-soft px-4 py-3 text-sm leading-relaxed transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" />
       <div className="flex min-w-0 items-center gap-2"><GenerationSettings models={draft.type === "image" ? IMAGE_MODEL_OPTIONS.map(model => ({ id: model.id, label: model.label })) : videoModels} model={draft.type === "image" ? draft.modelId : draft.model} onModel={value => {

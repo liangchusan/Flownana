@@ -21,7 +21,6 @@ import {
 import { getImageAspectRatios, getImagePromptMinLength, IMAGE_PROMPT_MAX_LENGTH } from "@/lib/image-model-capabilities";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
 import { GENERATION_STATUS_UNAVAILABLE, isConfirmedGenerationFailure } from "@/lib/generation-request-state";
-import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import type { GenerationParameters } from "@/lib/creation-history";
 import {
@@ -231,7 +230,7 @@ export function GenerateForm({
   const handleGenerate = async () => {
     if (status === "loading") return;
     if (!accountScope) {
-      trackEvent("signup_started", { source: "image_generator" });
+
       await signInForCurrentEnvironment();
       return;
     }
@@ -289,15 +288,7 @@ export function GenerateForm({
     if (!usesConcurrentGenerationLimit) {
       setIsGenerating(true);
     }
-    trackEvent("generation_started", {
-      type: "image",
-      model,
-      ...(hasResolution ? { resolution } : {}),
-      aspect_ratio: aspectRatio,
-      credits_cost: creditsCost,
-      mode,
-      output_count: outputCount,
-    });
+
     updatePrompt("");
     updateImages([]);
 
@@ -324,13 +315,7 @@ export function GenerateForm({
           return;
         }
         if (!response.data.imageUrl) throw { response };
-        trackEvent("generation_success", {
-          type: "image",
-          model,
-          ...(hasResolution ? { resolution } : {}),
-          aspect_ratio: aspectRatio,
-          credits_cost: response.data.creditsCost || creditsCost,
-        });
+
         if (taskId && onTaskIdChange) onTaskIdChange(taskId);
         if (taskId) {
           onGenerationTaskCreated?.({
@@ -361,17 +346,9 @@ export function GenerateForm({
           { mediaType: "image", status: error.response?.status }
         );
         if (error.response?.status === 402) {
-          trackEvent("insufficient_credits_shown", {
-            type: "image",
-            required: error.response?.data?.required,
-            available: error.response?.data?.available,
-          });
+
         }
-        trackEvent("generation_failed", {
-          type: "image",
-          model,
-          error: error.response?.data?.errorCode || errorDisplay.code,
-        });
+
         onGenerationFailure?.({
           optimisticId,
           taskId: error.response?.data?.taskId,

@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { PricingTrigger } from "@/components/pricing/pricing-trigger";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { UserMenu } from "@/components/layout/user-menu";
-import { trackEvent } from "@/lib/analytics";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 
 interface HeaderProps {
@@ -39,17 +39,12 @@ export function Header({ showBackground = false }: HeaderProps) {
           </Link>
           <Link
             href="/image"
-            onClick={() => trackEvent("ai_image_entry_click", { source: "header" })}
             className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
           >
             AI Image
           </Link>
-          <Link 
-            href="/pricing" 
-            className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
-          >
-            Pricing
-          </Link>
+          <PricingTrigger className="text-sm font-medium text-white transition-all duration-300 hover:text-white/80 hover:opacity-90"
+          >Pricing</PricingTrigger>
         </nav>
 
         {/* User Menu / Login Button - Right */}
@@ -67,7 +62,7 @@ export function Header({ showBackground = false }: HeaderProps) {
           ) : (
             <Button
               onClick={() => {
-                trackEvent("signup_started", { source: "header" });
+
                 signInForCurrentEnvironment();
               }}
               className="flex items-center space-x-2 border border-white/20 bg-white/10 text-white transition-all duration-300 hover:bg-white/20 hover:opacity-90 active:scale-[0.98]"

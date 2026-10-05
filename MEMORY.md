@@ -1,5 +1,637 @@
 # Flownana 工程记忆
 
+## 2026-10-05 地域基础统计已部署测试站（覆盖此前默认关闭状态）
+
+- 用户确认按地域基础采集策略行动。已先同步 PRODUCT 和 DESIGN：US/JP/TW 默认
+  基础统计，其他/未知地区先询问；历史拒绝和 GPC 优先，广告授权三项继续 denied。
+- 新无缓存 /api/analytics/policy 读取 Vercel 国家头；全站 Privacy 入口复用 Modal，
+  同等 Allow/Reject，并支持原有持久撤回重试。初始地域尚未返回时不加载标签。
+- 上下文 JSON 新增可选 collectionBasis，不新增数据库字段或迁移。服务端对
+  regional_default 校验允许地域，对 GPC 拒绝新上下文；撤回仍能读取被 GPC
+  禁用的旧签名以清除后台记录。不补发历史 missing_context，不改业务事实/金额。
+- 实际隔离本地 PostgreSQL 测试 510 项：508 通过、0 失败、2 个外部审计跳过；
+  tsc、lint --quiet、design:check 与 Preview 云构建通过。固定测试入口已指向
+  READY dpl_CdrS72RGKBgcZZP68TLkBk7iMhzY /
+  flownana-59xo0w655-liangchusans-projects.vercel.app。生产仍为
+  dpl_H878BZzhGhujMQJkJKFzTqeh6Yd8；没有生产发布、环境变量变更、DDL、提交/推送。
+  deployment files 仅 .env.example，没有真实 .env 文件。
+- 实际线上独立 Chrome 验收：地域接口 private/no-store；历史拒绝与刷新零标签；
+  GPC 即便旧 granted 仍零标签且 Allow 禁用；允许后唯一 Test SDK、真实会话及
+  HttpOnly 签名上下文 POST 200；page_view/pricing_view 发 Google 各 204；撤回
+  DELETE 200、签名 Cookie 清除且刷新零标签。桌面 1440×1000、手机 390×844 的
+  Privacy 设置已截图检查。控制地域分支另用响应替身验证默认开启不伪写 granted、
+  先询问分支零标签；服务端地域拒绝在本地真实 API/PG 测试验证。
+- Test DebugView 在 15:34 实际显示 page_view 1、pricing_view 1、first_visit 1、
+  session_start 1，non_personalized_ads=1；保留本轮收件截图。不再只用 204 推断收件。
+  Test 内部流量过滤器回读为测试状态，未改 GA 过滤/广告配置。
+- 用户原已登录 Chrome 刷新后有 Privacy 与 granted，但真实监听 SDK 请求明确
+  net::ERR_BLOCKED_BY_CLIENT、google_tag_manager=false、上下文 POST=0；当前 Test
+  用户上下文仍 0。已告知仅对测试站放行 Google 标签后再验收新业务，未改浏览器
+  保护、未重付或升级套餐。旧 USD96/200 purchase 保持 missing_context，未补报。
+- 线上初次验收遇到 networkidle 等待保护握手与页面延迟、曝光等待不足；调整
+  验收为 DOM 就绪/实际可见/SDK 就绪后通过，没有据这些等待失败修改业务语义。
+  本轮没有执行新付款/真实生成；购买同会话完整收件、退款与 Ads 竞价仍待单独验收。
+
+
+## 2026-10-05 默认统计策略讨论与测试授权
+
+- 用户提出默认同意。已核对 Google EU UCP（EEA/英国/瑞士）、加州 CCPA、
+  日本 PPC Cookie/第三方数据 Q&A、韩国 PIPC 行为信息政策、台湾个资法；
+  不能将“不面向欧盟”或“不显示弹窗”当全球合法同意。PRODUCT 记录默认开启
+  基础统计的调整方向与待确认地域/拒绝入口/广告用途边界；没有全站改默认。
+- 按本次用户授权，仅当前 flownana-test.vercel.app 测试浏览器 localStorage
+  改为 granted，pending=false，触发既有事件并取消 Test ga-disable。
+  实际出现唯一 G-RP4MTRCXT0 标签、gtag=function，但 google_tag_manager 尚未
+  就绪，无本轮真实收件证明。浏览器 API 没有给出明确的加载失败错误，不能
+  将早前 ERR_BLOCKED_BY_CLIENT 直接当本轮已确认原因。后续继续定位 SDK。
+- 未覆盖其他访客的旧拒绝，没有补报历史付款、修改广告授权、部署代码或
+  更改生产站。当前测试浏览器允许保留供用户测试；正式政策未发布。
+
+## 2026-10-05 测试站升级未进入 GA 的只读诊断
+
+- 用户反馈测试站升级后 GA Test 实时仍为零。实际回读 Test 库：13:42:31
+  （Asia/Shanghai）的 USD 200 upgrade purchase 已持久化，但 status=missing_context、
+  attempts=0、errorCode=no_consented_context、context=null、transmittedAt=null。
+  早前 USD 96 首购也为 missing_context；不是已发送后的报表延迟。
+- 用户当前 Test /image 标签页实际 localStorage consent=denied、pending=false，
+  无 Google tag、gtag 未定义；符合既定默认不采集策略。上轮验收撤回后保持
+  denied，网站尚无允许统计入口，所以直接升级不会取得 GA 会话。
+- 已向用户请求仅当前测试浏览器临时允许以验证页面/套餐曝光；正式策略仍待
+  确认，没有擅自开启或补发历史报告，无代码、部署或数据库写入变更。
+  已说明测试无需再次付款；后续需先证明 SDK 与后台上下文正常，再验收新业务。
+
+## 2026-10-05 独立测试站已部署（覆盖此前只读状态）
+
+- 用户批准测试站、GA 和测试支付，选择现有 Free 组织；实际 $0/月报价确认后
+  建立 flownana-test / heaahlpqqfehojzvozhr（东京、ACTIVE_HEALTHY）。没有复制
+  正式数据或升级套餐。仅新测试库初始化全部 15 项 Prisma 迁移与校验和；
+  RLS、Data API 撤权和 flownana_app 最小权限保留，应用角色仅有运行所需权限。
+  Preview DATABASE_URL/DIRECT_URL 都使用测试应用角色；后续 DDL 继续经授权
+  Supabase 迁移执行，不能直接用 Preview DIRECT_URL 当管理员迁移连接。
+- 固定入口 https://flownana-test.vercel.app 已绑定本次 READY Preview：
+  dpl_AKqJrQm2ffyvDmSTf2EXv54ZANz3 /
+  flownana-41h7p4rwd-liangchusans-projects.vercel.app。生产仍为
+  dpl_H878BZzhGhujMQJkJKFzTqeh6Yd8，正式三域名均未切换；Production 环境变量
+  ID/值/类型全部前后回读一致。没有生产部署、正式库迁移、提交或推送。
+- 专用 Blob flownana-test-media / store_7bTCQFi1TafI9fvg（hnd1）仅连 Preview；
+  原 Blob 与 NEXTAUTH_SECRET 的 Production/Development 原值保留。
+  Preview 使用新 DB、NEXTAUTH_SECRET、CRON_SECRET、Webhook Secret；GA Test
+  ID G-RP4MTRCXT0 和现有 Test MP Secret、六个既有 Test Price。免登录测试账号关闭。
+  Development 本次没有改成新测试库，不能误认为 Development 已同步隔离。
+- Preview 支付显式 opt-in，并校验 Test 密钥、独立 DB ref 与连接；拒绝正式库、
+  Live 事件、伪造 pooler/host。测试库两项价格 CHECK 只允许六个 Sandbox Price；
+  正式迁移文件及正式库的 Live 允许列表不改。新沙盒 Webhook
+  we_1UN41xRqa49126u8ZWrq9LmT 仅指向固定测试入口；保留 Vercel 保护，Webhook
+  通过平台已有自动化 bypass 接收（真实值仅存平台变量/endpoint，不记录在文档）。
+- 共享 Google OAuth 客户端只新增测试 callback，三项原 redirect URI 和 origin
+  不变；真实 Google 登录完成，在独立 Test 库创建账号。真实 Stripe Sandbox
+  Starter 年付 USD 96 用官方测试卡支付，session/Invoice 均 livemode=false、paid，
+  返回 Billing 为 active、余额 200、下一次发积分 2026-11-05。没有真实扣款。
+  Stripe 实际 Webhook POST 200；重放同一真实 invoice.paid 的签名 payload 返回
+  duplicate=true，刷新 Billing 后 CreditBatch 仍 1/200、purchase 报告仍 1。
+- Portal API 实际 200 并跳到 Stripe Test Portal，当前浏览器页面空白；只证明
+  session 创建，Portal 页面操作/取消订阅仍待手测，未宣称端到端通过。
+- GA 功能开关在 Preview 为 true，但访客默认拒绝，无同意 UI。真实付款时原
+  Chrome 未拿到 SDK 会话：sign_up/purchase 各一条 missing_context，attempts=0，
+  no_consented_context；购买参数为 96/USD。没有编造归因或补发无授权事实。
+  独立浏览器真实测试站验收：默认 0 标签，显式允许后仅 1 个 Test 标签；
+  page_view/pricing_view 各实际请求 Google 并收到 204。Test DebugView 本轮回读
+  仍为 0，不能把传输当后台收件；真实购买同会话归因尚未验收。验收后撤回 200，
+  测试用户 context=0，原浏览器临时允许已恢复 denied。正式采集策略仍待确认。
+- Preview Cron 不自动调度；GA 失败补偿与年付月积分补偿需手动验收/触发，不能
+  把测试站日常定时任务视为运行。没有调用付费 AI Provider 或上传真实素材；
+  测试积分与 DB 隔离不等于生成供应商免费，生成链路仍待单独授权验收。
+- 首次 Preview 意外打包旧 .env/.env.production，发现后添加 .vercelignore 排除
+  全部真实 .env*，重新部署；最终 deployment files 回读没有 .env 文件。
+  首次部署 dpl_8j8uKqMzG5thHmhHpobVe9qL19e3 已删除，无可访问旧产物。
+- 回归实际 507 项：505 通过、0 失败、2 个外部审计跳过；TS、lint --quiet、
+  design:check 与云构建通过。已检查测试套餐桌面 1440px / 手机 390px 显示。
+  当前部署来自批准的工作区快照（含此前本地改动），不是已提交 Git commit。
+  详细测试环境信息与后续操作见 docs/TEST-ENVIRONMENT.md。
+- 验收收尾：删除本轮临时数据库口令、平台变量导出、Webhook Secret 与付款对象
+  的私有副本，停止本地临时 PostgreSQL；平台所需配置保留。测试站 Billing 页
+  保留给用户，测试账号、沙盒订阅与 200 积分保留用于后续测试。
+
+## 2026-10-05 Supabase 测试库费用只读核对
+
+- 实际 list_organizations / list_projects / get_organization 回读：当前可见组织
+  liangchusan's Org 为 Free（tier_free），只有一个 ACTIVE_HEALTHY 项目，即现有
+  kbpmirqktzxlpkfeuhtn，区域东京。没有创建项目、分支、迁移或变更套餐。
+- 官方当前规则：账号作为 Owner/Admin 的所有组织合计最多两个活跃免费项目，
+  每个免费项目数据库 500 MB，闲置一周可暂停。当前可见配置适合优先申请第二个
+  独立 Free 项目作为测试库；创建前仍需按实际创建报价/额度确认，不把旧分支
+  付费报价等同所有独立测试项目均收费。没有对付费资源创建授权。
+- 测试项目只初始化必要结构与测试数据，不复制正式用户、账单、订阅或积分；
+  网站 Preview 必须显式绑定新测试连接。当前仍未建立该远程测试数据库。
+
+## 2026-10-05 Vercel 测试环境现状只读核对
+
+- 当前团队项目列表只有 flownana；正式入口为 https://www.flownana.com，
+  没有单独的 flownana-test 项目。本次六事件方案没有执行 Vercel 部署。
+- 现有 flownana 项目有历史 Preview 部署：
+  flownana-csn3dbt0y-liangchusans-projects.vercel.app，经 inspect 确认 target=preview、
+  readyState=READY。它不是本次 GA 代码的部署，不能视为已配置完整隔离测试站；
+  本轮未核对该历史部署的数据库隔离或业务可用性。
+- GA 的 Flownana Test 与填入的数据流网址不创建 Vercel 网站。后续可使用同项目
+  Preview 建立测试部署，但数据库/外部服务需单独隔离；本轮仅查看，没有创建
+  项目、部署、域名、环境变量或数据库迁移。
+
+## 2026-10-05 GA 完整验收结果（本地通过，真实业务上线待验收）
+
+- 本轮发现并修复离线撤回请求丢失：lib/analytics.ts 保存待撤回标记，
+  AnalyticsEvents 在初始化、online、页面存活每 60 秒重试；成功响应只清除
+  对应当前版本，连续撤回的旧响应不能覆盖新撤回。旧撤回未确认前，
+  重新允许也不加载标签/同步上下文；成功撤回不自动同意。无新增同意 UI。
+  PRODUCT 第 12 节已同步既有撤回契约的故障恢复与离线边界。
+- 实际浏览器 + Next context API + 签名 Cookie + 独立 PostgreSQL 验证：
+  断网后浏览器立即 opt-out，待撤回跨刷新保存；503/重新允许仍无标签；
+  online 重试 200 后原 pending 报告变 revoked、context 清空。Google SDK
+  在该测试为替身；离线时服务端尚未知撤回、已发请求不能撤销。
+- 原有登录 Chrome 的本地 Test 页明确报 net::ERR_BLOCKED_BY_CLIENT，
+  被拦截的是 googletagmanager SDK；没有改动用户浏览器保护设置。已请用户
+  仅允许 localhost:3118 测试页。独立 headed Chrome 仍观察 page_view 2、
+  pricing_view 2、begin_checkout 1（隔离返回对象）及 Google 204；重新进入
+  Test DebugView 后实际看到 11:21 三事件对应次数，共七条（含两个基础自动事件）。
+  保存 ga-test-browser-debugview-receipt.png，已告知用户暂时无需改保护设置。
+  此前未显示的原因未确定；不将其等同原 Chrome 拦截，不用 MP 替代浏览器证明。
+- GA 后台只读验收：正式/Test 都为洛杉矶时区、USD；正式事件/用户 14 个月，
+  Test 事件 2 个月/用户 14 个月；Test 内部流量过滤器「测试」，signals 与
+  用户提供的数据收集未启用。未更改这些设置。早前服务端三个隔离业务
+  事件的 DebugView/实时收件证据仍成立，实际 OAuth/Stripe/Provider 不据此通过。
+- 真实 SDK 初始化时的第一次 get 可能返回临时 client_id，早于实际首屏请求。
+  captureAnalyticsContext 改为官方 get 的首次有效读取后再次确认两个 ID；不解析
+  Cookie、不编造标识。新增早期临时 ID 回归；真实 SDK 提前读取对照通过。
+- 11:48 同一真实 SDK 会话联合验收通过：两个页面、两次套餐曝光、一次隔离
+  Checkout helper 请求，与三项持久业务报告的 client/session 完全一致；真实
+  MP worker 各 transmitted 一次，重复事实零追加。实际 context API 撤回确认后
+  不再采集；OAuth/Stripe/Provider 仍为替身。GA 六事件独立收件已核对，但
+  最新同会话在 GA 报表中的完整联结尚未回读，不能据此宣称归因通过。
+- 受控重复联合验收出现真实网络失败：purchase 持久状态 uncertain，
+  errorCode=network_uncertain、attempts=1；没有自动重发。不是全部投递均成功，
+  正式使用需监控/人工核对该状态，不以随后成功样本掩盖失败。
+- 最终隔离全量回归 505 项：503 通过、0 失败、2 个真实 Stripe 外部审计跳过；
+  TS、lint --quiet、design:check、最新 Test build 通过；九项桌面/手机浏览器
+  检查通过，离线补偿联合测试通过。旧发射点调用盘点无旧业务事件。
+  原始最终日志为 /tmp/flownana-ga-*-final.log；详细矩阵在
+  docs/GA4-IMPLEMENTATION-VALIDATION-2026-10-05.md。
+- 没有真实扣款、共享库迁移、平台 GA ID/启用开关改动、Preview/生产发布，
+  没有提交/推送或 Ads 关联。默认采集策略仍关闭。代码/隔离验收通过，
+  六事件独立 GA 收件及同会话网络/持久上下文一致有证据；GA 报表联结和实际
+  OAuth/Stripe/Provider 业务链路尚不能放行。
+- 验收清理完成：独立库 User/AnalyticsContext/AnalyticsReport 均为零；停止
+  本地 3118 应用与 55438 PostgreSQL，关闭自建标签页/浏览器、撤掉本地测试
+  允许标记，删除本轮临时 Secret 与真实 client/session 文件。原 GA 登录和
+  已配置 Vercel Secret 保留。购买商品抽屉实际回读 starter_monthly/quantity=1；
+  DebugView price 显示 12000000，原投递 price=12；未用该显示替代标准收入报表核对。
+
+## 2026-10-05 GA 六事件开发（本地完成，外部收件待验收）
+
+- 已通过正式 Chrome 的本机 WebSocket 连接原有已登录 GA；用户明确声明
+  已完成必要披露与授权，并允许点击 Google「我确认」，已在正式/Test 两处完成。
+  正式创建 Flownana Production Server 2026-10-05，Test 创建
+  Flownana Test Server 2026-10-05；GA_API_SECRET 已以 Secret 类型写入 Vercel，
+  正式仅 Production、Test 仅 Preview/Development，env ls 已回读两个隔离范围。
+  Secret 未写入源码/文档/聊天。未配置平台 GA ID/启用开关、迁移共享库或发布。
+  该声明不改变用户「采集策略以后确认」的决定；默认采集仍关闭。
+- 实际回读 Test / 557281646、流 16040384516、G-RP4MTRCXT0，增强型衡量关闭；
+  正式 / 208428049、流 15944150044、G-2PTWF8DJE2，增强型衡量仍开启，
+  发布启用前必须按新页面策略核对关闭重复/不必要自动采集。
+- Google strict /debug/mp/collect 已对六事件返回 HTTP 200、validationMessages=[]；
+  验证接口不校验 Secret、不进入报表，不是认证或真实收件证明。
+- 真实 Google SDK 测试发现原初始化 push 普通数组，SDK 不处理命令；已改成
+  官方 arguments 对象。相同真实 SDK 对照：数组无 client callback/collect，
+  arguments 有真实 client callback/collect；新增初始化契约回归测试通过。
+  修复后 Test 构建、lint、design:check 通过，真实 SDK 已取真实 client/session，
+  页面/曝光/SPA 和撤回网络边界已观察；headed/headless 都观察两条页面、
+  两条曝光、一条隔离 Checkout helper 事件。GA 后台浏览器三事件尚未显示。
+  隔离业务事实经实际 worker 投递 Test：sign_up/generation_completed/purchase
+  各一条 transmitted，重复创建/完成/核验不增加；OAuth/Stripe/素材仍为替身，
+  没有真实扣款。约 10:45 Test DebugView 和实时概览已实际回读上述服务端
+  三事件各一次；客户端真实收件/完整六事件联结仍待核对，204 不替代收件。
+- 用户批准六事件开发和详细测试：page_view、sign_up、pricing_view、
+  begin_checkout、purchase、generation_completed；pricing_view 为实际支付曝光。
+  PRODUCT 第 12 节及测量方案已同步。旧模板/Agent/点击/下载等投递本地同批停用，
+  线上未切换；没有提交、推送、部署或迁移共享数据库。
+- 用户要求采集策略以后确认：默认 NEXT_PUBLIC_GA_ENABLED=false，不新增同意 UI，
+  不默认允许；预留 setAnalyticsConsent。显式允许后才加载唯一 Google tag；
+  撤回设置 Google 官方 ga-disable 标记并取消待投递，存储失败仍拒绝。
+  正式/Test 的 ID 与域名分别校验，无跨环境 fallback；广告 consent 与 signals 关闭。
+- 新增 AnalyticsContext、AnalyticsReport，迁移 20261004232658_analytics_reporting。
+  HMAC HttpOnly 真实 client/session 上下文、账号创建版本、Checkout/生成快照及
+  环境隔离；稳定事实键冲突忽略插入和条件租约去重。缺少/过期上下文记覆盖缺口，
+  不是编造会话/补同意。两表 RLS 与服务端角色权限在独立 PostgreSQL 验证。
+- 注册由真实新建事实确定；生成所有创建入口保存上下文，中央持久化成功入口报告。
+  purchase 由 Invoice/Subscription/PaymentIntent 回读核验现金、环境、归属；
+  Webhook/返回共用 Invoice ID；折扣后商品美元金额与税分开，零现金/手动标付不冒充收款。
+  Billing 浏览器 purchase 发射已移除，仅保留展示信息。
+- 后台网络投递用 Next.js after，响应/事务结束后处理；有效登录上下文同步可带动待发送。
+  Vercel CLI 回读当前团队 plan=hobby，故使用每天 UTC 07:00 补偿 Cron，
+  没有五分钟 Cron 或套餐升级。429 退避；网络/5xx/中断标 uncertain，先核对再恢复；
+  2xx 仅 transmitted，绝不等于 GA 已收件。Preview Cron 需手动调用验收。
+- 完整隔离回归：502 项，500 通过，0 失败，2 个真实 Stripe Sandbox 外部审计跳过。
+  TypeScript、lint --quiet、design:check、隔离配置 build 通过。
+  Chrome 本地构建浏览器 9 项通过，桌面 1440×1000/手机 390×844；SDK/网络替身，
+  无真实 GA 收件。普通图/视频、模板四张、Agent 两张的服务/事务与完成去重，
+  现金金额/折扣/税、无返回 Webhook/故障重试、注销撤回、租约恢复均做隔离验证。
+  临时数据库和浏览器依赖放 /tmp，未加入项目依赖；没有真实模型、Blob 写入或扣款。
+- 限制：退款/首购广告信号/混合 Invoice/客户余额混合收款/后台长期清理未实施；
+  非活跃授权续费与长任务有覆盖缺口。MP 72h 可回填不保证会话归因，需核对
+  24h 会话窗口、48h 联结处理；日补偿可能延迟。离线撤回尚需补偿验收，
+  已发请求不可撤销；新表结构/权限异常是开启后注册/生成事务依赖。
+- 早前 CUA 多次超时且独立测试浏览器被 Google 拒绝登录；已关闭独立窗口。
+  用户开启 Chrome 远程调试后，现有登录会话连接成功。没有导出浏览器密码、
+  Cookie 或认证存储，也没有安装第三方 GA 报表插件。
+- 本轮真实 Google 验证后已停止 localhost:3118 服务和临时独立 PostgreSQL，
+  已删除两份临时 Secret 和真实 tag 上下文文件。Vercel Secret 保留；原有 GA
+  标签页/登录保留，自建 localhost 标签页和独立测试浏览器已关闭。
+  Test DebugView/实时截图位于 /tmp/flownana-ga-runtime/ga-test-*-receipt.png。
+- 详细实现、日志、手动验收及风险见 docs/GA4-IMPLEMENTATION-VALIDATION-2026-10-05.md。
+  共享数据库迁移、Preview 平台配置/部署须具体确认；正式发布须明确授权。
+
+
+## 2026-10-04 GA 后台准备（用户操作，进行中）
+
+- 用户最新确认：基础与业务转化同批加入，业务持续迭代，埋点只保留最必要
+  核心；已撤回先仅基础访问、业务以后恢复的过渡方案。PRODUCT 第 12 节
+  已替换为六事件候选字典待确认：page_view、sign_up、pricing_view、
+  begin_checkout、purchase、generation_completed。四项使用 GA 标准/
+  推荐事件，Pricing 曝光和生成成功为必要产品自定义；付款核验/去重、环境隔离和隐私
+  保留。旧事件停用与新业务启用同批验收，不发布业务追踪全停的过渡版。
+  本轮仅准备文档，没有实施、迁移或部署；未运行代码/GA 收件测试。
+- 用户定义支付曝光为进入 Pricing 并实际看到套餐列表，要求调整事件名。
+  GA 官方推荐列表无独立支付曝光事件，方案采用 pricing_view；当前为弹窗，
+  实际可见才报告，每次打开一次，同次切换月/年不追加曝光。不能使用提交
+  付款信息的 add_payment_info 替代，亦不并行发送 view_item_list/旧
+  pricing_viewed。PRODUCT 与方案已同步，应用代码及 GA 后台未变更。
+- 用户已提供 GA 官方 gtag.js 安装片段，ID 为正式 `G-2PTWF8DJE2`。匿名
+  HTTP 检查正式首页 200，但返回 HTML 中无 Google tag ID、gtag.js 或
+  ga4-init。测试域名匿名访问跳转到 Vercel 登录保护页，不能检查到应用标签。
+  这两项不是实际浏览器执行/收件验收；未回读平台环境变量，缺少变量只是
+  待核对原因。工作区已有依赖 NEXT_PUBLIC_GA_MEASUREMENT_ID 的标签入口。
+- 当前最小业务连接详细范围已写入 PRODUCT 第 12 节待确认；使用唯一
+  Google tag、环境隔离及安全标准页面/业务事件，切换时停用旧业务投递。
+  不直接把官方片段复制到已有加载入口旁边；没有
+  更改代码、环境变量或生产部署，未运行应用测试。后续手动验证须含 Tag
+  Assistant/实时或 DebugView，当前尚未完成“设置数据收集”。
+- 用户授权在既有 Flownana GA 资源下开始后台准备；Chrome 控制连接连续超时，
+  后续改为用户操作、助手逐步核对截图。未安装第三方 GA 数据插件。
+- 截图确认 GA 账号 `146543098`、正式媒体资源 `Flownana` / `208428049`；
+  数据流 `flownana` / `15944150044`，衡量 ID `G-2PTWF8DJE2`，流网址为
+  `https://flownana.com`。这些是公开配置 ID，不是 API Secret。
+- 用户确认将报告时区从中国时间改为 America/Los_Angeles 并保存；USD 已在
+  原截图中核实。改后时区尚未截图回读；Ads 时区和币种仍只来自用户确认。
+- 数据流截图显示过去 48 小时无数据；增强型衡量已开启，细项待核对；邮件
+  隐去开启，查询参数隐去未开启。不能据此宣称标签已部署或实时收件通过。
+- 已确认正式/测试测量隔离，市场 US/JP/KR/TW。正式资源保留页面截图核实
+  事件/用户数据均为 14 个月，新活动重置开启，用户确认已保存；页面提示
+  24 小时后生效。资源选择器截图核实 Test `557281646` 已建立在相同账号；
+  Test 流/衡量 ID 已截图核实，时区/币种与保留设置仍待核对。Ads 关联和
+  收件验收待完成；现有本地/Preview 测试付款门禁保持。
+- 测试流详情截图确认 `Flownana Test Web` / `16040384516`，衡量 ID
+  `G-RP4MTRCXT0`，网址 `https://flownana-test.vercel.app`；增强型衡量
+  主开关关闭，页面显示未收到数据。独立 ID 已建立不代表网站投递已隔离；
+  本轮未安装或部署测试标签，未创建 MP Secret；正式 Ads 关联待基础收件之后。
+- 方案和后台核对记录位于 `docs/GA4-ADS-MEASUREMENT-PLAN.md`。本轮仅更新
+  文档，没有改应用代码/事件含义、环境变量或部署；未运行应用测试。下一步
+  按用户新要求先厘清现有事件与统一 GA 测量体系，随后继续后台准备；付款与归因覆盖仍
+  需单独批准埋点实施并验收，不把后台设置当作投放就绪。
+- 增强型衡量细项截图确认历史记录页面变化和六类增强事件全部开启。助手已
+  给出按需关闭建议，但用户未确认保存，不能宣称设置已生效。
+- Git 历史回读：基础 GA 埋点于 2026-05-19 的 `bdc59a6` 首次加入，模板和
+  Agent 扩展见 2026-09-11 `6283165`、2026-09-12 `53c134d`。代码提交时点
+  不代表线上开始收件；现有手动事件本身也是经 gtag 投递 GA4。当前工作区
+  仍有未提交追踪修改；没有做生产实时/DebugView 整体核对。
+- 用户确认全新 GA 测量体系及后续完整下线旧埋点方向，已同步 PRODUCT
+  第 12 节。新事件字典、付款/首购事实与切换验收标准尚待具体化并确认；
+  本轮没有停用旧代码或上线新标签。不把测试流加到正式资源来替代环境隔离。
+- 用户要求按 GA 官方引导和固定清单推进，避免后台准备与网站改造交叉跳转；
+  清单已写入测量方案。最新任务页截图显示 Ads 关联任务锁定，先前提前
+  推进关联的建议已撤回；当前继续“设置数据收集 / 采取行动”，核对官方
+  安装说明。基础标签连接与收件须在关联步骤之前完成，不能把创建流当作
+  已接入；事件重建仍须详细规格，生产发布仍需授权。没有旁路任务页锁定，
+  也不据此推断所有 GA 关联入口均有同一限制。本轮仅文档，无代码测试/部署。
+
+## 2026-10-03 保存卡片已发布（真实付款待验收）
+
+- 用户明确授权“发布”，从当前已验证工作区部署 Production：
+  `dpl_H878BZzhGhujMQJkJKFzTqeh6Yd8`，部署地址
+  `https://flownana-5pv7p3gu7-liangchusans-projects.vercel.app`。CLI 最终 READY，
+  再次 inspect 确认 `https://www.flownana.com` 指向该 Production 部署。生产
+  构建成功回读正式 Stripe 账户和六个 Live Price；部署后 `npm run smoke:prod`
+  全部通过，当前部署的 error 日志查询暂未返回记录。未更改 Preview 部署、
+  测试结账门禁或数据库；未提交/推送 Git。以下开发阶段的验证与风险继续适用。
+
+- 用户确认 `docs/PRODUCT.md` 第 10.2 节并授权开发：Stripe Hosted Checkout
+  提供可选保存卡片选项，同账号升级或重新购买时复用已同意保存的卡片；仍需
+  用户确认付款，银行要求时完成额外验证。本地和 Preview 继续禁用测试结账。
+- `lib/checkout-reservation.ts` 在持久化 Session 参数中增加
+  `saved_payment_method_options.payment_method_save=enabled` 和
+  `allow_redisplay_filters=[always]`。Stripe 收集保存同意，仅供续费的卡片不强制
+  展示；首次订阅由 Checkout 创建 Customer，付款核验后沿用现有绑定流程；
+  后续结账使用当前账号 `stripeCustomerId`，不按邮箱跨账号寻找卡片。不存储
+  卡号或安全码，不变更价格、积分、续费和 GA4。
+- 保留现有 Stripe SDK 与全局 Billing API 版本；使用窄类型扩展描述 SDK 尚未
+  声明的附加参数。实际独立“Flownana 沙盒”账户的 `2023-10-16` API 已接受
+  两项参数，并回读确认；没有升级全局 API 或改变订阅响应结构。
+- 实际服务端结账代码加内存账单边界，在独立 Stripe 沙盒创建首次/已有 Customer
+  两个测试 Checkout，回读 `payment_method_save=enabled`、仅 `always` 可展示、
+  金额 $16 以及 Customer/邮箱关联正确；重复调用复用同一 Session。沙盒已保存
+  测试卡使用虚拟 token，未输入真实卡号、未扣款、未写入共用主库。本次未验证
+  用户勾选保存后的真实付款；浏览器观察 Stripe 页面连续超时，保存选项与预填卡
+  的实际显示仍待验收。验证结束后两个临时 Checkout 已过期、临时 Customer 已
+  删除，并逐一回读确认；无共享数据库写入或付款。
+- `tests/checkout-reservations.test.ts` 补充新购/升级/重试参数与 Customer 复用
+  断言；这些隔离 PostgreSQL 用例本轮因无测试库而跳过，不能宣称已执行。
+  本轮全量测试 408 passed/13 skipped/0 failed；TypeScript、lint quiet、build
+  和 diff check 均通过。该检查完成后已按上述部署发布保存卡片代码。
+- 再次回读正式账户：可收款/可出款、无待补充事项；仅六个启用 Price，金额和
+  月/年周期与产品一致，三个 Product 默认月付 Price 正确。旧四个 Price 已不在
+  列表中，用户删除它们不影响当前套餐。Live Webhook enabled，Portal active/
+  default 且付款方式更新 enabled；正式 Stripe 订阅为 0。主库 Subscription、
+  CheckoutReservation、ProcessedStripeEvent、Customer 关联及 QA 用户均为 0，
+  两个只允许 Live Price 的数据库 CHECK 均 validated。
+- Vercel 再次 inspect 确认正式域名仍指向 `dpl_ByCcSsQtML5LBgLdkxiEU2Kq6XRD`
+  的 Production READY 部署；本轮重新运行 `npm run smoke:prod` 全部通过，验证
+  范围为公开页面与匿名接口，未替代真实付款或已登录账单验收。
+- 修正文档“生产仍为测试模式”的过期风险描述。实际线上首次付款、Live Webhook
+  发放/重复处理、保存卡片后再次支付、发卡行验证和 GA4 仍待手动验收；工作区
+  仍含此前已发布但未提交到 Git 的变更。
+
+## 2026-10-02 Stripe 正式模式已发布（真实付款待验收）
+
+- 用户已确认 `docs/PRODUCT.md` 第 10.1 节并授权开发上线：仅 Production 使用
+  正式账户，Starter/Pro/Max 的月/年价格与积分规则不变。后来进一步确认收费
+  Supabase 分支不创建，本地和 Preview 保留测试密钥/Price，但停止新建测试
+  Checkout、升级报价与补付，旧测试返回页、Webhook 和 Cron 不再写入共享主库。
+  Production Live Checkout 必须显式开启，关闭新结账时真实付款的 Webhook 与
+  年付积分发放仍可处理，Cron 只扫描当前环境配置的年付 Price。
+- 全量测试 410 passed/13 skipped/0 failed、lint quiet、design:check、TypeScript、
+  build 通过。Preview 部署 `dpl_C7JLSJ2obAmMXgC4sF3d3zVEdLhi` 为 READY，
+  稳定地址 `flownana-test.vercel.app` 已重新指向它；Production 的门禁关闭部署
+  `dpl_9ntfJtuMWzjJE8qoBXr4wv9rjznm` 为 READY，`www.flownana.com` 已绑定，
+  `npm run smoke:prod` 通过。生产构建实际连接 Stripe 回读并确认正式账户和
+  六个 Live Price；真实付款仍未执行。
+- 主库清理后，将 Production `STRIPE_LIVE_CHECKOUT_ENABLED=true` 仅设于
+  Production Config 并回读，最终部署 `dpl_ByCcSsQtML5LBgLdkxiEU2Kq6XRD`
+  已 READY、绑定 `https://www.flownana.com`，构建再次核验正式账户和六个
+  Live Price，最终 `npm run smoke:prod` 全部通过。最终部署前的本地复核为
+  408 passed/13 skipped/0 failed、lint quiet、TypeScript/build/diff check 通过。
+  部署后主库再次回读：Subscription、Stripe Customer 关联和 QA 用户均为 0，
+  真实用户两批积分与剩余 212 未变化；真实沙盒订阅仍 canceled，沙盒 Webhook
+  disabled，Live Webhook enabled。尚未执行真实付款、Portal 或已登录 GA4 验收。
+- 旧 Preview 独立部署 URL 可能仍运行历史代码；为防测试账单重新写入共用主库，
+  已通过 Supabase Migration `stripe_live_only_billing` 给 `CheckoutReservation`
+  和 `Subscription` 加入只接受六个 Live Price ID 的 CHECK 约束；迁移 SQL
+  保存于 `prisma/migrations/20261002231000_stripe_live_only_billing/migration.sql`。
+  回读两个约束均 validated；用旧沙盒 Starter Price 分别试插两表均被拒绝，
+  试插事务未留下行，主库订阅/预约仍为 0。未来轮换 Live Price 必须先更新
+  该允许列表，再切换 Vercel Production Price 环境变量。该数据库迁移在最终
+  运行时代码部署后应用，无需重新部署才生效。
+- 本次从含有此前已发布及本轮已批准变更的工作区直接部署，尚未创建 Git 提交
+  或推送；远端 `main` 不能作为当前线上产物的复现来源。未来从 Git 自动部署前
+  应先整理并同步该工作区，避免覆盖 Live 门禁与测试禁用代码。
+- 正式 Stripe 账户 `acct_1SwJs2RohkvhKuAJ` 已回读 `charges_enabled`、
+  `payouts_enabled`、`details_submitted` 均为 true，无待补充事项。创建 Starter
+  Product 并在 Starter、现有 Pro、Max Product 下创建六个 Live USD 周期 Price：
+  Starter 月/年 `price_1UM5q4RohkvhKuAJ8Ie0xeqr` / `price_1UM5q5RohkvhKuAJlKiHNcAE`
+  （$16/$96），Pro `price_1UM5q6RohkvhKuAJsH1qPH5S` /
+  `price_1UM5q6RohkvhKuAJhbgmCUHY`（$48/$288），Max
+  `price_1UM5q7RohkvhKuAJ4WYA3IsS` / `price_1UM5q8RohkvhKuAJl70A7Jhi`
+  （$96/$576）。六个均 active 且回读金额/周期匹配；旧四个错误 Live Price
+  已停用，事前确认无 Live 订阅或 Payment Link。
+- 创建 Live Billing Portal `bpc_1UM5r0RohkvhKuAJJqOmO3YB`，按测试配置允许
+  更新客户/支付信息、看发票及期末取消；创建指向生产回调的 Live Webhook
+  `we_1UM5sNRohkvhKuAJOGY0ms90`，订阅既有 10 个事件。签名密钥只写入 Vercel
+  Production Sensitive 环境变量，未写入仓库。六个 Live Price ID 也仅写入
+  Vercel Production；`STRIPE_LIVE_CHECKOUT_ENABLED=true` 仅写入 Production
+  Config 并回读，已随最终 READY 部署生效。
+- 用户已在 Vercel 设置 Live API Key；2026-10-02 只读拉取核验 Production
+  `STRIPE_SECRET_KEY` 前缀为 `sk_live_`，未输出密钥。其最初被写进覆盖全部三个
+  环境的共享变量，导致 Preview/Development 也临时成为 Live Key；现已用
+  `.env.local` 中原测试密钥分别覆盖 Preview/Development，并将三环境变量
+  拆开设为 Sensitive。Vercel 元数据回读为 Production 一条、Preview 与
+  Development 一条；新 Production/Preview 部署已采用各自变量。
+- Stripe 连接回读：Flownana 正式账户现有启用 Price 仅 Pro $16/月、$96/年及
+  Max $50/月、$300/年，均不符合当前 Starter/Pro/Max 六档产品价格；正式账户
+  原无 Webhook endpoint、Billing Portal 配置或订阅；旧 Price 未用于网站。
+- 本地 `.env.local`、`.env.production` 的测试密钥属于独立“Flownana 沙盒”
+  账户，不是正式账户的 Test Mode。原指向生产域名的沙盒 Webhook
+  `we_1THfBXRqa49126u8yR3SNgev` 已禁用。真实生产账号
+  `116734473226090685751` 的沙盒 Starter 订阅
+  `sub_1U1dKyRqa49126u8PGW9ZaG1` 已在 Stripe 即时取消并回读 canceled；
+  独立 QA 沙盒订阅未取消。主库一次事务删除 7 条测试 Subscription、全部测试
+  ProcessedStripeEvent 和 QA 用户 `test-user-local`（含其测试积分/媒体关系），
+  清空真实用户的测试 Customer 关联；前置条件限制当时只有这两位账号、7 条
+  测试订阅、0 条预约。回读主库 Subscription、预约、ProcessedStripeEvent、
+  测试 Customer 关联、QA 用户均为 0；真实用户两批积分未改，剩余 212。
+- 审计发现 Vercel Preview/Development 的 `DATABASE_URL` 与本地
+  `.env.local` 都连接 Production 使用的 Supabase 项目
+  `kbpmirqktzxlpkfeuhtn`，目前没有独立分支。即使生产 Webhook 忽略测试事件，
+  Preview/本地测试 Checkout 原可写入同库的 `User.stripeCustomerId`、Subscription
+  和积分。用户选择停止测试结账而不建立分支；新代码封住测试写入入口，
+  仍需手测并监控主库没有测试账单再次出现。
+- Supabase 当前组织 `ehldliupgspenpkyrfnh` 的独立分支报价为每小时 USD
+  0.01344（30 天约 USD 9.68，其他用量另计）；用户明确表示收费则不创建，
+  因此未创建分支，也未建立额外 schema。用户选择停止本地与 Preview 测试结账。
+- 切换前的只读审计曾确认旧 Production 使用独立沙盒测试密钥；该结论仅适用
+  旧部署。当前 Production 构建已核验 Live Key 归属和六档金额；Preview、
+  Development 仍保留测试密钥，但代码禁止测试结账。真实付款、Live Webhook
+  投递和购买后的积分/GA4 需上线后手测。
+
+## 2026-09-24 支付恢复与 Pricing 工作区生产发布
+
+- 用户明确要求检查全部本地分支并发布。本机仅有 `main` 一个本地分支、一个
+  worktree；本地 `HEAD`、`origin/main` 和 `git ls-remote --heads origin` 均为
+  `57a5a9ddb4e8aa5f0711f093be67465f594f5432`，远端仅有 `main`。当前工作区
+  仍有已验收但未提交的 Pricing、导航、支付恢复、埋点及文档改动；直接从该
+  工作区部署，没有 Git 提交或推送。
+- 部署前隔离库全量测试 485 passed、2 opt-in skipped、0 failed；lint quiet、
+  design:check、TypeScript、生产模式本机构建和 diff check 通过。Vercel 生产
+  部署 `dpl_qVT1bE5MxAYsU5QbLffmuGXJUfd5` 已 `READY`，CLI inspect 确认
+  target=production，别名 `https://www.flownana.com`。部署运行错误日志查询
+  暂无记录。
+- 生产 HTTP 冒烟尚未通过：本机 `npm run smoke:prod` 实际退出码 6，
+  `curl` 无法解析 `www.flownana.com`；部署域名、Vercel CLI curl 及浏览器
+  访问也在连接阶段超时。不能把 READY/别名等同于线上页面、登录或支付完成
+  验收。生产 Stripe 密钥模式、真实 Webhook 投递及支付边界仍需在网络恢复后
+  验证。此条部署记录为发布后文档更新，不包含在上述 Vercel 构建产物中。
+
+## 2026-09-24 待付恢复与返回状态补齐（本地，未发布）
+
+- 本轮按用户要求暂不处理埋点。Billing 返回页将缺少 Session、未完成支付、
+  已付但权益同步中、无法核验分别显示；只有当前周期发放记录存在且账单套餐
+  匹配时才显示成功；账单摘要读取失败时也只显示同步中，避免成功与错误同时
+  出现。新增返回状态单测。
+- `paused` 订阅不再显示必然返回 409 的 Complete payment，改为 Manage billing；
+  其他待付状态保留 Hosted Invoice 补付并增加账单管理兜底。Billing 读取待付
+  订阅时重新核对 Stripe 归属和发票，已付且 Webhook 延迟时复用幂等发放逻辑
+  补齐权益，未付不发积分。真实 Stripe Test Mode 与隔离数据库新场景通过：
+  付款后不投递 Webhook，访问 Billing 发 200 积分，重复访问不多发。
+- 定向账单事务 13/13、真实沙盒恢复 6/6、返回状态 1/1、全量回归
+  485 passed/2 opt-in skipped、lint 0 errors/16 existing warnings、
+  design:check、TypeScript、preview build 通过。浏览器复核缺少 Session 提示与
+  已付升级成功页；`past_due`/`unpaid`/`paused` 的真实浏览器界面及外部
+  Stripe Hosted Invoice 页面仍待验收。未提交、未发布。
+
+## 2026-09-24 支付返回与待付恢复优化（本地，未发布）
+
+- 本地隔离账号 `payment-qa-handoff-20260924` 的真实 Stripe Test Mode Starter
+  月付 Checkout 已完成：$16、订阅 active，浏览器 Billing 显示 200 积分、刷新
+  不重复，Start Creating 返回创作页，侧栏同步 Starter/200。测试登录回跳的
+  套餐/周期恢复也已在浏览器验证。Pro 月付升级 Checkout 随后完成 $48 Test Mode
+  支付，旧 Starter 被取消、新 Pro active；隔离库两批共 1000 积分，浏览器升级
+  成功页显示 $48/Pro/1000，刷新不重复。本代理未点击最终浏览器付款按钮。
+  此为隔离本地数据库与 Stripe Test Mode，不涉及生产发布。
+- 后续复核 PAY-01 时新增 PAY-05：已核验成功事件在 GA 晚于账单页初始化时会
+  漏报。新增先失败的复现测试，改为最多 20 秒重试，成功/卸载即停止，重试前
+  检查交易 ID 的本机去重记录。真实 GA4 收件仍待验证。
+- PRODUCT 已确认本轮付款返回、待付账单可见与 `purchase_success` 验收规则；
+  代码将成功事件改为仅由服务端已核验的 Checkout 结果触发，并用本地交易 ID
+  去重，金额不再取 URL。缺少 Session/无法确认均不再显示已收款。Billing 对
+  `incomplete`/`past_due`/`unpaid`/`paused` 显示待处理状态；恢复入口仅返回
+  鉴权、Stripe 归属、未付发票和生产 Test Mode 门禁均通过的 Hosted Invoice URL。
+- 真实 Stripe Test Mode 加隔离 PostgreSQL 的未付→恢复脚本 3/3 passed；
+  后续补测真实测试卡拒付、3DS PaymentIntent 状态，扩至 5/5 passed；
+  账单恢复链接在未付时可得、付款后消失。年付 paid invoice 首次和推进本地
+  月度发放时间后的第二次积分各 200，重放不多发（沙盒套件 8/8）。
+  Checkout 取消带安全 returnTo 回到
+  原站内页面并重开 Pricing，浏览器模拟往返保留 Prompt 草稿。全量测试
+  最终 486 项、484 passed、
+  0 failed、2 skipped（opt-in 沙盒）、0 todo；六套餐真实 Checkout 复跑通过，
+  lint、design:check、build、
+  diff check 均通过。没有提交或发布。
+- 浏览器实测伪造成功 URL 的中性提示、Pricing 开关/Esc/焦点恢复及
+  390/768/1440px 无横向溢出。补测真实沙盒 `incomplete` 订阅，Billing 的
+  待付提示/补付按钮、Pricing 三套餐的恢复 CTA 均在浏览器可见；测试订阅和
+  Customer 已清理。浏览器进入外部 Stripe Checkout/发票时连接再次超时，
+  最终付款、3DS、实际升级及其他待付状态仍未完成。详见
+  `docs/PAYMENT-FLOW-AUDIT-2026-09-22.md`。本地 `next dev` 因 Watchpack
+  `EMFILE` 自行重启，改用已构建的 `next start` 验收。
+- 发现登录前点击套餐会丢失选择；新增当前标签页十分钟有效的套餐/周期意图，
+  回跳原页 `#pricing`，由用户再次点击继续，避免登录成功后自动发起 Checkout。
+  浏览器验证到未登录选 Pro 月付并进入包含 `/image#pricing` 的登录地址；构建环境
+  只提供 Google 登录，`next dev` 因 Watchpack `EMFILE` 无法完成测试账号回跳。
+  登录后实际 UI 恢复仍待验收。
+
+## 2026-09-23 支付审计补测（仅测试与方案，未改计费产品代码）
+
+- 新增 opt-in Stripe Test Mode 恢复/升级测试：首期 `incomplete` 未付不发积分，
+  测试支付后由本地签名 `invoice.paid` 发 200 积分、重放不重复；年付 Starter→Pro
+  剩余 11 个月抵扣 $88、目标 $288、应付 $200，真实 Checkout 金额匹配。3 项
+  （含父套件）通过；脚本清理测试 Session、订阅、Customer 与隔离库账号。
+  实际拒付、Stripe 实际通知投递及升级付款后状态尚未验收。
+- 发现 PAY-04：`incomplete` 订阅未显示在 Billing 摘要，却会阻止新 Checkout，
+  用户可能缺少恢复入口。与 PAY-01/02/03 一起记录于
+  `docs/PAYMENT-FLOW-AUDIT-2026-09-22.md`，目前仅形成优化方案，未实施。
+- 修正历史图片引用测试夹具：`generated` 资产补关联成功 Generation。隔离库
+  全量回归 479 项，474 passed、0 failed、2 skipped（沙盒 opt-in）、3 todo
+  （PAY-01 待修断言）。浏览器付款返回、登录衔接、完整升级及响应式 UI 仍待测。
+
+## 2026-09-22 支付全流程审计（进行中，未修改产品代码）
+
+- 用户要求完整测试功能/UI/边界并给优化方案。矩阵、证据、问题和待测项记录在
+  `docs/PAYMENT-FLOW-AUDIT-2026-09-22.md`；当前目标尚未完成。
+- 基线 397 passed/11 skipped。建立临时本机 PostgreSQL 并应用全部迁移后，
+  全量 472 passed/2 failed/0 skipped；失败为历史图片引用子用例及父套件，单独
+  复现。支付事务 12 项和结账预约 18 项子用例均通过，Stripe 为故障注入边界。
+- 新增 opt-in 的真实 Stripe Test Mode 测试：六套餐 Checkout 创建/金额/复用/
+  过期及真实年付 paid invoice 发积分、幂等、取消，共 8 项通过。API 测试对象
+  已清理；脚本拒绝 Live Key 和非隔离数据库。未发生真实扣款，未部署或提交。
+- 新增 3 个明确 TODO 的审计断言，复现成功埋点信任 URL、伪造金额和刷新重复。
+  浏览器复现无支付 Session 仍显示 Payment received；均未修复，待整体方案。
+- 测试站点 `http://localhost:3110` 使用临时库，专用账号 payment-qa-20260922；
+  首次 Starter 年付已创建沙盒 Checkout，但浏览器操作反复超时，尚未实际填卡。
+  临时库目录记录于 `/tmp/flownana-payment-pg-path`，服务端口 55439。
+  后续继续真实 Checkout/升级/Portal 与完整响应式交互验收，不能声称全绿。
+
+## 2026-09-22 Pricing 正式发布与本机发布权限
+
+- 用户明确批准生产发布。订阅大弹窗、九项产品卖点、套餐定位、强化年付优惠与
+  同风格升级确认已部署：`dpl_FwQLZ65Rf6gGc9YKQ1nH9aWMYekV`，Vercel 返回
+  `READY`，正式域名为 `https://www.flownana.com`。本次从当前工作区发布，未提交 Git。
+- 本地 397 passed、11 skipped、0 failed，build/lint/design:check 通过；云端构建
+  通过，发布后 `npm run smoke:prod` 全部通过，含首页视频资源与 API 权限断言。
+  登录态真实升级报价、返回套餐时周期保留、嵌套焦点及实际付款仍需手动验收。
+- Vercel CLI 已重新登录。应用户要求，在本机 Codex `sandbox_workspace_write`
+  增加 Vercel 的 Application Support/com.vercel.cli 和 Caches/com.vercel.cli
+  两个目录写入白名单；保留 workspace-write 与原审批策略，配置一般需新会话加载。
+  发布使用临时 npm 缓存和 `NO_UPDATE_NOTIFIER=1`。此设置解决目录写入限制，
+  不跳过 Vercel 账号过期后的身份验证，也不代表关闭平台自动审批。
+
+## 2026-09-22 Pricing 发布尝试（授权待恢复）
+
+- 用户授权测试通过后发布。重新执行测试为 397 passed、11 skipped、0 failed；
+  lint、design:check、diff 检查通过，使用此前已成功构建的同一份功能代码。
+- Vercel CLI 部署返回 `Not authorized`，尚未创建成功的生产部署，也未运行发布后
+  冒烟。已启动设备登录流程，等待用户恢复 CLI 授权后继续发布；现有线上版本未替换。
+
+## 2026-09-22 Pricing 卖点与升级确认精调（本地未发布）
+
+- 按用户新截图调整套餐名/价格字号、24px 卡片内边距、价格区留白与按钮对齐；
+  补充 Starter/Pro/Max 的创作定位，并从既有能力提炼九项带 Lucide 图标的卖点。
+  移除分辨率、普通按钮下的重复周期小字、独立积分到期/不退款页脚；Save 50%
+  改为品牌蓝实心标签。实际套餐、价格、积分与退款规则未改，不可升级原因保留。
+- UpgradeModal 改为相同浅灰画布、浅色细边框卡、蓝色主按钮和固定圆形关闭按钮；
+  返回按钮为 Back to plans，保留旧/新套餐、周期、积分、实付与抵扣明细，增加
+  加载和错误的无障碍状态。确认按钮继续受报价加载/错误保护。
+- PRODUCT/DESIGN 已同步。397 项测试通过、11 项数据库测试跳过；build、lint、
+  design:check 和 diff 检查通过。浏览器实测订阅 390/768/1440px、九项权益与
+  平板按钮对齐，无横向溢出。升级弹窗使用 /tmp 下真实组件静态渲染的模拟报价
+  做桌面/手机视觉检查及加载/错误禁用检查，不代表真实登录/支付流程通过。
+- 仍需手测真实账号升级报价、返回订阅弹窗时周期保留、嵌套 Esc/焦点恢复及付款；
+  未提交、未部署。临时模拟页面不属于产品代码。
+
+## 2026-09-22 Pricing 统一大弹窗（本地未发布）
+
+- 按用户确认的 ChatGPT 应用内参考，将 Pricing 改为全视口浅色弹窗；价格和购买
+  按钮位于权益之前，推荐 Pro 为浅蓝卡片及蓝色按钮，其余卡片保持白色。
+  套餐名称、价格、积分、权益、默认年付、升级确认与服务端计费规则未改。
+- Header、Footer、账单页与已有创作/用户菜单入口均原地打开同一 Provider 弹窗。
+  `/pricing` 不再展示独立页面，仅跳转 `/#pricing` 兼容书签和已有 Checkout 取消地址；
+  关闭仅清理 pricing hash，不修改原页面路径、查询参数或创作状态。
+- PRODUCT/DESIGN 已同步；pricing_viewed 统一由打开弹窗触发，移除独立页监听，
+  checkout_started 保持。新增导航回归覆盖原 children、原 URL 和兼容地址。
+- 验证：397 项测试通过、11 项数据库测试跳过、0 失败；build、lint -- --quiet、
+  design:check、git diff --check 通过。内置浏览器检查 390/768/1440px 无横向溢出，
+  桌面购买按钮对齐、月/年价格、原地开关、Esc、Prompt 保留和焦点恢复、旧地址
+  跳转与关闭后 hash 清理；检查时浏览器 error 日志为空。
+- 未部署、未提交。登录态当前套餐/禁用原因、嵌套升级确认、真实支付与取消返回、
+  附件及活跃任务保留仍需手动验收；本次浏览器验证为未登录状态。
+
+## 2026-09-20 已下线旧 Image/Video 路由与无入口创作 UI（已发布）
+
+- 用户明确取消全部旧 `/ai-image`、`/ai-video`、`/ai-music` 兼容地址：路由页和
+  Next.js redirects 已移除，三者现在均返回 404。
+- 已删除无路由调用者的旧 TemplatePanel、ResultPanel、My Creations/Explore 结果链路、
+  独立 Image/Video Preview 与旧 CreationPreviewDialog；当前 Image、Video、Assets 与
+  Agent 工作台不再携带这套过时交互分支。PRODUCT 路由、验收规则与生产冒烟断言已同步。
+  `npm run test`（395 passed、11 skipped）、`npm run lint -- --quiet`、`npm run design:check`
+  通过；清除 Next 开发缓存中已删除路由的类型索引后，`npm run build` 通过并仅列出
+  任何旧 `/ai-*` 路由。Vercel 生产部署
+  `dpl_G4rgtWWCfuFijibxwbuumM8HtkRC` 已 READY 并绑定 `https://www.flownana.com`；线上
+  `/ai-image`、`/ai-video`、`/ai-music` 的 404 断言已通过。生产冒烟在请求
+  `/videos/flownana-home-demo.mp4` 时超时，故后续 API 断言尚未完成；需单独排查该媒体
+  资源的线上可达性，不能将本次冒烟称为全绿。
+
+## 2026-09-20 Agent 视频引用缩略图统一（已发布，待手测）
+
+- Agent 从结果点击 `@` 添加视频引用时，不再显示文字占位 `video reference`。Agent
+  Composer 现复用 Image/Video Composer 的媒体缩略图：显示视频封面、时长及统一删除
+  控件；引用仍按 Agent 的“描述需求后再出方案”流程处理，未改变生成、计费或埋点。
+- `@` 预填会保留已有视频任务的 `duration` 元数据，缺失时共享组件从媒体元数据读取。
+  新增回归测试；`npm run test`：395 passed、11 skipped、0 failed，`npm run lint -- --quiet`、
+  `npm run design:check`、`npm run build` 与 `git diff --check` 通过。待登录态手测 Video 与 Agent 的 `@`
+  视频引用在 390/768/1440px 下的封面、时长、删除和发送行为。
+
+## 2026-09-20 Agent Composer 菜单覆盖媒体修复（已发布，待手测）
+
+- Agent 会话内容区此前为 `z-10`、底部 Composer 为 `z-0`，导致 Composer 内即使菜单
+  使用 `z-50`，仍被结果图片或视频遮挡。Composer 容器现提升到 `z-20`；模式和 `+`
+  素材菜单均可在会话媒体之上显示，不改变菜单行为、生成逻辑或埋点。
+- 回归测试覆盖两层容器的层级关系。`npm run test`：394 passed、11 skipped、0 failed；
+  `npm run design:check` 与 `git diff --check` 通过。仍需登录态手测 390/768/1440px 的
+  Agent 模式菜单和 `+` 菜单，确认其覆盖结果媒体且可正常选择/关闭。
+
 ## 2026-09-17 生成设置与引用校验生产发布
 
 - 已提交并推送 `41b4f19 feat: unify generation settings and reference validation`；本地
@@ -1501,3 +2133,44 @@
   二次截图时网络超时，但此前公开页面和预览内容已读取，本地实现截图已完成。
 - GitHub HTTPS 在首次推送时持续连接超时；生产发布不受影响，功能提交及本条发布记录
   需要在连通恢复后完成 `origin/main` SHA 核验。
+
+## 2026-10-05 正式 GA 发布准备（用户已授权）
+
+- 用户明确授权准备并发布 Production。正式库已应用 `20261004232658_analytics_reporting`：新增两张分析表与索引/外键、RLS，仅服务端角色访问；Prisma 迁移历史已记录匹配源码的 SHA256。未复制测试用户/账单、未修改 Live Price CHECK。
+- Production 已新增 `NEXT_PUBLIC_GA_MEASUREMENT_ID=G-2PTWF8DJE2`、`NEXT_PUBLIC_GA_ENABLED=true`；正式 MP Secret 已有独立 Sensitive 配置，Live Checkout 开关回读为 true。Preview/Development 保留 Test 配置。
+- 本轮隔离 PostgreSQL 全量测试 508 passed / 2 skipped / 0 failed；TypeScript、lint quiet、design:check、diff check 通过。正式部署仍待执行；GA 后台登录浏览器连接恢复后核对增强采集设置。
+
+- Production 构建 `dpl_5ReqFC36CmGGfP9zf3BAqexZuA8S` 已 READY，使用 `--prod --skip-domain`；正式 Stripe 账户和六个 Live Price 的云端回读校验通过，上传文件中仅 `.env.example`。正式域名仍指向旧部署，待后台设置回读后提升。正式 GA 增强型衡量已通过已登录 UI 停用，以保持唯一安全页面采集与最小事件方案。
+
+## 2026-10-05 正式 GA 发布完成与验收边界
+
+- 正式域名 `https://www.flownana.com` 已绑定 Production READY
+  `dpl_5ReqFC36CmGGfP9zf3BAqexZuA8S`；提升后 `npm run smoke:prod` 全部通过。
+  上一节“部署/提升待执行”为准备时历史状态，本节覆盖。Test 入口仍为 Preview READY
+  `dpl_CdrS72RGKBgcZZP68TLkBk7iMhzY`，配置、库、Stripe/GA 未与正式混用。
+- 正式 Stripe Webhook 只读回查 enabled、Live，指向正式 `/api/webhooks/stripe`，
+  十类账单/订阅事件保留；构建已校验六个 Live Price。未执行真实扣款、未修改付款事实。
+- 正式无痕浏览器实测允许统计：POST analytics/context 200、page_view 和 pricing_view
+  的 Google collect 204，目标 G-2PTWF8DJE2，安全 URL/标题与 yearly 参数正确，广告
+  个性化仍关闭。policy 200、private/no-store/Vary 正确；test-env 404。
+- 浏览器解锁后控制仍返回旧画面/定位错误；本轮正式 GA 后台收件与线上撤回暂未回读，
+  不能将网络 204 当作后台收件。真实注册、付款、成功生成同会话收件也保留人工验收。
+  新表权限/RLS 回读正确；现有 _prisma_migrations 有 RLS 无策略信息级提示，与新增表无关。
+- PRODUCT 已同步正式发布授权；方案、测试环境和验收文档已同步最新状态，历史快照
+  不作为当前未上线结论。本轮部署当前工作区，未创建 Git 提交/推送；部署后的文档
+  更新在本地，未重新部署纯文档记录。
+
+## 2026-10-05 保存已发布代码与旧埋点复核
+
+- 用户明确要求提交、推送本次已发布代码。批次保存当前 Production 运行源码，
+  同时包括此前已发布但未提交的 Pricing/导航、付款返回与恢复、Live/Test 支付隔离、
+  旧页面/无引用旧组件清理，以及本轮六事件 GA、分析迁移、地域策略和独立测试配置。
+  不增加业务范围，不新增发布或真实扣款；正式后台收件等验收边界保持上节记录。
+- 本轮静态复核 app/components/lib：旧 landing/signup/pricing/checkout/purchase、
+  生成过程、模板、Agent 与下载事件均无 GA 发射点；客户端仅允许 page_view、
+  pricing_view、begin_checkout，服务端仅允许 sign_up、purchase、generation_completed。
+  generation_failed 仍作为业务错误码使用，不是上报事件；旧 GA 历史数据不删除。
+- PRODUCT 中 Pricing 和失败诊断的旧事件表述已同步，历史契约明确标为已切换。
+  已运行的回归证据为 508 passed/2 skipped/0 failed、静态检查与正式发布冒烟通过；
+  本轮未改变运行代码，提交前另核对 diff 格式、候选文件凭据与远端分歧。
+  提交与推送是否完成以最终 Git/远端 SHA 核验为准，不把本条计划当作推送成功证据。

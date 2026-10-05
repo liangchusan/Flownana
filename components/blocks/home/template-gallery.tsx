@@ -1,5 +1,3 @@
-import { useEffect, useRef } from "react";
-import { trackEvent } from "@/lib/analytics";
 import Image from "next/image";
 
 const templates = [
@@ -86,20 +84,8 @@ const templates = [
 ];
 
 export function TemplateGallery({ onSelect }: { onSelect?: (id: string) => void }) {
-  const root = useRef<HTMLElement>(null);
-  const viewed = useRef(new Set<string>());
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        const id = (entry.target as HTMLElement).dataset.templateId;
-        if (entry.isIntersecting && id && !viewed.current.has(id)) { viewed.current.add(id); trackEvent("template_view", { template_id: id }); }
-      }
-    }, { threshold: 0.5 });
-    root.current?.querySelectorAll("[data-template-id]").forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
-  }, []);
   return (
-    <section ref={root} aria-labelledby="templates-heading" className="px-4 pb-12 md:px-8 md:pb-16">
+    <section aria-labelledby="templates-heading" className="px-4 pb-12 md:px-8 md:pb-16">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-4">
           <h2 id="templates-heading" className="font-display text-xl font-medium tracking-[-0.02em] text-foreground">Templates</h2>

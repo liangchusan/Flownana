@@ -10,6 +10,7 @@ export type ClientBillingSummary = {
     currentPeriodEnd?: string;
     cancelAtPeriodEnd?: boolean;
   } | null;
+  paymentIssue: { status: string; plan: string | null } | null;
   credits: {
     current: number;
     expiringSoon?: number;
@@ -18,7 +19,7 @@ export type ClientBillingSummary = {
 };
 
 const SUMMARY_CACHE_TTL_MS = 60_000;
-const SUMMARY_STORAGE_KEY = "flownana_billing_summary_cache_v2";
+const SUMMARY_STORAGE_KEY = "flownana_billing_summary_cache_v3";
 const SUMMARY_INVALIDATION_KEY = "flownana_billing_summary_invalidated";
 const cache = new Map<string, { summary: ClientBillingSummary; cachedAt: number }>();
 const requests = new Map<string, Promise<ClientBillingSummary | null>>();
@@ -51,6 +52,7 @@ function isSummary(value: unknown): value is ClientBillingSummary {
   if (!value || typeof value !== "object") return false;
   const data = value as ClientBillingSummary;
   return !!data.credits && Number.isFinite(data.credits.current) && data.credits.current >= 0 &&
+    (data.paymentIssue === null || (!!data.paymentIssue && typeof data.paymentIssue.status === "string")) &&
     (data.subscription === null || (!!data.subscription && typeof data.subscription.planType === "string" &&
       typeof data.subscription.billingCycle === "string" && typeof data.subscription.status === "string"));
 }
@@ -79,6 +81,7 @@ export function clearCachedBillingSummary() {
   // Storage is an optional optimization; it must never prevent signOut.
   try {
     window.localStorage.removeItem(SUMMARY_STORAGE_KEY);
+    window.localStorage.removeItem("flownana_billing_summary_cache_v2");
     window.localStorage.removeItem("flownana_billing_summary_cache_v1");
     window.localStorage.setItem(SUMMARY_INVALIDATION_KEY, `${Date.now()}:${Math.random()}`);
   } catch {}

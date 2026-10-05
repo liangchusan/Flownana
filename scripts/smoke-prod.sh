@@ -61,9 +61,9 @@ expect_status GET /home 404
 expect_status GET /image 200
 expect_status GET /video 200
 expect_status GET /assets 200
-expect_status GET /ai-image 308
-expect_status GET /ai-video 308
-expect_status GET /ai-music 308
+expect_status GET /ai-image 404
+expect_status GET /ai-video 404
+expect_status GET /ai-music 404
 expect_status GET /videos/flownana-home-demo.mp4 200
 expect_status GET /api/billing/summary 401
 expect_status GET '/api/creations?type=image' 401

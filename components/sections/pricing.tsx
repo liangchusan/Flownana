@@ -1,4 +1,6 @@
-import Link from "next/link";
+"use client";
+
+import { usePricingModal } from "@/components/pricing/pricing-modal-provider";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
 
@@ -35,6 +37,7 @@ const plans = [
 ];
 
 export function Pricing() {
+  const { openPricing } = usePricingModal();
   return (
     <section className="bg-background px-4 py-20 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -91,14 +94,9 @@ export function Pricing() {
                 ))}
               </ul>
 
-              <Link href="/pricing" className="block">
-                <Button
-                  className="w-full"
-                  variant={plan.popular ? "default" : "outline"}
-                >
-                  View plans
-                </Button>
-              </Link>
+              <Button className="w-full" variant={plan.popular ? "default" : "outline"} onClick={openPricing}>
+                View plans
+              </Button>
             </div>
           ))}
         </div>

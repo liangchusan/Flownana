@@ -1,6 +1,8 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { cookies } from "next/headers";
+import { ANALYTICS_COOKIE, readAnalyticsContext, serverMeasurementId } from "@/lib/analytics-server";
 import { prisma } from "@/lib/prisma";
 import {
   getTestAuthCreditAmount,
@@ -157,6 +159,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             image: user.image,
+            analyticsContext: account?.provider === "google" && serverMeasurementId() ? readAnalyticsContext((await cookies()).get(ANALYTICS_COOKIE)?.value) : null,
           });
           user.accountCreatedAt = profile.createdAt.toISOString();
           return true;

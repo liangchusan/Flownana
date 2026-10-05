@@ -17,7 +17,6 @@ import { Logo } from "@/components/ui/logo";
 import { CreditsWidget } from "@/components/creation/credits-widget";
 import { UserMenu } from "@/components/layout/user-menu";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
-import { trackEvent } from "@/lib/analytics";
 import {
   WORKSPACE_PATHS,
   type WorkspaceDestination,
@@ -124,7 +123,7 @@ export function WorkspaceSidebar({
               <UserMenu align="left" compact={collapsed} variant="sidebar" user={{ name: session.user?.name, email: session.user?.email, image: session.user?.image }} />
             </div>
           ) : (
-            <button type="button" onClick={() => { trackEvent("signup_started", { source: "sidebar_avatar" }); signInForCurrentEnvironment(); }} className={`flex h-10 w-full items-center rounded-ui text-sm text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${collapsed ? "lg:justify-center" : "gap-2 px-3"}`}>
+            <button type="button" onClick={() => {  signInForCurrentEnvironment(); }} className={`flex h-10 w-full items-center rounded-ui text-sm text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${collapsed ? "lg:justify-center" : "gap-2 px-3"}`}>
               <UserCircle className="h-5 w-5" /><span className={collapsed ? "lg:hidden" : ""}>Sign in</span>
             </button>
           )}

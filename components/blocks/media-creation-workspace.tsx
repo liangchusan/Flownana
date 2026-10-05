@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { PanelLoading } from "@/components/ui/panel-loading";
 import { Footer } from "@/components/layout/footer";
-import { trackEvent } from "@/lib/analytics";
 import { TemplateGallery } from "@/components/blocks/home/template-gallery";
 import { Modal } from "@/components/ui/modal";
 import { PanelRight, X } from "lucide-react";
@@ -130,7 +129,6 @@ function ScopedMediaCreationWorkspace({
   const scrollRef = useRef<HTMLDivElement>(null);
   const preservedScrollTopRef = useRef<number | null>(null);
   const mutationRevision = useRef(0);
-  const templateOutputs = useRef(new Set<string>());
   const creationTimelineKey = getCreationTimelineKey(creations);
 
   useLayoutEffect(() => {
@@ -176,19 +174,6 @@ function ScopedMediaCreationWorkspace({
     setDetailsRun(null);
     setDetailsOpen(false);
   }, [pathname, composerType]);
-
-  useEffect(() => {
-    for (const creation of creations) {
-      if (!creation.parameters?.templateId || creation.parameters.agentConversationId) continue;
-      if (["pending", "generating", "processing"].includes(creation.status)) templateOutputs.current.add(creation.id);
-      if (templateOutputs.current.has(creation.id) && ["success", "failed"].includes(creation.status)) {
-        templateOutputs.current.delete(creation.id);
-        const key = `template-result:${accountScope}:${creation.id}`;
-        try { if (sessionStorage.getItem(key)) continue; sessionStorage.setItem(key, "1"); } catch { /* In-memory de-duplication remains available. */ }
-        trackEvent(creation.status === "success" ? "generation_success" : "generation_failed", { type: "image", template_id: creation.parameters.templateId, output_index: creation.parameters.outputIndex, model: creation.parameters.model });
-      }
-    }
-  }, [creations, accountScope]);
 
   const activeGenerationCount = creations.filter((creation) => ["pending", "generating", "processing"].includes(creation.status) && !(creation.optimistic && creation.statusUncertain && !creation.taskId)).length;
 
@@ -267,8 +252,7 @@ function ScopedMediaCreationWorkspace({
   const restoreCreation = (creation: CreationHistoryItem) => {
     if (creation.parameters?.templateId && ["success", "failed"].includes(creation.status)) {
       router.push(`/agent?template=${encodeURIComponent(creation.parameters.templateId)}&source=${encodeURIComponent(creation.id)}`);
-      trackEvent("variant_selected", { template_id: creation.parameters.templateId, output_index: creation.parameters.outputIndex });
-      if (creation.status === "success") trackEvent("continued_edit", { template_id: creation.parameters.templateId });
+
       return;
     }
     if (creation.type === "music") {
@@ -441,7 +425,7 @@ function ScopedMediaCreationWorkspace({
                   {agentMode ? <AgentComposer onModeChange={(type) => { setAgentMode(false); setType(type); }} /> : composer}
                 </div>
               </div>
-              {isHome && <TemplateGallery onSelect={(id) => { trackEvent("template_click", { template_id: id }); router.push(`/agent?template=${encodeURIComponent(id)}`); }} />}
+              {isHome && <TemplateGallery onSelect={(id) => {  router.push(`/agent?template=${encodeURIComponent(id)}`); }} />}
               {isHome && sessionStatus === "unauthenticated" && <Footer variant="light" />}
             </main>
             {detailsRun && detailsOpen && <DetailsPanel run={detailsRun} onClose={() => setDetailsOpen(false)} />}

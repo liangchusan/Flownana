@@ -1,6 +1,7 @@
 {
   "regions": ["hnd1"],
   "crons": [
+    { "path": "/api/cron/analytics", "schedule": "0 7 * * *" },
     {
       "path": "/api/cron/monthly-credits",
       "schedule": "0 8 * * *"

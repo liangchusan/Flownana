@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import { AnalyticsEvents } from "@/components/analytics/analytics-events";
-import { GA_MEASUREMENT_ID } from "@/lib/analytics";
+import { AnalyticsPreferences } from "@/components/analytics/analytics-preferences";
+import { measurementIdForEnvironment } from "@/lib/analytics-policy";
 
 export const metadata: Metadata = {
   title: "Flownana - AI Image & Video Generation",
@@ -22,26 +22,10 @@ export default function RootLayout({
         <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body className="font-sans">
-        {GA_MEASUREMENT_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
-            />
-            <Script id="ga4-init" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                window.gtag = gtag;
-                gtag('js', new Date());
-                gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
-              `}
-            </Script>
-          </>
-        )}
         <Providers>
           <Suspense fallback={null}>
-            <AnalyticsEvents />
+            <AnalyticsEvents measurementAllowed={Boolean(measurementIdForEnvironment(process.env.VERCEL_ENV, process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID))} />
+            <AnalyticsPreferences />
           </Suspense>
           {children}
         </Providers>

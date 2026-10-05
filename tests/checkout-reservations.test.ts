@@ -20,6 +20,10 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     }
   }
   process.env.STRIPE_WEBHOOK_SECRET = "isolated_webhook_fixture";
+  // These are Live-shaped fault-injection fixtures; every Stripe call is replaced.
+  process.env.VERCEL_ENV = "production";
+  process.env.STRIPE_SECRET_KEY = "sk_live_isolated_fixture_only";
+  process.env.STRIPE_LIVE_CHECKOUT_ENABLED = "true";
 
   async function fixture() {
     const id = `reservation_test_${randomUUID()}`;
@@ -50,6 +54,8 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
             sessions.set(sessionId, { id: sessionId, mode: "subscription", status: "open", payment_status: "unpaid", livemode: true,
               created: Math.floor(Date.now() / 1000), expires_at: params.expires_at, metadata: params.metadata,
               client_reference_id: params.client_reference_id, customer: params.customer || null,
+              currency: "usd", amount_subtotal: prices[params.line_items[0].price].unit_amount,
+              total_details: { amount_discount: [...couponRequests.values()].find(coupon => coupon.id === params.discounts?.[0]?.coupon)?.amount_off || 0 },
               url: `https://checkout.example/${sessionId}` });
             peakOpen = Math.max(peakOpen, [...sessions.values()].filter((session) => session.status === "open").length);
           }
@@ -129,9 +135,20 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     try {
       const replies = await Promise.all(Array.from({ length: 10 }, () => f.routePost()));
       assert.ok(replies.every((reply) => reply.status === 200));
-      const urls = await Promise.all(replies.map((reply) => reply.json().then((data: any) => data.url)));
+      const bodies = await Promise.all(replies.map(reply => reply.json()));
+      const urls = bodies.map(data => data.url);
       assert.equal(new Set(urls).size, 1); assert.equal(f.creates(), 1); assert.equal(f.peakOpen(), 1);
+      assert.equal(new Set(bodies.map(data => data.checkout.id)).size, 1);
+      for (const data of bodies) {
+        assert.equal(data.checkout.event.value, 16); assert.equal(data.checkout.event.currency, "USD");
+        assert.deepEqual(data.checkout.event.items, [{ item_id: "starter_monthly", item_name: "starter monthly", price: 16, quantity: 1 }]);
+      }
       assert.equal(await db.checkoutReservation.count({ where: { userId: f.user.id, closedAt: null } }), 1);
+      const request = [...f.requests.values()][0].params;
+      assert.equal(request.customer, f.user.stripeCustomerId);
+      assert.equal(request.customer_email, undefined);
+      assert.deepEqual(request.saved_payment_method_options,
+        { payment_method_save: "enabled", allow_redisplay_filters: ["always"] });
     } finally { await f.cleanup(); }
   });
 
@@ -146,6 +163,10 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
       f.faults({ hideSessions: false });
       const restored = await f.create("pro_yearly", "upgrade");
       assert.match(restored.url, /checkout\.example/); assert.equal(f.creates(), 1); assert.equal(f.couponRequests.size, 1);
+      const request = [...f.requests.values()][0].params;
+      assert.equal(request.customer, f.user.stripeCustomerId);
+      assert.deepEqual(request.saved_payment_method_options,
+        { payment_method_save: "enabled", allow_redisplay_filters: ["always"] });
       assert.deepEqual((await db.checkoutReservation.findUniqueOrThrow({ where: { id: row.id } })).sessionParams, row.sessionParams);
     } finally { await f.cleanup(); }
   });
@@ -268,6 +289,12 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
       f.sessions.set(legacy.id, legacy);
       await f.create();
       assert.equal(legacy.status, "expired"); assert.equal(f.peakOpen(), 1);
+      const request = [...f.requests.values()][0].params;
+      assert.equal(request.customer, undefined);
+      assert.equal(request.customer_email, f.user.email);
+      assert.equal(request.customer_creation, undefined, "Subscription Checkout creates its Customer at confirmation");
+      assert.deepEqual(request.saved_payment_method_options,
+        { payment_method_save: "enabled", allow_redisplay_filters: ["always"] });
     } finally { await f.cleanup(); }
   });
 
@@ -281,7 +308,8 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     } finally { await f.cleanup(); }
   });
 
-  await t.test("quote retries retain the reserved price; annual credit grant expires that quote before issuing its value", async () => {
+  await t.test("quote retries retain the reserved price; annual credit grant expires that quote before issuing its value", async subtest => {
+    subtest.mock.timers.enable({ apis: ["Date"], now: Date.parse("2026-08-15T00:00:00Z") });
     const f = await fixture();
     try {
       const old = await f.predecessor(); await f.create("pro_yearly", "upgrade");

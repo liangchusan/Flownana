@@ -9,12 +9,16 @@ import {
 
 export async function getBillingSummary(userId: string, accountCreatedAt?: string) {
   return withBillingUser(userId, async (tx, user) => {
-    const [sub, credits] = await Promise.all([
+    const [sub, paymentIssue, credits] = await Promise.all([
       tx.subscription.findFirst({
         where: {
           userId,
           status: { in: ["active", "trialing"] },
         },
+        orderBy: { createdAt: "desc" },
+      }),
+      tx.subscription.findFirst({
+        where: { userId, status: { in: ["incomplete", "past_due", "unpaid", "paused"] } },
         orderBy: { createdAt: "desc" },
       }),
       getCreditSummary(userId, tx),
@@ -37,6 +41,8 @@ export async function getBillingSummary(userId: string, accountCreatedAt?: strin
             cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
           }
         : null,
+      paymentIssue: paymentIssue ? { status: paymentIssue.status,
+        plan: getPriceKeyFromStripePriceId(paymentIssue.stripePriceId)?.key ?? null } : null,
       credits: {
         current: credits.total,
         expiringSoon: credits.expiringSoon,

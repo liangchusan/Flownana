@@ -37,34 +37,32 @@ export function UpgradeModal({
   const [amountLine, formulaLine, noteLine] = (chargeLine ?? "").split("\n");
 
   return (
-    <Modal onClose={onClose} aria-labelledby="upgrade-dialog-title" className="fixed inset-0 z-[80] flex items-end justify-center bg-foreground/30 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-      <section
-        className="relative w-full rounded-t-ui-xl border border-border bg-background p-5 shadow-float sm:max-w-lg sm:rounded-ui-xl sm:p-7"
-      >
+    <Modal onClose={onClose} aria-labelledby="upgrade-dialog-title" className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-surface-soft/95 px-4 py-16 backdrop-blur-sm">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-ui text-muted-foreground transition-all duration-300 hover:bg-surface-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="fixed right-3 top-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-surface-soft text-muted-foreground transition-all duration-300 hover:bg-surface-strong hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:right-5 sm:top-5"
           aria-label="Close upgrade confirmation"
         >
           <X className="h-5 w-5" />
         </button>
+      <section
+        className="w-full max-w-xl max-h-[calc(100dvh-8rem)] overflow-y-auto rounded-ui-xl border border-border bg-background p-6 sm:p-8"
+      >
 
-        <p className="mb-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">
-          Confirm change
-        </p>
-        <h2 id="upgrade-dialog-title" className="pr-10 text-xl font-medium text-foreground">
+
+        <h2 id="upgrade-dialog-title" className="text-center text-2xl font-medium text-foreground sm:text-3xl">
           Upgrade your plan
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Review the plan, billing period, credits, and amount before continuing.
+        <p className="mt-3 text-center text-sm leading-relaxed text-muted-foreground">
+          A little more room to create. Review your upgrade below.
         </p>
 
         {currentPlan && targetPlan && (
-          <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-ui-lg bg-surface-soft p-4">
+          <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-ui-xl border border-border bg-surface-soft/50 p-4 sm:p-5">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Current</p>
-              <p className="mt-1 truncate text-sm font-semibold text-foreground">
+              <p className="mt-1 text-sm font-semibold text-foreground">
                 {currentPlan}
               </p>
               {currentPrice && (
@@ -74,7 +72,7 @@ export function UpgradeModal({
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
             <div className="min-w-0 text-right">
               <p className="text-xs text-muted-foreground">New plan</p>
-              <p className="mt-1 truncate text-sm font-semibold text-foreground">
+              <p className="mt-1 text-sm font-semibold text-foreground">
                 {targetPlan}
               </p>
               {targetPrice && (
@@ -100,15 +98,15 @@ export function UpgradeModal({
         </div>
 
         {isLoadingQuote && (
-          <div className="mt-4 animate-pulse rounded-ui-lg bg-surface-soft p-4">
+          <div role="status" aria-label="Calculating upgrade price" className="mt-4 animate-pulse rounded-ui-xl bg-surface-soft p-5">
             <div className="h-5 w-40 rounded bg-surface-strong" />
             <div className="mt-3 h-3 w-full rounded bg-surface-strong" />
           </div>
         )}
 
         {!isLoadingQuote && chargeLine && (
-          <div className="mt-4 rounded-ui-lg border border-primary/20 bg-primary/5 px-4 py-4">
-            <p className="text-base font-semibold text-foreground">{amountLine}</p>
+          <div className="mt-4 rounded-ui-xl border border-brand-blue/25 bg-brand-blue-soft/40 p-5">
+            <p className="text-2xl font-medium tracking-tight text-foreground" aria-live="polite">{amountLine}</p>
             {formulaLine && (
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 {formulaLine}
@@ -123,7 +121,7 @@ export function UpgradeModal({
         )}
 
         {!isLoadingQuote && error && (
-          <p className="mt-4 rounded-ui-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <p role="alert" className="mt-4 rounded-ui-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
           </p>
         )}
@@ -139,11 +137,12 @@ export function UpgradeModal({
           </p>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
+        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row">
+          <Button className="h-11 sm:flex-1" variant="outline" onClick={onClose}>
+            Back to plans
           </Button>
           <Button
+            className="h-11 bg-brand-blue text-background hover:bg-brand-blue/90 active:bg-brand-blue/80 sm:flex-[2]"
             onClick={onConfirm}
             disabled={!!isLoadingQuote || !!error || !chargeLine}
           >

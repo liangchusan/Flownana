@@ -1,53 +1,73 @@
 "use client";
-
-import { useEffect, useRef } from "react";
+import Script from "next/script";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { trackEvent, trackPageView } from "@/lib/analytics";
+import { usePathname } from "next/navigation";
+import { captureAnalyticsContext, GA_ENABLED, GA_MEASUREMENT_ID, hasAnalyticsConsent, reconcileAnalyticsRevocation, setTagDisabled, trackPageView } from "@/lib/analytics";
+import { allowedAnalyticsHost, safePage, TEST_GA_ID } from "@/lib/analytics-policy";
+import { ACCOUNT_SCOPE_HEADER, getAccountScope } from "@/lib/account-scope";
 
-export function AnalyticsEvents() {
+export function AnalyticsEvents({ measurementAllowed }: { measurementAllowed: boolean }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const { status } = useSession();
-  const trackedSignupCompleted = useRef(false);
-  const trackedPurchases = useRef(new Set<string>());
-
+  const { data: session } = useSession();
+  const scope = getAccountScope(session?.user);
+  const [enabled, setEnabled] = useState(false);
+  const [ready, setReady] = useState(false);
+  const lastPage = useRef<string | null>(null);
   useEffect(() => {
-    const query = searchParams.toString();
-    const path = query ? `${pathname}?${query}` : pathname;
-    trackPageView(path);
-
-    if (pathname === "/") {
-      trackEvent("landing_page_view");
-    }
-    if (pathname === "/pricing") {
-      trackEvent("pricing_viewed");
-    }
-
-    const checkoutSuccess = searchParams.get("checkout") === "success";
-    const upgradeSuccess = searchParams.get("upgrade") === "success";
-    if (pathname === "/account/billing" && (checkoutSuccess || upgradeSuccess)) {
-      const key = `${path}:${checkoutSuccess ? "checkout" : "upgrade"}`;
-      if (!trackedPurchases.current.has(key)) {
-        trackedPurchases.current.add(key);
-        trackEvent("purchase_success", {
-          purchase_type: checkoutSuccess ? "new_subscription" : "upgrade",
-          from: searchParams.get("from"),
-          to: searchParams.get("to"),
-          payable_cents: Number(searchParams.get("payable") || "0"),
-          credit_cents: Number(searchParams.get("credit") || "0"),
-          currency: searchParams.get("currency") || "usd",
-        });
+    const retryWithdrawal = () => { void reconcileAnalyticsRevocation(); };
+    retryWithdrawal();
+    window.addEventListener("online", retryWithdrawal);
+    const timer = window.setInterval(retryWithdrawal, 60_000);
+    return () => { window.removeEventListener("online", retryWithdrawal); window.clearInterval(timer); };
+  }, []);
+  useEffect(() => {
+    const update = () => {
+      const allowed = measurementAllowed && GA_ENABLED && !!GA_MEASUREMENT_ID &&
+        allowedAnalyticsHost(GA_MEASUREMENT_ID, window.location.hostname) && hasAnalyticsConsent();
+      setTagDisabled(!allowed);
+      setEnabled(allowed);
+      if (!allowed) {
+        lastPage.current = null;
+        window.gtag?.("consent", "update", { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+        return;
       }
-    }
-  }, [pathname, searchParams]);
-
+      if (window.gtag) {
+        window.gtag("consent", "update", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+        return;
+      }
+      window.dataLayer = window.dataLayer || [];
+      // gtag.js consumes the official arguments object; plain arrays are ignored.
+      window.gtag = function () { window.dataLayer!.push(arguments); };
+      window.gtag("consent", "default", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+      window.gtag("js", new Date());
+      window.gtag("config", GA_MEASUREMENT_ID, { send_page_view: false, allow_google_signals: false,
+        allow_ad_personalization_signals: false, ...safePage(window.location.href, window.location.origin, document.referrer),
+        ...(GA_MEASUREMENT_ID === TEST_GA_ID ? { debug_mode: true } : {}) });
+    };
+    update();
+    window.addEventListener("flownana:analytics-consent", update);
+    window.addEventListener("storage", update);
+    return () => { window.removeEventListener("flownana:analytics-consent", update); window.removeEventListener("storage", update); };
+  }, [measurementAllowed]);
   useEffect(() => {
-    if (status === "authenticated" && !trackedSignupCompleted.current) {
-      trackedSignupCompleted.current = true;
-      trackEvent("signup_completed");
-    }
-  }, [status]);
-
-  return null;
+    if (!enabled || !ready || lastPage.current === pathname) return;
+    window.gtag?.("config", GA_MEASUREMENT_ID, { send_page_view: false, ...safePage(window.location.href, window.location.origin, document.referrer) });
+    if (trackPageView(window.location.href)) lastPage.current = pathname;
+  }, [pathname, ready, enabled]);
+  useEffect(() => {
+    if (!enabled || !ready) return;
+    const abort = new AbortController();
+    const sync = async () => {
+      const context = await captureAnalyticsContext();
+      if (context && !abort.signal.aborted && hasAnalyticsConsent()) await fetch("/api/analytics/context", {
+        method: "POST", headers: { "Content-Type": "application/json", ...(scope ? { [ACCOUNT_SCOPE_HEADER]: scope } : {}) },
+        body: JSON.stringify(context), signal: abort.signal,
+      }).catch(() => undefined);
+    };
+    void sync();
+    const timer = window.setInterval(() => { void sync(); }, 60_000);
+    return () => { abort.abort(); window.clearInterval(timer); };
+  }, [scope, enabled, ready]);
+  return enabled && GA_MEASUREMENT_ID ? <Script id="flownana-google-tag" src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} strategy="afterInteractive" onReady={() => setReady(true)} /> : null;
 }
