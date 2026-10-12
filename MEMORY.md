@@ -1,5 +1,20 @@
 # Flownana 工程记忆
 
+## 2026-10-12 正式发布结果
+
+- 全部53个本地变更已提交b489166并推送main，Vercel Git生产发布
+  dpl_7pzv8vSStncgJCkabCYSUAewPx6m已READY，正式别名www.flownana.com/flownana.com。
+  构建49秒；npm run smoke:prod全部通过，按该部署近10分钟error/fatal日志为空。
+- 生产/api/analytics/policy实际返回US/defaultAnalytics=true/defaultAdvertising=true，
+  广告接口enabled=true。现有生产报告仍2条transmitted，无待投递积压。
+- 告警表已正式迁移，RLS/权限回读和真实Prisma回滚检查通过。当前生产CRON_SECRET
+  已配置但本地不可用，未执行认证worker/health实测；告警发送变量未配置，邮件通知
+  与外部心跳探测仍未启用。cron依然每日，不把代码发布称为告警渠道完整落地。
+- npm audit生产依赖0 high/0 critical，3 moderate来自global-agent/roarr/sprintf-js，
+  没有可用修复版本；未扩展到替换代理架构。真实登录绑定、换号、增强购买Google/
+  Ads收件、大视频及移动Safari下载仍需手工验收。Test库连接超时限制保留。
+- 本条发布记录随后单独提交/推送；文档提交可能触发同代码新部署，最终结果以回读为准。
+
 ## 2026-10-12 全部本地改动发布授权与检查
 
 - 用户明确批准检查、全部提交、推送及生产发布，包含此前同意/默认地区、告警恢复、
