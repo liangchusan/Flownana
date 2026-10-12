@@ -1,11 +1,12 @@
 "use client";
 import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { captureAnalyticsContext, GA_ENABLED, GA_MEASUREMENT_ID, hasAnalyticsConsent, reconcileAnalyticsRevocation, setTagDisabled, trackPageView } from "@/lib/analytics";
 import { allowedAnalyticsHost, safePage, TEST_GA_ID } from "@/lib/analytics-policy";
 import { ACCOUNT_SCOPE_HEADER, getAccountScope } from "@/lib/account-scope";
+import { ADVERTISING_EVENT, bindAdvertisingAccount, ensureDefaultAdvertising, hasAdvertisingConsent, reconcileAdvertisingWithdrawal, refreshAdvertisingConsent } from "@/lib/advertising-consent";
 
 export function AnalyticsEvents({ measurementAllowed }: { measurementAllowed: boolean }) {
   const pathname = usePathname();
@@ -14,8 +15,9 @@ export function AnalyticsEvents({ measurementAllowed }: { measurementAllowed: bo
   const [enabled, setEnabled] = useState(false);
   const [ready, setReady] = useState(false);
   const lastPage = useRef<string | null>(null);
+  useLayoutEffect(() => { bindAdvertisingAccount(scope); void refreshAdvertisingConsent(); }, [scope]);
   useEffect(() => {
-    const retryWithdrawal = () => { void reconcileAnalyticsRevocation(); };
+    const retryWithdrawal = () => { void reconcileAnalyticsRevocation(); void reconcileAdvertisingWithdrawal(); };
     retryWithdrawal();
     window.addEventListener("online", retryWithdrawal);
     const timer = window.setInterval(retryWithdrawal, 60_000);
@@ -33,13 +35,15 @@ export function AnalyticsEvents({ measurementAllowed }: { measurementAllowed: bo
         return;
       }
       if (window.gtag) {
-        window.gtag("consent", "update", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+        const ads = hasAdvertisingConsent() ? "granted" : "denied";
+        window.gtag("consent", "update", { analytics_storage: "granted", ad_storage: ads, ad_user_data: ads, ad_personalization: "denied" });
         return;
       }
       window.dataLayer = window.dataLayer || [];
       // gtag.js consumes the official arguments object; plain arrays are ignored.
       window.gtag = function () { window.dataLayer!.push(arguments); };
-      window.gtag("consent", "default", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+      const defaultAds = hasAdvertisingConsent() ? "granted" : "denied";
+      window.gtag("consent", "default", { analytics_storage: "granted", ad_storage: defaultAds, ad_user_data: defaultAds, ad_personalization: "denied" });
       window.gtag("js", new Date());
       window.gtag("config", GA_MEASUREMENT_ID, { send_page_view: false, allow_google_signals: false,
         allow_ad_personalization_signals: false, ...safePage(window.location.href, window.location.origin, document.referrer),
@@ -48,7 +52,11 @@ export function AnalyticsEvents({ measurementAllowed }: { measurementAllowed: bo
     update();
     window.addEventListener("flownana:analytics-consent", update);
     window.addEventListener("storage", update);
-    return () => { window.removeEventListener("flownana:analytics-consent", update); window.removeEventListener("storage", update); };
+    window.addEventListener(ADVERTISING_EVENT, update);
+    const refresh = () => { void refreshAdvertisingConsent(); };
+    window.addEventListener("storage", refresh);
+    return () => { window.removeEventListener("flownana:analytics-consent", update); window.removeEventListener("storage", update);
+      window.removeEventListener("storage", refresh); window.removeEventListener(ADVERTISING_EVENT, update); };
   }, [measurementAllowed]);
   useEffect(() => {
     if (!enabled || !ready || lastPage.current === pathname) return;
@@ -60,10 +68,13 @@ export function AnalyticsEvents({ measurementAllowed }: { measurementAllowed: bo
     const abort = new AbortController();
     const sync = async () => {
       const context = await captureAnalyticsContext();
-      if (context && !abort.signal.aborted && hasAnalyticsConsent()) await fetch("/api/analytics/context", {
+      if (context && !abort.signal.aborted && hasAnalyticsConsent()) {
+        const response = await fetch("/api/analytics/context", {
         method: "POST", headers: { "Content-Type": "application/json", ...(scope ? { [ACCOUNT_SCOPE_HEADER]: scope } : {}) },
         body: JSON.stringify(context), signal: abort.signal,
-      }).catch(() => undefined);
+        }).catch(() => undefined);
+        if (response?.ok && !abort.signal.aborted && hasAnalyticsConsent()) await ensureDefaultAdvertising();
+      }
     };
     void sync();
     const timer = window.setInterval(() => { void sync(); }, 60_000);

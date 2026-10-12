@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { matchesRequestAccount } from "@/lib/account-scope";
 import { ANALYTICS_COOKIE, allowedAnalyticsHost, validContext } from "@/lib/analytics-policy";
-import { permitsAnalyticsContext } from "@/lib/analytics-collection-policy";
+import { analyticsCollectionPolicy, permitsAnalyticsContext } from "@/lib/analytics-collection-policy";
 import { analyticsEnvironment, contextFromRequest, saveAnalyticsContext, scheduleAnalyticsReports, serverMeasurementId, signAnalyticsContext } from "@/lib/analytics-server";
 export const dynamic = "force-dynamic";
 function sameOrigin(request: Request) { return request.headers.get("origin") === new URL(request.url).origin; }
@@ -17,6 +17,9 @@ export async function POST(request: Request) {
   if (!permitsAnalyticsContext(request.headers, context.collectionBasis)) return NextResponse.json({ error: "Collection disabled" }, { status: 403 });
   // Timestamp is assigned by the server, never accepted as consent evidence from a future client clock.
   context.capturedAt = Date.now();
+  delete context.collectionCountry;
+  const country = analyticsCollectionPolicy(request.headers).country;
+  if (country) context.collectionCountry = country;
   const signature = signAnalyticsContext(context);
   if (!signature) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
   const session = await getServerSession(authOptions);

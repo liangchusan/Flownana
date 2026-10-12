@@ -1,11 +1,12 @@
 import { LegalHeader } from "@/components/layout/legal-header";
+import { PrivacySettingsTrigger } from "@/components/analytics/privacy-settings-trigger";
 
 export const metadata = {
   title: "Privacy Policy | Flownana",
 };
 
 export default function PrivacyPolicyPage() {
-  const lastUpdated = "October 5, 2026";
+  const lastUpdated = "October 12, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,17 +62,39 @@ export default function PrivacyPolicyPage() {
             We use Google Analytics to measure visits, account creation, pricing interest, checkout, verified
             purchases, and successful image or video creation. Google receives cookie identifiers, session
             identifiers, limited page information, and relevant transaction amounts and product names.
-            We do not send your prompts, uploaded content, email address, payment card details, or account ID to Analytics.
+            We do not send your prompts, uploaded content, raw email address, payment card details, or account ID to Analytics.
             Google signals and ad personalization are disabled in this measurement setup.
           </p>
           <p>
-            Basic analytics is enabled by default for visits identified as coming from the United States, Japan,
+            Analytics and ad measurement are enabled by default for visits identified as coming from
+            the United States or Taiwan, unless you have rejected them or sent Global Privacy Control.
+            We display a notice and you can choose Reject in Privacy settings at any time.
+            Other or unidentified regions require Allow. Default operation is recorded as a regional
+            policy, separately from an explicit Allow. After sign-in with a verified email,
+            we use advertising cookies and send Google a SHA-256 hashed version of your verified email
+            with verified purchases to match advertising interactions with purchases, including activity
+            before and after sign-in. A hashed email is still user data used for matching. This choice
+            is recorded for each purpose; it does not enable personalized advertising or remarketing.
+            Before sign-in, regional defaults or your Allow choice cover browser measurement without an email.
+            In eligible regions we bind measurement permission to your verified account automatically;
+            in other regions can choose Allow before sign-in. That choice lasts up to 180 days and binds only to the first verified account, so no second Allow is needed. Switching accounts does not reuse it. Reject withdraws both permissions.
+            We retain your account-bound permission and its version and time until withdrawal or account
+            deletion; a regional account permission expires after 180 days and its eligibility is
+            checked again before renewal. You can reject or withdraw without affecting sign-in, generation, or payment.
+            Withdrawal stops subsequent sharing once confirmed by our server; an already-started send
+            may finish first. If offline, we retry when online. Previously shared data is not automatically
+            deleted; contact us to request deletion. Google processes and retains data under its policies
+            and our configured retention period.
+          </p>
+          <p>
+            Basic analytics is enabled by default for visits identified as coming from the United States
             or Taiwan, unless you have rejected it. For other or unidentified regions, we ask you to choose first.
-            Global Privacy Control turns analytics off. Use the Privacy button to allow, reject, or withdraw analytics
+            Global Privacy Control turns analytics off. Open Privacy settings from the account menu, navigation, or website footer to allow, reject, or withdraw analytics
             at any time. This does not disable essential sign-in or payment functionality. Withdrawal stops future
             collection; it does not automatically delete information already sent. If you are offline, we retry the
             server withdrawal when your connection returns.
           </p>
+          <p><PrivacySettingsTrigger className="rounded-ui text-sm underline underline-offset-4 transition-all duration-300 hover:text-text-secondary active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open privacy settings</PrivacySettingsTrigger></p>
           <p>
             Google processes analytics information under its own policies. Learn more about
             {" "}<a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer">how Google uses information from partner sites</a>.

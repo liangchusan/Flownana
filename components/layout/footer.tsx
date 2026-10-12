@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PricingTrigger } from "@/components/pricing/pricing-trigger";
 import { Logo } from "@/components/ui/logo";
+import { PrivacySettingsTrigger } from "@/components/analytics/privacy-settings-trigger";
 
 export function Footer({ variant = "dark" }: { variant?: "dark" | "light" }) {
   const light = variant === "light";
@@ -64,8 +65,9 @@ export function Footer({ variant = "dark" }: { variant?: "dark" | "light" }) {
           </div>
         </div>
 
-        <div className={`mt-8 border-t pt-8 text-center text-sm ${light ? "border-border" : "border-white/10"}`}>
+        <div className={`mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t pt-8 text-center text-sm ${light ? "border-border" : "border-white/10"}`}>
           <p>Copyright © {new Date().getFullYear()} Flownana. All rights reserved.</p>
+          <PrivacySettingsTrigger className={`min-h-11 rounded-ui px-1 ${linkClassName}`} />
         </div>
       </div>
     </footer>

@@ -124,7 +124,7 @@ function ScopedAgentWorkspace({ id, templateId, sourceId }: { id?: string; templ
       const data = await res.json(); op.assertCurrent(); if (!res.ok) throw new Error(data.error); await poll();
     } catch (e) { if (!op.signal.aborted) setError(e instanceof Error ? e.message : "Retry failed."); } finally { setBusy(false); }
   };
-  return <div className="flex h-dvh overflow-hidden bg-background">
+  return <div className="workspace-viewport flex overflow-hidden bg-background">
     <WorkspaceSidebar activeSection="agent" collapsed={collapsed} onCollapsedChange={setCollapsed} mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} />
     <div className="flex min-w-0 flex-1 flex-col">
       <WorkspaceMobileHeader onOpen={() => setMobileOpen(true)} />

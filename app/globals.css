@@ -51,6 +51,7 @@
 
 body {
   min-height: 100vh;
+  padding-bottom: var(--analytics-banner-height, 0px);
   color: rgb(var(--foreground));
   background: rgb(var(--background));
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -73,6 +74,10 @@ body {
 }
 
 @layer utilities {
+  .workspace-viewport {
+    height: max(0px, calc(100dvh - var(--analytics-banner-height, 0px)));
+  }
+
   .text-balance {
     text-wrap: balance;
   }

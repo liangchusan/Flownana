@@ -398,7 +398,7 @@ function ScopedMediaCreationWorkspace({
   const activeSection = isHome ? "home" : view === "assets" ? "assets" : composerType;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="workspace-viewport flex overflow-hidden bg-background">
       <WorkspaceSidebar activeSection={activeSection} onWorkspaceNavigate={navigateWorkspace} collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} mobileOpen={mobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
         <WorkspaceMobileHeader showLogo={!isHome} onOpen={() => setMobileSidebarOpen(true)} />

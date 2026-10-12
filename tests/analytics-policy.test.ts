@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allowedAnalyticsHost, commerceEvent, measurementIdForEnvironment, PRODUCTION_GA_ID, safePage, TEST_GA_ID, validContext } from "../lib/analytics-policy.ts";
+import { allowedAnalyticsHost, commerceEvent, measurementIdForEnvironment, PRODUCTION_GA_ID, safeCampaignQuery, safePage, TEST_GA_ID, validContext } from "../lib/analytics-policy.ts";
 import { createSourceLoader } from "./helpers/load-source.ts";
 
 test("both environment and hostname prohibit cross-property collection", () => {
@@ -21,6 +21,35 @@ test("private paths, query strings, identity, media URLs and titles never surviv
   const page = safePage("/?utm_source=google&utm_campaign=us_search&gclid=opaque_click&email=person@example.com", "https://www.flownana.com");
   assert.match(page.page_location, /utm_campaign=us_search/);
   assert.doesNotMatch(page.page_location, /email/);
+});
+test("public ad destinations retain safe attribution while private and arbitrary parameters stay excluded", () => {
+  const campaign = "utm_source=google&utm_medium=cpc&utm_campaign=launch_2026&utm_content=image-ad&utm_term=ai_image&gclid=click-1&gbraid=braid_2&wbraid=braid.3";
+  for (const route of ["/", "/image", "/video", "/pricing", "/agent"]) {
+    const page = safePage(`${route}?${campaign}&prompt=private&session_id=cs_private&email=private%40example.com#private`, "https://www.flownana.com");
+    assert.equal(page.page_location, `https://www.flownana.com${route}?${campaign}`);
+    assert.equal(page.page_path, route);
+    const unsafe = safePage(`${route}?utm_source=person%40example.com&utm_campaign=${"x".repeat(201)}&gclid=https%3A%2F%2Fprivate.example`, "https://www.flownana.com");
+    assert.equal(unsafe.page_location, `https://www.flownana.com${route}`);
+  }
+  for (const route of ["/agent/private-thread", "/account/billing", "/account/profile", "/assets", "/unknown"]) {
+    const page = safePage(`${route}?${campaign}`, "https://www.flownana.com");
+    assert.equal(new URL(page.page_location).search, "");
+  }
+});
+test("campaigns retain long IDs and Unicode labels, reject ambiguous/sensitive values and prioritize complete IDs", () => {
+  for (const size of [101, 512]) assert.equal(safeCampaignQuery(new URLSearchParams({ gclid: "a".repeat(size) })).query.get("gclid"), "a".repeat(size));
+  assert.equal(safeCampaignQuery(new URLSearchParams({ gclid: "a".repeat(513) })).query.has("gclid"), false);
+  assert.equal(safeCampaignQuery(new URLSearchParams({ utm_campaign: "日本 夏の広告", utm_term: "AI image" })).query.get("utm_campaign"), "日本 夏の広告");
+  for (const value of ["person@example.com", "https://private.test", "secret token", "label\nprivate", "hidden\u200bvalue", "eyJaaaaaa.eyJbbbbbb.signature"])
+    assert.equal(safeCampaignQuery(new URLSearchParams({ utm_content: value })).query.size, 0);
+  assert.equal(safeCampaignQuery(new URLSearchParams("gclid=one&gclid=two")).query.size, 0);
+  assert.equal(safeCampaignQuery(new URLSearchParams("gclid=one&gclid=one")).query.get("gclid"), "one");
+  const oversized = safeCampaignQuery(new URLSearchParams({ gclid: "a".repeat(512), utm_campaign: "日".repeat(200), utm_source: "google" }));
+  assert.equal(oversized.query.get("gclid"), "a".repeat(512));
+  assert.equal(oversized.query.get("utm_source"), "google");
+  assert.equal(oversized.query.has("utm_campaign"), false);
+  assert.ok(oversized.query.toString().length <= 1500);
+  assert.ok(oversized.rejected.budget);
 });
 test("contexts require real GA format, correct property, nonfuture timestamp and lifetime", () => {
   const c = { clientId: "1234.5678", sessionId: 1234, capturedAt: 10000, measurementId: TEST_GA_ID };
@@ -90,7 +119,7 @@ test("Google tag initialization uses the SDK command object and configures one c
     originalDocument ? Object.defineProperty(globalThis, "document", originalDocument) : Reflect.deleteProperty(globalThis, "document");
   });
   const source = createSourceLoader({
-    react: { useEffect: (work: () => unknown) => effects.push(work), useRef: () => ({ current: null }), useState: () => [false, () => {}] },
+    react: { useLayoutEffect() {}, useEffect: (work: () => unknown) => effects.push(work), useRef: () => ({ current: null }), useState: () => [false, () => {}] },
     "next-auth/react": { useSession: () => ({ data: null }) }, "next/navigation": { usePathname: () => "/" },
     "@/lib/analytics": { GA_ENABLED: true, GA_MEASUREMENT_ID: TEST_GA_ID, hasAnalyticsConsent: () => true, setTagDisabled() {}, reconcileAnalyticsRevocation: async () => true },
   });

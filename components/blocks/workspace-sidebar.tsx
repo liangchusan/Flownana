@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Menu,
   PanelLeft,
+  ShieldCheck,
   UserCircle,
   Video,
   X,
@@ -17,6 +18,7 @@ import { Logo } from "@/components/ui/logo";
 import { CreditsWidget } from "@/components/creation/credits-widget";
 import { UserMenu } from "@/components/layout/user-menu";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
+import { PrivacySettingsTrigger } from "@/components/analytics/privacy-settings-trigger";
 import {
   WORKSPACE_PATHS,
   type WorkspaceDestination,
@@ -122,11 +124,14 @@ export function WorkspaceSidebar({
               <CreditsWidget variant="sidebar" compact={collapsed} />
               <UserMenu align="left" compact={collapsed} variant="sidebar" user={{ name: session.user?.name, email: session.user?.email, image: session.user?.image }} />
             </div>
-          ) : (
+          ) : (<>
             <button type="button" onClick={() => {  signInForCurrentEnvironment(); }} className={`flex h-10 w-full items-center rounded-ui text-sm text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${collapsed ? "lg:justify-center" : "gap-2 px-3"}`}>
               <UserCircle className="h-5 w-5" /><span className={collapsed ? "lg:hidden" : ""}>Sign in</span>
             </button>
-          )}
+            {activeSection !== "home" && <PrivacySettingsTrigger aria-label="Privacy settings" title="Privacy settings" onClick={() => onMobileOpenChange(false)} className={`mt-1 flex min-h-11 w-full items-center rounded-ui text-xs text-muted-foreground transition-all duration-300 hover:bg-background hover:text-foreground active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 ${collapsed ? "lg:justify-center" : "gap-2 px-3"}`}>
+              <ShieldCheck className="h-4 w-4 shrink-0" /><span className={collapsed ? "lg:hidden" : ""}>Privacy settings</span>
+            </PrivacySettingsTrigger>}
+          </>)}
         </div>
       </aside>
     </>

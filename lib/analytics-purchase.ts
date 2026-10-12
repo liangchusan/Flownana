@@ -19,10 +19,10 @@ export function verifiedInvoiceEvent(invoice: Stripe.Invoice, intent: Stripe.Pay
   return { ...event, transaction_id: invoice.id, tax: (invoice.total - invoice.total_excluding_tax) / 100, purchase_type: purchaseType };
 }
 
-export async function reportVerifiedInvoice(invoiceId: string, expectedUserId?: string) {
+export async function verifiedInvoiceDetails(invoiceId: string, expectedUserId?: string, timeout = 8_000) {
   if (!serverMeasurementId()) return;
   const stripe = getStripe();
-  const readOptions = { timeout: 8_000, maxNetworkRetries: 0 } as const;
+  const readOptions = { timeout: Math.max(2000, Math.min(timeout, 8000)), maxNetworkRetries: 0 } as const;
   const invoice = await stripe.invoices.retrieve(invoiceId, {}, readOptions);
   if (invoice.livemode !== (process.env.VERCEL_ENV === "production")) throw new Error("Analytics invoice environment mismatch");
   const subId = stripeInvoiceSubscriptionId(invoice);
@@ -45,6 +45,13 @@ export async function reportVerifiedInvoice(invoiceId: string, expectedUserId?: 
   const params = verifiedInvoiceEvent(invoice, intent, plan.key, purchaseType);
   if (!params) return;
   const occurredAt = new Date((invoice.status_transitions.paid_at || invoice.created) * 1000);
+  return { userId, user, sub, invoice, params, occurredAt };
+}
+
+export async function reportVerifiedInvoice(invoiceId: string, expectedUserId?: string) {
+  const verified = await verifiedInvoiceDetails(invoiceId, expectedUserId);
+  if (!verified) return;
+  const { userId, user, sub, invoice, params, occurredAt } = verified;
   await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
     const current = await tx.user.findUnique({ where: { id: userId } });

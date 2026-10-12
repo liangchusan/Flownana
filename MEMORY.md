@@ -1,5 +1,565 @@
 # Flownana 工程记忆
 
+## 2026-10-12 全部本地改动发布授权与检查
+
+- 用户明确批准检查、全部提交、推送及生产发布，包含此前同意/默认地区、告警恢复、
+  参数过滤、下载命名、Pricing关闭及依赖升级。全量455测试441 passed/14 skipped；
+  全仓lint两处测试module变量改名后0 errors/17 warnings；design检查、build通过。
+- Test库仍连接超时。生产告警表迁移先回滚验证后执行，Prisma迁移历史同步checksum。
+  RLS开启，anon/authenticated/service_role均无读权限，flownana_app获读写且唯一策略；
+  本地生产连接以postgres完成Prisma真实读写并回滚，测试行不存在。不是app角色实测。
+- 邮件渠道与外部存活探测尚未配置，每日cron仍保留；真实登录自动绑定、增强购买
+  GA4/Ads收件及大视频/移动Safari下载仍需生产手工验收。正式部署结果另补记录。
+
+## 2026-10-12 其他地区匿名一次Allow（本地未发布）
+
+- 用户明确要求两次合为一次。访客新Allow保存独立广告意向（版本/时间、180天），
+  匿名浏览器两项on，不传邮箱；旧基础统计granted不自动升级。
+- 账户统计上下文同步成功后，验证邮箱并自动完成账户许可；绑定前持久认领账户，
+  刷新/失败重试只用于该账户，已有许可账户也消耗意向，换号不复用。
+  Reject删除意向、撤回两项，GPC和待撤回优先。不新增表，后台保护机制不变。
+- PRODUCT/DESIGN/隐私政策同步。全量455测试441 passed/14 skipped；定向14 passed；
+  类型、局部lint、设计检查及Test GA构建通过。意向测试覆盖刷新、过期、未验证邮箱、
+  单次绑定、已有许可认领、换号和拒绝。本地匿名Allow后两项on，刷新/重开保持，
+  Reject刷新后不恢复；桌面与390手机无溢出，截图/tmp/flownana-one-allow-desktop.jpg
+  和/tmp/flownana-one-allow-mobile.jpg。
+- 未发布/真实Google登录/付款或Ads收件。账户自动绑定只有隔离测试证据，发布后
+  需手测匿名Allow->真实验证登录、换号、断网撤回；清空存储或180天过期需重新选择。
+  前批告警数据库/实际通知配置与真实收件验收风险仍保留。
+
+## 2026-10-12 地区提示截图与同意次数核对
+
+- 本地 Test 构建分别注入服务端 US/TW/JP 地区，保存三张首次提示截图：
+  /tmp/flownana-consent-us.jpg、/tmp/flownana-consent-tw.jpg、
+  /tmp/flownana-consent-other.jpg；美台文案和规则一致，其他地区为手动提示。
+- 实测其他地区未登录 Allow 后 Privacy 显示 Analytics on、Sign in then Allow；
+  结合 choose(true) 账户/verified guard 确认匿名 Allow 只开启基础统计，没有持久
+  匿名广告 intent。登录后需再次 Allow，尚未达到此前其他地区一次允许的目标。
+  本轮仅截图与核对，未扩展实现；登录后单次 Allow 可合并两项用途。
+- 登录提示将 Terms of Service 与 Privacy Policy 合并为 By signing in 告知，
+  无两个独立勾选；统计和广告为两用途/一个 Allow-Reject 面板。未发布。
+
+## 2026-10-12 US/TW 默认基础统计与广告衡量（本地未发布）
+
+- 用户明确改为先投美国和台湾，并批准这两地区默认开启；按服务端 Vercel 国家
+  US/TW 判断，JP/KR/其他或未知地区仍手动允许。投放地域不等于网站访问限制。
+- 默认权限单独记录 regional_default basis、国家、版本和180天期限，不伪造显式
+  Allow；匿名仅启用浏览器衡量，验证邮箱登录后才绑定本人账户及后续购买邮箱哈希。
+  购买上下文国家由服务端覆盖签名，默认授权与购买国家须一致。旧显式 v1 兼容。
+- 已拒绝、GPC、待撤回或账户撤回记录优先；默认不能自动恢复撤回。保留非阻断
+  告知、Allow/Reject、Privacy 设置和关闭广告个性化；隐私政策与PRODUCT/DESIGN同步。
+- 全量454测试440 passed/14 skipped；相关35测试34 passed/1 skipped；tsc、局部
+  ESLint、design:check和build通过。Test GA ID构建的匿名本地浏览器实测桌面1440/
+  手机390：无需Allow即两项on、提示关闭后重开一致、Reject后刷新统计off且广告
+  不恢复；未溢出。测试代理同源端口不一致曾导致撤回403，修正测试代理后自动重试
+  成功，生产同源保护未放宽。截图 /tmp/flownana-regional-default-desktop.png、
+  /tmp/flownana-regional-default-mobile.png、/tmp/flownana-regional-rejected-desktop.jpg。
+- 未发布/生产迁移/真实扣款或邮件。登录后地区默认绑定、换号、真实增强购买Google
+  收件/Ads归因仍待手工验收；地区默认和告知不代表完整法律合规结论。前批告警表
+  SQL/RLS连接超时及Resend配置/调度/外部存活探测限制仍存在。
+
+## 2026-10-12 恢复告警与营销参数实施（本地未发布）
+
+- 用户确认轻量purchase_type分类，保留purchase主转化，不加first_purchase/首购账本。
+  投放市场US/JP/KR/TW，不把地域投放当作网站访问限制；默认广告许可仍未获确定。
+- 点击ID/UTM分开校验：512/200字符，Unicode安全UTM、冲突重复拒绝、编码query1500预算，
+  点击ID优先且不截断；公开Pricing/精确Agent加入，私有路径仍泛化/去query。
+- 新增有界恢复（多页50/总批次10/时间预算）、Retry-After/抖动/最多10次明确429重试，
+  uncertain不自动重发。新增AnalyticsMonitorState/迁移、CRON_SECRET健康接口、
+  worker心跳与聚合邮件告警；邮件持久key+请求体、防并发、冷却/恢复、Preview禁发。
+- 用户指定告警接收邮箱liangchusan@gmail.com；代码Resend REST无需SDK，尚无发送凭据/
+  验证域配置或真实邮件。新增三项服务器配置见.env.example；未创建外部服务账户。
+- Stripe近24小时invoice.paid事件只读分页/回读验证、十分钟grace，内部报告缺失告警；
+  预算/200事件上限或核验失败标记incomplete，不把未检查的剩余付款假装完整。
+  提取verifiedInvoiceDetails复用原核验，不变付款/权益/事件params/去重。
+- 全量452测试438 passed/14 skipped，相关33测试32 passed/1 skipped，tsc/局部ESLint/
+  本地build/diff check通过。新增迁移的Test事务SQL/RLS测试请求连接超时，两次连通
+  尝试均失败，未获数据库验收证据；不声称真实Prisma并发或SQL测试已通过。
+- 未迁移生产/部署/实际扣款/发通知/改GA后台；现有每日cron未擅自改为5分钟，因为
+  当前连接未确认Vercel计划。5分钟调度、外部心跳监控、Test迁移及实际邮件还需配置。
+  PRODUCT和实施方案已同步；匿名一次Allow/默认同意是独立尚未实施范围。
+
+## 2026-10-12 完善方案反馈与范围收缩
+
+- 用户接受异常恢复/告警与营销参数加固，要求记住参数规则；方案与PRODUCT已记为
+  已确认。点击ID/UTM分开校验、私人数据过滤与路径白名单规则持续保留。
+- 用户拒绝复杂首购方案，不开发first_purchase/首购账本或七事件，不切换Ads主目标；
+  首次客户优化仍须讨论简单可行的取舍，不能把新订阅近似值称为准确首次付费。
+- 匿名一次Allow方向接受，但用户询问是否可在小流量时默认同意；权限策略尚待确定。
+  当前运行授权规则不变，没有默认开启广告权限、发送数据、迁移或发布。
+
+## 2026-10-12 广告测量完善方案（待确认细则）
+
+- 用户确定本轮优化首次付费客户，要求提出恢复告警/参数加固方案，并询问匿名
+  Allow 能否一次开启两项。方案 docs/ADS-MEASUREMENT-IMPROVEMENT-PLAN-2026-10-12.md
+  与 PRODUCT 已添加待确认范围，未改业务实现或部署。
+- 建议匿名许可有版本/时间/撤回记录，首次验证登录原子单账户绑定；首次广告用途
+  全地区提示，不继承旧基础同意或其他账号。新增首购账本核对完整 Stripe 历史，
+  保留 purchase，新增后端 first_purchase（七事件）用于唯一主要目标，旧付款不重放。
+- 核查当前Google官方事件创建规则为客户端执行，不能依赖GA界面筛选当前MP购买
+  生成首购。建议5分钟有界恢复与主动告警、外部worker存活检测；Vercel Hobby仅每日，
+  实施前核对计划/通知渠道，不擅自开收费服务。营销点击ID/UTM分开安全校验。
+- 本轮只有方案/文档，未执行运行测试、迁移、通知或新扣款；详细流程/七事件/
+  最小持久表须确认后开发，当前正式状态仍为上一节审计证据。
+
+## 2026-10-12 GA / Ads 完整配置复核
+
+- 本对话截图确认正式 GA4 208428049 的 purchase 已导入 Ads，购买为账号默认且
+  purchase 为主要；原网站订阅为次要并移出默认目标。动态 GA 价值、缺省 0 USD、
+  每一次、数据驱动归因；用户确认 Ads 自动标记开启。没有助手后台自动回读。
+- 当前正式域名再次回读 dpl_Cta7ATUAjCQuirZG1xLfd844Btyg / READY，公共 JS 运行
+  GA ID 为 G-2PTWF8DJE2，增强 API enabled=true。生产报告仅原 purchase / generation
+  各 1，均 transmitted / 单次，purchase 16 USD、完整 item 和 session、3.906 秒传输；
+  无积压/重复，当前广告授权 0。未出现新增强购买，不能宣称 Ads 归因已验收。
+- 确认授权覆盖限制：US/JP/TW 无首次广告提示，匿名 Allow 仅开统计，登录后不
+  自动再提示。purchase 同时含新订阅/续费/升级，不等于首次付费；恢复 cron 每日
+  一次最多 20 条，uncertain 隔离但缺主动告警；安全 URL 会丢弃 >100 字符点击值、
+  空格/中文 UTM，Pricing/Agent 不保留营销 query。未证明每类输入一定导致 Ads 丢失。
+- HTTP 根域 -> HTTPS -> www 的测试参数保留；首页/Image/Video/Pricing 200。
+  仅 HTTP 验证，不执行 JS/伪造 GA 事件。定向测试 26 passed / 1 isolated-DB skipped。
+- 审计报告 docs/GA-ADS-AUDIT-2026-10-12.md 区分现有证据、建议、待核对后台及
+  新订单收件边界。未改业务实现或平台状态，未部署；提示流程/首购等新决策仍需
+  产品规格确认。无需为现有 GA4 导入路线另装第二套主要 Ads purchase。
+
+## 2026-10-12 GA4 用户提供数据配置完成（用户确认）
+
+- 用户亲自开启正式 GA4 的“收集用户提供的数据”，确认“收集自动检测到的由用户
+  提供的数据”未勾选；助手没有代接受条款。由用户反馈确认，浏览器连接限制下
+  未作助手自动管理端回读。
+- 当前正式版本 dpl_Cta7ATUAjCQuirZG1xLfd844Btyg，Production 增强开关 true；
+  允许/拒绝 UI+后台、基础 page_view 实时收件通过。测试结束账户维持拒绝。
+  新 purchase 的邮箱哈希真实收件和 Ads 归因仍未验收：没有新交易，旧交易不重放。
+  后续需在交易发生前 Allow，再用新真实订单验证；不因本轮测试擅自收费或升级套餐。
+
+## 2026-10-12 正式允许/拒绝及基础 Google 收件通过
+
+- 用户确认修复后 Allow 为 Ad measurement on；真实生产授权记录与当前账户绑定
+  正确。用户随后 Reject 并刷新，确认 Analytics off / Ad measurement off；后台
+  再次回读基础上下文和活跃广告授权均 0。修复后的正式允许/撤回验收通过。
+- 用户在正式 GA4 实时报告确认本次 page_view 收到；这是用户可见后台回读，
+  不是助手自动浏览器检查。仅证明基础页面收件，不证明新的增强 purchase。
+- 用户查看 GA4 数据收集，“收集用户提供的数据”当前关闭。已请用户在正式属性
+  开启，自动检测保持关闭，出现条款由用户亲自阅读确认（政策确认不可撤销，但
+  后续可停用）。当前尚等开启结果，未由助手代接受 Google 条款。
+- 本轮没有新交易，没有重发 10 月 10 日 purchase。因此真实购买邮箱哈希收件和
+  Ads 匹配仍需一笔新的、事件发生前已同意的购买，以及对应后台配置验收。
+
+## 2026-10-12 登录授权/拒绝后台验收
+
+- dpl_Cta7ATUAjCQuirZG1xLfd844Btyg 正式域名回读 READY，修复后 smoke:prod 全通过。
+- 用户退出后用既有账户重新 Google 登录，清理待撤回再 Allow，确认 Ad measurement on。
+  生产广告记录 purpose=advertising_measurement、version=2026-10-12-v1、未撤回，
+  accountCreatedAt 与当前账户一致；正式请求日志 POST advertising 200、DELETE 200。
+- 随后请求用户 Reject 并刷新；后台回读该账户剩余 AnalyticsContext 为 0。
+  延后再次回读 analytics_contexts=0、active_ad_grants=0、ad_withdrawal_markers=0，
+  服务端撤回确认成立；当前仍等用户页面刷新状态反馈。
+  仍待用户页面状态确认及 GA4 实时/用户提供数据设置反馈。不得据此声称邮箱匹配收件
+  或 Ads 优化可用；本轮没有新 purchase，未补发原真实付款。
+
+## 2026-10-12 正式授权失败修复（已发布，继续验收）
+
+- 用户首次 Allow 仍为旧会话，提示 Sign in again；重新登录后 Allow 出现红字。
+  正式日志证实 POST/DELETE advertising 均 500，Prisma P2010：直接 SELECT
+  pg_advisory_xact_lock 返回 void，无法反序列化。该问题此前替身测试未覆盖；
+  不是用户授权错误，发布验收尚未通过。
+- 两处锁查询改为 SELECT 1 AS locked FROM pg_advisory_xact_lock(...)，保留锁
+  语义/账户范围，不更改授权或撤回规则。Test Supabase 实际 SQL 返回 locked=1；
+  本地 Prisma 独立实测因本地连接不是指定 Test 项目主动跳过，未连接业务库。
+  23 项回归通过，替身加入拒绝 void 投影的边界；局部 ESLint、tsc 通过。
+- 修复部署 dpl_Cta7ATUAjCQuirZG1xLfd844Btyg /
+  flownana-42b3f1qvo-liangchusans-projects.vercel.app，远端真实 Stripe 校验与
+  构建通过、READY 后 promote 正式域名，Production 开关 true 沿用。
+  首次 dpl_GtiQazAV9ceoffXbwviHPeDgW71r 已被该版本替代。
+- 已请用户刷新并先 Retry withdrawal 清理失败授权留下的待撤回，再 Allow；
+  接下来需核对生产记录、Reject 确认及 Google 实际收件。没有后台伪造授权或
+  重放旧交易。/tmp/flownana-release-lock-{tests,deploy,promote,smoke}.log。
+
+## 2026-10-12 正式发布与登录验收（进行中）
+
+- 用户明确要求发布并执行登录后的允许、拒绝与 Google 收件。使用已有 Vercel
+  CLI 62.2.0（普通 npx 因本地 npm 缓存 EPERM；临时缓存下载被取消）核验项目
+  prj_RrK07bwootA87BVAfsBvo2YuqLIA / team_L9t1mYGNpJnsru52JdEw9qHg。
+- 部署 dpl_GtiQazAV9ceoffXbwviHPeDgW71r / flownana-cy8at9ssr-liangchusans-projects.vercel.app
+  先 production --skip-domain 构建 READY，再 promote 到 www.flownana.com。
+  Production 增强开关已设为 Config true，构建与运行覆盖同为 true；未改 Preview。
+  远端构建通过真实 Stripe 账户与六个 Live Price 校验、Next 16.3.8 编译/类型检查。
+- 发布树为未提交的工作区：基底 0163ffde85b42e8522c187f22c0c0ad93c570ffc，
+  39 个变更文件发布前 SHA-256 指纹
+  416471dc8e86459158fbc3b8d8cfa27b44539fce9b71ff8e40cc3fc2e1c5e20b。
+  包含本对话批准的增强/合并/文案、隐私入口、Pricing 防误关闭、可读下载命名、
+  归因/Terms/依赖局部修复。Max 年付成本未变。未提交/推送；后续文档更新不在该部署。
+- 发布前 npm test 446：432 passed、0 failed、14 skipped；Lint 0 errors / 17
+  既有 warnings；design:check、diff check 通过。正式 smoke:prod 全通过。
+  正式广告 API 匿名 GET 200，enabled=true/granted=false/verified=false；
+  policy 200，auth/session 200 空对象。正式域名 inspect 确认指向上述 READY。
+  生产 AnalyticsContext/AnalyticsReport RLS 回读均开启；上传根目录仅 .env.example。
+- 浏览器自动化连续超时；Chrome AX 仅有浏览器栏，截图为空白；未读取到 GA 页面。
+  无法代用户登录/点击，已通过 async 请用户重新登录并 Allow 后告知，先不 Reject。
+  暂未看到新 advertising 授权。没有修改生产授权记录、重放旧 purchase 或实际付款。
+- Google 后台 UPD/条款与真实接收尚未核验；本站开关开启不等于 Google 增强收件
+  完成。用户动作、数据库授权/撤回、Google 实时/购买收件仍须逐层验收。
+  日志 /tmp/flownana-release-{tests,lint,design,deploy,promote,smoke,final-inspect}.log。
+
+## 2026-10-12 隐私提示文案精简（本地，未发布）
+
+- 用户要求按钮不带 all，统一为 Allow / Reject；首次提醒与设置同用短提示：
+  cookies for analytics/ad measurement、hashed email shared with Google for purchase
+  matching、无个性化广告、随时撤回。状态、登录提示与错误文案一并压缩，
+  完整用途仍在隐私政策；授权、拒绝、撤回、账户边界及开关不变。
+- PRODUCT、DESIGN、方案和隐私政策按钮称谓同步。相关 23 项回归通过；
+  局部 ESLint、tsc、design:check、diff check 通过。未部署或修改平台设置。
+- 本地 Test GA/Development 构建通过；实际匿名 IAB 390×844 / 1440×900
+  检查短提示、Allow/Reject、无横向溢出与关闭重开。浏览器保留之前的撤回待确认
+  状态，重试说明正确显示；不是本轮新增业务失败。截图
+  `/tmp/flownana-short-privacy-mobile.jpg` 与 `/tmp/flownana-short-privacy-desktop.jpg`。
+  本轮仅文案，未重新验证真实登录或 Google 接收，先前验收风险仍保留。
+
+## 2026-10-12 合并统计与广告同意（本地，未发布）
+
+- 用户明确要求将两项同意整合；首次提示和 Privacy 设置在增强开关启用时共用
+  Allow all / Reject all，并在同一段说明统计、广告 Cookie、购买邮箱哈希与匹配。
+  已登录且邮箱已验证时一次允许完成两项；匿名/旧未验证会话只开启基础统计，
+  登录并验证邮箱后仍用同一组按钮完成当前账户授权，不自动继承匿名或其他账户许可。
+- 全部拒绝沿用基础统计撤回路径同时撤回广告用途；允许失败保留面板与错误说明。
+  迟到的允许回调不能在拒绝或关闭后重新打开面板。旧统计许可和地域默认不升级
+  为广告许可；后台用途记录仍分开保存，默认开关及付款/事件/去重契约不变。
+- PRODUCT、DESIGN、增强方案和隐私政策已同步。相关 23 项回归通过，新增 3 项
+  覆盖共同允许/拒绝、匿名边界、拒绝后的迟到回调；tsc、局部 ESLint、design:check、
+  diff check 通过；本地 Test GA/Development 构建通过。未重复全量测试。
+- 实际匿名 IAB 390×844 / 1440×900：同一组按钮、手机无横向溢出、拒绝关闭、
+  关闭重开通过；本地拒绝后的服务器撤回确认未完成，面板正确保留 pending 和重试，
+  不能称真实后端撤回已验收。截图 `/tmp/flownana-combined-privacy-mobile.jpg` 与
+  `/tmp/flownana-combined-privacy-desktop.jpg`。临时服务器/浏览器已清理。
+- 无部署、后台设置、实际邮箱共享或数据库迁移。仍须在 Test 环境手测登录账户
+  一次允许两项、全部拒绝后服务器确认、刷新/换号、GA 接收与 Ads 匹配。
+
+## 2026-10-12 增强型转化实现（本地，未发布）
+
+- 用户明确批准按最小方案开发。Privacy 展开设置新增独立 Ad measurement，
+  默认关闭，基础统计允许且 Google 已验证邮箱的当前账户才能允许；拒绝/
+  撤回、GPC、换账号立即关闭浏览器广告权限，个性化始终 denied。
+- 开关 `NEXT_PUBLIC_GA_ENHANCED_CONVERSIONS_ENABLED` 默认 false（.env.example），
+  仍要求 GA 环境/属性正确。没有变更平台环境值、GA/Ads 设置或接受外部条款。
+- 无表结构变更/迁移。受保护 AnalyticsContext 的独立 advertising 用途记录
+  绑定账户创建时间，含版本、时间、两类用途、随机授权编号及邮箱 HMAC 核验摘要；
+  撤回改存无邮箱摘要的时间标记。签名回执仅允许撤回，支持退出后重试；无回执
+  的未完成授权需原账户重新登录才能确认撤回。允许请求迟到不能覆盖已确认撤回。
+- Google profile.email_verified 只赋予服务器 JWT 邮箱验证依据，session 暴露
+  boolean；旧会话/测试登录不被自动视为已验证。登录本身不是广告数据同意。
+- 原 purchase 队列附加授权编号/账户 epoch，不存邮箱或其 GA 哈希。发送前检查
+  同一授权仍有效、授权早于付款、账户 epoch 和邮箱未变，再规范化 SHA-256，
+  仅 MP 顶层 user_data.sha256_email_address；不新增 user_id 或事件。
+  原交易金额、items、invoice 去重及基本事件契约保留，撤回/重新授权不增强旧队列。
+- 增强发送锁定广告授权记录（不锁计费 User）直到传输完成，撤回确认随后返回；
+  不承诺追回已经开始或已发送的数据。传输不确定仍隔离，不盲目重发。
+- 最终 npm test 443 项：429 passed、0 failed、14 skipped；新增 8 项（含子项）
+  覆盖真实 API/队列/worker 源码及浏览器模块，但数据库与传输为隔离替身。
+  缺少隔离 PostgreSQL，数据库专项未执行，不能称真实 SQL 并发已验收。
+  Lint 0 errors / 17 既有 warnings，design:check、diff check 通过；生产构建和
+  构建内 TypeScript 通过（本地 Test GA/Development 环境、GA_API_SECRET 为空）。
+  开发监听曾因 EMFILE 重启，改用构建后服务验收；无残留测试服务器。
+- 本地 IAB 390×844 / 1440×900 检查实际匿名 Privacy 首次、关闭后重开、禁用允许、
+  无横向溢出；桌面截图 `/tmp/flownana-enhanced-privacy-desktop.jpg`。尚未用真实
+  Google 登录验收允许/拒绝/撤回，账号菜单/侧栏/页脚触发仍需登录态手测。
+- PRODUCT、DESIGN、隐私政策（日期 2026-10-12）及方案文档已同步。未提交/推送/
+  部署，保留其他工作区修改。后续先 Test 验证 Google 用户数据负载、接收与 Ads
+  诊断（当前未发真实邮箱/哈希），再经批准正式发布；Ads 开关暂不单独启用。
+
+## 2026-10-12 增强型转化研究（提案待确认）
+
+- 核查官方 GA4/Ads 文档与本地 analytics/analytics-server：目前广告用途
+  denied，未附加 user_data；仅开启 Ads 后台开关不足以增强现有服务端购买。
+- 建议 GA4 用户提供数据路径，独立广告衡量同意后仅 purchase 邮箱哈希，
+  保持六事件、交易去重和个性化广告关闭。新增授权持久化与撤回需要先确认范围。
+- PRODUCT 已添加明确待确认入口，细节见
+  `docs/ENHANCED-CONVERSIONS-PROPOSAL-2026-10-12.md`。不把研究提案视作批准。
+- 本轮未改业务代码、迁移、后台设置或部署，未发送真实邮箱/哈希或补报付款。
+  未运行运行时测试；后续须分别验证同意控制、GA 接收及 Ads 归因，不能用 204
+  或 realtime purchase 计数证明增强匹配成功。功能收益需真实流量观察。
+
+## 2026-10-10 生成作品下载文件名统一（本地，未发布）
+
+- 用户要求图片/视频下载名称清晰可读，统一采用
+  `Flownana-Image/Video-YYYY-MM-DD_HHmmss-01.png/mp4`，UTC 任务创建时间加
+  任务内输出序号（01 起），历史音乐为 Audio。扩展名取经校验的实际 MIME，
+  支持 PNG/JPEG/WebP/AVIF/HEIC/HEIF/GIF、MP4/MOV/WebM、MP3/WAV/M4A。
+  不包含 Prompt、账号或随机存储文件名，PRODUCT 第 8 节已同步。
+- Creation stream、Assets、Agent 的现有下载入口均复用该下载接口。授权查找保留
+  userId、creation/taskId 与 URL 归属；公开 Blob 不再 307 到 download=1，统一
+  走既有 safeRemoteMediaFetch 流式响应，以 Content-Disposition 指定名称。
+  继续公共 HTTPS/DNS/重定向/签名/大小/时限校验与 private,no-store；不改原存储
+  路径、媒体内容或数据库记录，不增加下载埋点。无可见 UI 布局变化。
+- 实际命名/下载路由 3 项、media-security 7 项测试通过；改动文件 ESLint、
+  tsc --noEmit、design:check、diff check 通过。独立 Chrome 通过真实源码下载
+  Route + 匿名隔离 HTTP 测试服务器验收图片/视频各两次建议文件名与完整下载；
+  账号、数据库和远程媒体为明确替身，文件字节为测试 fixture，未连接真实用户。
+  临时脚本 `/tmp/flownana-download-browser.cjs`；未重跑全量测试或生产构建。
+- 本轮未提交/推送/部署，保留其他任务的工作区改动。手测生成结果、Assets、
+  Agent 图片和视频下载、同任务多图序号、重复下载、手机 Safari 保存和真实大
+  视频可播放性。公开 Blob 下载新增 Function 流量/耗时，生产大视频速度与平台
+  时限未实测；同秒任务或本地已有同名文件可能由浏览器追加重名后缀。
+
+## 2026-10-10 投放局部修复与真实付款验收（修复未发布）
+
+- 用户批准修复既有规格偏差，明确暂不处理 Max 年付成本。safePage 将现有安全
+  UTM/gclid/gbraid/wbraid 白名单扩展到公开 /image、/video；私有路径和敏感
+  参数仍过滤，六事件含义及广告 denied 不变。新增归因/隐私回归；PRODUCT 已同步。
+- Terms 纠正音乐生成旧承诺，补充现有年付扣款/月度发积分/30 天有效及失败返还
+  积分的事实，不增加现金退款承诺。本地 390px/1440px 页面和无横向溢出已检查。
+- 固定 Next/eslint-config-next 16.3.8、music-metadata 11.16.0、Axios 1.20.0；
+  lockfile 更新 sharp 0.35.5、source-map-js 1.2.2、undici 6.29.0/7.30.0。
+  生产依赖 audit 从 13 项降为 3 moderate，0 critical/high；余项同属
+  global-agent→roarr→sprintf-js，格式化字符串可控性未在当前调用发现，未强升主版本。
+- Next ImageResponse 应用入口未发现，不将公告等同已证实 RCE；MP4 音频仅历史
+  已归属素材可能到达解析器，新上传音频仍 MP3/WAV。补丁对 stsd 头部、条目大小和
+  剩余字节做边界检查。2 秒限制子进程中零/超大/短条目拒绝；独立复核额外覆盖
+  偏移与合法最小条目。真实 ffmpeg MP3/M4A、PCM WAV、静音 MP4/MOV 对照通过。
+- 最终 npm test 435 项：421 passed、0 failed、14 skipped；Lint 0 errors /
+  17 warnings；design:check、diff check、Next 生产构建及构建内类型检查通过。
+  sharp SVG→PNG 合法输入通过。日志 /tmp/flownana-readiness-fix-*。
+- 正式版本真实验收：用户自行支付 Starter monthly $16 USD，Live charge succeeded、
+  captured=1600、refund=0；同一 Checkout complete/paid、订阅 active、预约 fulfilled。
+  Checkout/invoice/subscription Webhook 已处理，pending_webhooks=0；仅一次周期发放
+  200 积分，用户确认刷新不重复。旧未付预约自动 expired。账期至 11 月 10 日，积分
+  于发放 30 天后的 11 月 9 日过期，符合当前规则；没有人为补发或改主库。
+- purchase 唯一账单键，value=16/currency=USD/tax=0/item=starter_monthly，
+  new_subscription、有效上下文、transmitted/attempts=1。付款前待验证/未付款事件
+  随后同一发票完成，未见多扣款或多发权益。这是内部验收交易，不计作真实获客成绩。
+- 用户随后生成 GPT Image 2 图片，成功 1 张，扣 2 积分，余额 198，用户 UI 与数据库
+  一致；PNG 2,663,632 bytes、Blob 地址及单条 output 关联已保存；generation_completed
+  唯一记录 transmitted/attempts=1。用户确认 Assets 刷新后仍在、下载打开正常。
+- GA4 正式属性 208428049 实时报告实见 begin_checkout、purchase、generation_completed
+  各 1，purchase 关键事件 1、Purchasers 1。已证明接收；金额/交易参数明细与 Ads
+  可用性须分别核验，不能仅据计数称广告优化闭环通过。
+- 保留并行任务及之前的工作区修改；本轮未提交、推送、部署、改价、改同意或数据库写入。
+  真实付款/生成在现有正式版本上，不能算本地修复已经上线。仍需发布授权、GA
+  参数/Ads 验收、取消/未回站/续费/升级/失败退款等未覆盖场景；本轮不是全模型或全安全证明。
+
+## 2026-10-10 Pricing 防误关闭修复（本地，未发布）
+
+- 用户明确要求套餐支付展示仅点击右上角“×”退出。PRODUCT 第 10 节与 DESIGN
+  Pricing 规范同步覆盖旧的空白/Esc 关闭规则；移除 PricingModalProvider 的
+  空白 mousedown 处理及 backdrop 标记，复用 Modal 的 dismissible=false 阻止
+  Esc/native cancel。关闭按钮、原 URL/hash 清理及草稿保持逻辑沿用原实现。
+- 所有 Pricing 入口共用该 Provider；未修改共享 Modal、升级确认、计费或 GA4。
+  保留原有工作区改动。本轮未提交、推送或部署，正式站尚未包含此修复。
+- 实际 design:check、单文件 ESLint、tsc --noEmit、diff check 通过；既有 Modal、
+  Pricing 导航/登录意图/异步竞态回归共 10 项通过。未重跑全量测试或生产构建。
+- 独立 Chrome 本地开发页面检查 390/768/1440px：#pricing 首次与关闭后重开、
+  左右/顶部空白点击、Esc、周期切换保持打开，× 关闭并清理 hash，无横向溢出；
+  桌面页脚 Pricing 入口也通过。已检查手机和桌面截图，临时验收脚本与截图
+  /tmp/flownana-pricing-dismiss-*。账号/session 与 analytics API 使用匿名替身，
+  未执行真实登录、付款或生成；截图紧接周期点击可能保留 300ms 切换过渡帧。
+- 手测仍需登录账户菜单、Upgrade、账单入口及 Checkout 取消/登录返回路径，
+  检查关闭重开、Prompt/附件保留、手机滚动及关闭按钮可达。登录态升级确认与
+  真实支付未重新验收；生产验证需先获得发布授权。
+
+## 2026-10-10 投放前检查（仅审计，未改产品或部署）
+
+- 结论及逐项验收表见 `docs/ADS-READINESS-AUDIT-2026-10-10.md`：站点基础可用，
+  付费获客/自动竞价/放量尚未通过完整验收。本轮没有改价、改同意、付款、生成、
+  业务数据写入、提交、推送或部署；PRODUCT 不变，保留原有工作区修改。
+- 本轮 npm test 434 项：420 passed、0 failed、14 skipped（包含隔离数据库及
+  两个真实 Stripe 沙盒专项）；tsc、design:check、diff check 通过；Lint 0 errors /
+  17 warnings；smoke:prod 全通过。未重新 build，未完成浏览器桌面/手机视觉验收。
+- Vercel 正式域名回读仍为 dpl_AEwcbd6w5qL8aDNuHudMqbZYJK3J READY。Live Stripe
+  webhook enabled 且正式 URL 正确；Live charges 列表为空、has_more=false，暂无
+  实际收款可对账。GA/Ads 控制台与真实付款、权益、出图闭环本轮未验证。
+- 明确测量风险：广告用途始终 denied 符合现行批准范围，但限制 Ads 转化用途；
+  safePage 仅首页保留广告参数，本轮执行复现 /image、/video 的 UTM 从上报网址
+  移除；new_subscription 不等于账号首购。调整这些产品边界需先确认。
+- 成本压力情景：Max 年付 $576 / 28,800 积分=$0.02/积分；按代码视频系数 0.2
+  与 KIE 标准 $0.005/积分，充分使用相应视频的成本约 $720/年，比收入高 $144，
+  未含支付/存储/广告费。不是实际亏损结论，实际充值优惠/用量组合尚未核对。
+- npm audit --omit=dev 报 13 个包条目（1 critical、7 high、5 moderate），非
+  13 个已证实漏洞。Next ImageResponse 公告对应调用未在应用搜索中发现；音频
+  parseBuffer 有真实调用，解析告警需做适用性核查。本轮未测试攻击或升级依赖。
+- Vercel 有历史 OAuth state-cookie 错误聚合；最近 30 分钟错误分组为空，不能
+  算登录成功率。七日明细被 Hobby 保留期限制拒绝，需账单页核实商用套餐。
+  Terms 仍宣称音乐生成；公开退款/取消/到期说明、支持投递、队列恢复容量、
+  Provider 余额、真实设备性能、Ads 后台配置均需补验。报告详列证据限制。
+
+## 2026-10-05 主动底部面板与版权行入口已正式发布
+
+- 用户确认“可以的，发布”，并明确要求以后 UI 变更覆盖完整入口和状态，
+  不得只改首次提示。AGENTS.md 已加入所有触发入口、首次/再次打开、关闭
+  后重开和相关状态的验收要求；当前首次与主动设置共用同一底栏呈现代码。
+- 上传 HEAD 0163ffd 加当前未提交的完整隐私调整与文档，正式部署
+  dpl_AEwcbd6w5qL8aDNuHudMqbZYJK3J，最终 READY / production；独立 inspect
+  确认 www.flownana.com、flownana.com 关联新部署。产物：
+  https://flownana-8brtdxg6a-liangchusans-projects.vercel.app。
+  云端源码构建与 Production Live Stripe 账号/六个 Price 回读通过。
+  没有 Git 提交/推送，也没有付款或媒体生成。
+- 实际 npm run smoke:prod 全部通过，页面、历史路由、演示媒体、匿名保护
+  API、音乐下线、Cron 和视频 options 覆盖正常。发布、inspect 和冒烟日志
+  使用 /tmp/flownana-privacy-final-production- 前缀。
+- 新正式产物七组真实匿名浏览器验收通过：版权旁单一入口/首页侧栏不重复、
+  手动首次与重复打开均底部/×与ESC保持选择、拒绝后刷新无提示或 SDK、
+  Contact 页脚、隐私正文、Image 展开/收起访客侧栏、Video 访客入口、手机
+  抽屉关闭后底部设置/输入与生成无遮挡（并行项目合为七组记录）。真实
+  撤回 DELETE 200，浏览器异常 0。只阻止不相关图片/视频下载以稳定加载，
+  未替换账号、地域或上下文 API；截图中的媒体缺图来自验收工具阻止加载，
+  不代表生产媒体失败。没有实际登录账号或付款验收。
+- 新正式产物另做八组受控情境回归，全部通过：强制先询问地域的首次提示、
+  版权行/底部面板、ESC与释放高度、允许/拒绝与刷新、390px与320px、
+  撤回失败禁用/成功重试、GPC、登录菜单/隐私正文。这组 SDK、账号与 API
+  为明确替身，不能当作实际 GA 收件或真实账号验收；图片/媒体下载也已阻止。
+  结果 /tmp/flownana-privacy-final-prod-scenario-results.json；真实浏览器结果
+  /tmp/flownana-privacy-final-prod-real-results.json，两组 errors 都为 0。
+- 首轮自动化出现 networkidle 加载与撤回等待超时；随后减少媒体下载、
+  等待触发按钮真正初始化，再复测通过。另发现 Node HTTP policy 返回
+  defaultAnalytics:false，而 Chrome 的实际 policy 返回 true，表明两种
+  请求出口地域不同；不能用 CLI 的地区响应推断浏览器首次提示必然出现。
+  最终真实页面依照 Chrome 实际响应验收，首次询问分支由受控情境覆盖。
+- 正式桌面底栏与手机截图 /tmp/flownana-privacy-final-prod-panel.png、
+  /tmp/flownana-privacy-final-prod-mobile.png 已检查，版权位置也有正式截图。
+  当前未再改应用源码，本节发布记录在部署后补记；此前本地未发布条目是
+  历史状态。本轮未重新核验正式 GA 后台收件。
+- 手测仍需真机软键盘/安全区与实际登录账号菜单。生产网络慢时初始化前
+  极早点击、存储不可用、AdGuard 和撤回网络失败仍为已有风险；失败撤回
+  保持采集关闭，本轮受控重试验证通过。
+
+## 2026-10-05 隐私主动面板与版权行入口追加调整（本地，尚未发布）
+
+- 用户根据正式截图进一步要求：主动点击也打开底部面板，首页左下角
+  设置移到页脚中间，与 Copyright 版权说明并排。已先同步 PRODUCT/DESIGN，
+  再完成本地修改；上一节 dpl_D3Rt1CmpnYFKJQt1ruEc5iH78Qtf 仍是正式产物，
+  不包含本节追加调整。本轮未提交、推送或部署。
+- AnalyticsPreferences 去掉手动 Modal，首次/主动打开共用无模态底栏，
+  保留状态、GPC 禁用与待撤回/Retry withdrawal。主动面板 × 或 Escape
+  关闭但不改选择；实际高度仍由 ResizeObserver 预留，关闭释放空间。
+  不新增埋点、不改地域、同意/拒绝持久化或撤回链路。
+- 首页访客侧栏不再显示 Privacy settings；Footer Company 列删除重复
+  入口，版权行 flex-wrap 居中放普通文字按钮，桌面并排、手机自然换行。
+  没有版权页脚的 Image/Video 等工作台仍保留访客次级导航入口；登录菜单
+  和隐私正文可打开相同底部面板，不新增创作区页脚。
+- 实际 npm test：434 项，420 passed、0 failed、14 skipped；quiet lint、
+  TypeScript、design:check、生产格式的本地 build、diff check 通过。
+  构建用 Test GA/无业务数据库连接配置，不是正式 Live Stripe 校验。
+- 本地构建在 3125 端口、已安装 Chrome headless 实际八组验收通过：版权
+  行位置与无侧栏重复入口、手动底栏无遮罩且输入可用/ESC 保持选择与释放
+  高度、允许/拒绝及刷新、390px 首页与 Image 抽屉/底部输入和生成无遮挡、
+  320px 无溢出、撤回失败禁用与成功重试、GPC、登录菜单和隐私正文重开。
+  未捕获异常 0；SDK、账号、API 与业务数据明确替身，不声称真实收件或付款。
+- 截图 /tmp/flownana-privacy-refinement-footer.png、
+  /tmp/flownana-privacy-refinement-desktop.png、
+  /tmp/flownana-privacy-refinement-pending.png 已检查；手机关闭抽屉的首次截图
+  位于 300ms 动画中间，补足动画等待后复拍，不把过渡帧当作持久遮挡。
+  结果 /tmp/flownana-privacy-refinement-results.json，测试、构建与浏览器日志
+  使用 /tmp/flownana-privacy-refinement- 前缀。
+- 手测重点：桌面版权旁入口，真机软键盘和安全区，Image/Video 访客抽屉及
+  真实登录菜单，待撤回时重试和关闭/拒绝后刷新。正式网络、GA 后台与生产
+  初始化时序本轮未重新验证；存储失败和 AdGuard 拦截仍是原有风险。
+
+## 2026-10-05 隐私提示降干扰正式发布
+
+- 用户明确要求“发布”，已上传当前 HEAD 0163ffd 加本次未提交的隐私交互、
+  测试和文档改动。正式部署 dpl_D3Rt1CmpnYFKJQt1ruEc5iH78Qtf，Vercel
+  最终 READY / production；独立 inspect 复核成功。产物地址：
+  https://flownana-f31jh0e2g-liangchusans-projects.vercel.app。
+  www.flownana.com 和 flownana.com 均已关联该部署；实际 apex 307 跳 www，
+  www 首页 200。没有执行 Git 提交或推送。
+- 云端使用平台 Production 配置从源码重建，实际 Live Stripe 账号与六个
+  Price 回读校验通过；没有创建付款或生成任务。首次 npx CLI 安装等待较久，
+  中止未上传的安装后使用已有 Vercel CLI 59.7.0 成功部署。部署日志保留
+  /tmp/flownana-privacy-production-deploy.log，inspect 日志同名前缀。
+- 实际 npm run smoke:prod 全部通过：主页面、历史路由、演示媒体、匿名
+  账单/资产/图片/视频 API 的 401、音乐 410、Cron 401、视频 options 200。
+  日志 /tmp/flownana-privacy-production-smoke.log。前一节的本地未发布状态
+  为开发阶段历史记录，本节是当前部署事实。
+- 独立无扩展 Chrome 访问真实正式站（匿名、未替换 SDK/API）：首次底栏
+  无模态且可输入、× 后同标签页刷新无提示且没有写入授权；主动允许保存
+  granted 并只加载一个 G-2PTWF8DJE2 SDK（200），page_view 的真实 Google
+  collect 返回 204，上下文 POST 200。主动拒绝 DELETE 200，刷新后保持
+  denied、无底栏及 SDK。仅证明传输，未核验正式 GA 实时报告或数据流告警。
+  SDK/collect 与匿名上下文属于实际验收访问，没有真实账号的业务交易。
+- 隐私正文入口成功重开设置；公开 Contact 页 Footer 在初始化完成后的
+  独立复测成功，截图 /tmp/flownana-privacy-contact-debug.png 已检查。
+  早于 hydration 的自动点击曾未打开；只等待 policy 200 的脚本又遇到
+  5 秒请求取消（现有逻辑退回先询问），不把这些失败记录算作全部通过。
+  页脚极早点击窗口仍是已知待查时序风险。
+- 桌面正式截图 /tmp/flownana-privacy-prod-desktop.png 已检查；正式交互记录
+  /tmp/flownana-privacy-production-ui-results.json，页脚独立诊断日志
+  /tmp/flownana-privacy-production-debug.log 保留初始自动化超时与复测证据。
+  真机软键盘/安全区、实际登录账号菜单与 GA 后台收件仍需人工确认；AdGuard
+  仍可能拦截用户自己的标签，储存不可用时提醒记忆也可能失败。
+- 正式 Image 手机 390×844 布局验收已通过，输入框与生成按钮均在底栏
+  上方、无横向溢出；截图 /tmp/flownana-privacy-prod-mobile.png 已检查。
+  此项只控制地域 policy 为先询问以稳定出现底栏，其余正式资源/API 未替换。
+  随后的导航点击自动验收未能打开抽屉（侧栏仍在屏幕左侧之外），不能把
+  本地通过的抽屉用例当作正式已通过。
+- 后续独立手机正式复测等待完整 load 与初始化，实际确认按钮已连接
+  React 点击处理，导航成功展开、Privacy settings 成功打开 Modal。
+  此复测未替换正式 SDK、账号或地域 API；地域请求取消时仍使用安全的
+  先询问回退。日志 /tmp/flownana-privacy-production-mobile-diagnostic.log。
+  该证据覆盖上条抽屉待诊断状态；网络慢时初始化前的极早点击体验仍需
+  实机关注，不能宣称所有加载时序都已验证。
+- PRODUCT/DESIGN 同步用户正式发布授权。本节及授权文字在发布后补记，
+  没有后续应用源码变化，不影响上述已发布产物。
+
+## 2026-10-05 隐私提示降干扰开发完成（本地，尚未发布）
+
+- 用户确认“开发”，PRODUCT/DESIGN 已将上一节待确认方案改为批准范围。
+  AnalyticsPreferences 首次选择使用无模态底部横条，页面可继续输入/导航；
+  全站右下角 Privacy 悬浮按钮已删除，主动打开设置仍复用原有 Modal。
+- Allow/Reject 沿用原有持久选择和撤回链路。× 仅写 sessionStorage 提醒标记，
+  同标签页刷新/路由不再提醒，不写同意/拒绝或开启统计；储存失效时本次
+  仍关闭，但下次刷新可能重新提醒。历史选择、地域、GPC、广告关闭和六事件
+  不变。新标签页会话按浏览器 sessionStorage 生命周期处理。
+- Privacy settings 进入登录用户菜单、访客侧栏/移动抽屉（收起侧栏保留有
+  标签的 ShieldCheck 入口）、公开页 Footer 与隐私正文。隐私政策指引同步。
+  ResizeObserver 测量横条实际高度，CSS 预留正文底部和创作工作台空间；
+  Image/Video、Agent、Skeleton 共用 workspace-viewport，未使用 JSX 内联样式。
+- 实际 npm test：434 项，420 passed、0 failed、14 skipped（包含未启用的
+  隔离数据库/外部审计测试）；TypeScript、lint quiet、design:check、diff check
+  通过。npm build 在 Test GA / 本地无业务连接配置下通过，不是正式发布或
+  Production Live Stripe 回读验收。旧菜单测试已同步新增设置项，并新增
+  未选择/关闭记忆回归。
+- 生产格式的本地构建 + 独立无痕 Chrome headless 自动验收十组通过：桌面
+  1440×900 可编辑/无遮罩、× 后刷新零授权、允许后唯一标签/拒绝撤回后不
+  加载、收起访客侧栏、手机 390×844 输入及生成按钮无遮挡、320×568 按钮
+  无横向滚动、GPC、地域默认、登录菜单、页脚/隐私正文重开。未捕获异常 0。
+  SDK、上下文 API、账号和业务数据使用明确替身；不替代真实 GA 收件、登录、
+  付款或生成验收。本轮没有连接业务库、付款、生成、平台修改或部署。
+- 截图已实际检查 /tmp/flownana-privacy-desktop.png、
+  /tmp/flownana-privacy-mobile.png、/tmp/flownana-privacy-mobile-settings.png；
+  十组检查记录 /tmp/flownana-privacy-ui-results.json，测试与构建日志保留
+  /tmp/flownana-privacy-tests.log、/tmp/flownana-privacy-build.log。
+- 验收初期存在工具/替身问题：缺默认 Playwright 浏览器时改用已安装 Chrome；
+  开发服务与构建并行时刷新等待超时，改验本地构建；重复按钮定位及账号
+  accountCreatedAt 替身字段修正后十组通过，没有因此修改产品行为。
+- 尚未提交、推送或发布。手动测试重点为真机软键盘/安全区、实际账号菜单
+  与访客入口、拒绝后刷新、同标签页关闭记忆及真实 Test GA 收件；AdGuard
+  仍可独立拦截 Google SDK，不能用本轮替身结果宣称外部采集已恢复。
+
+## 2026-10-05 隐私提示降干扰调研与待确认提案
+
+- 用户反馈居中隐私弹窗和右下角常驻 Privacy 过于干扰。实际已登录 Chrome
+  打开 Notion 首页，看到页脚灰色 Cookie settings；该会话不是首次访问样本。
+  Figma、GitHub 官方说明支持页脚重开设置，Figma Sites 支持底部横条、选择
+  记忆与隐藏，也提供悬浮重开形态，没有声称主流网站全都没有悬浮入口。
+- PRODUCT/DESIGN 新增明确待确认提案：底部无模态首次提示、选择后消失、
+  设置入口进入菜单/页脚/隐私页，× 仅本标签页会话暂停提醒。不更改地域、
+  GPC、广告关闭、旧选择、撤回恢复或事件含义。批准前维持当前运行实现。
+- 本轮只有文档变化，未改代码、埋点或平台设置，未部署。主要待验收风险：
+  手机底条遮挡输入/生成、访客与收起侧栏的设置可发现性、sessionStorage
+  失败时提醒重复、主动撤回与历史选择回归。参考研究不替代实现验收。
+
+## 2026-10-05 正式 GA 未收到数据提示的浏览器诊断
+
+- 用户截图对应正式属性 208428049 / 流 15944150044 / G-2PTWF8DJE2。
+  本轮读取正式站实际 JS：正式衡量 ID 已打入产物，采集开关启用；地域
+  policy 接口返回 200。前文仅测试站发布的历史记录不代表当前正式状态。
+- 用户原有 Chrome 正式站控制台明确显示 Google SDK 请求
+  `https://www.googletagmanager.com/gtag/js?id=G-2PTWF8DJE2`
+  报 `net::ERR_BLOCKED_BY_CLIENT`；刷新正式站后同一错误再次出现。
+  已确认当前浏览器访问的标签被客户端拦截，未确定具体扩展/过滤规则；
+  不能据此推断所有访客都被拦截或正式 GA 后台已有收件。
+- 未修改网站代码、采集政策、GA 设置或浏览器保护，未部署、付款或生成。
+  手动验收：仅对本站放行相关标签后刷新，Privacy 允许统计，查看正式属性
+  实时 page_view/pricing_view；不需要再次付款。后台数据流告警不能替代实时
+  收件证据，当前仍未完成本轮正式后台收件核验。
+
 ## 2026-10-05 地域基础统计已部署测试站（覆盖此前默认关闭状态）
 
 - 用户确认按地域基础采集策略行动。已先同步 PRODUCT 和 DESIGN：US/JP/TW 默认

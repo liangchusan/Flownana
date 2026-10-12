@@ -4,14 +4,14 @@ import { analyticsCollectionBasis, analyticsCollectionPolicy, permitsAnalyticsCo
 import { createSourceLoader } from "./helpers/load-source.ts";
 
 test("regional defaults are limited, unknown countries require a choice, and rejection/GPC override grants", () => {
-  for (const country of ["US", "JP", "TW"]) {
+  for (const country of ["US", "TW"]) {
     const headers = new Headers({ "x-vercel-ip-country": country });
     const policy = analyticsCollectionPolicy(headers);
     assert.equal(analyticsCollectionBasis(policy, null), "regional_default");
     assert.equal(analyticsCollectionBasis(policy, "denied"), null);
     assert.equal(permitsAnalyticsContext(headers, "regional_default"), true);
   }
-  for (const country of ["KR", "DE", "GB", "CH", "HK", "", "USA"]) {
+  for (const country of ["JP", "KR", "DE", "GB", "CH", "HK", "", "USA"]) {
     const headers = new Headers({ "x-vercel-ip-country": country, "accept-language": "en-US" });
     const policy = analyticsCollectionPolicy(headers);
     assert.equal(analyticsCollectionBasis(policy, null), null);
@@ -31,7 +31,7 @@ test("policy endpoint avoids cache sharing across regions and privacy signals", 
     const response = route.GET(new Request("https://flownana-test.vercel.app/api/analytics/policy", { headers: { "x-vercel-ip-country": country } }));
     assert.match(response.headers.get("cache-control")!, /private, no-store/);
     assert.match(response.headers.get("vary")!, /sec-gpc/);
-    assert.deepEqual(await response.json(), { defaultAnalytics: country === "US", gpc: false });
+    assert.deepEqual(await response.json(), { defaultAnalytics: country === "US", defaultAdvertising: country === "US", country, gpc: false });
   }
 });
 

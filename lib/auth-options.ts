@@ -144,7 +144,9 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
+      user.verifiedEmail = account?.provider === "google" &&
+        (profile as { email_verified?: boolean } | undefined)?.email_verified === true ? user.email ?? undefined : undefined;
       if (process.env.NODE_ENV === "development") {
         console.log("🔐 登录尝试:", {
           user: user?.email,
@@ -171,6 +173,7 @@ export const authOptions: NextAuthOptions = {
       return false;
     },
     async jwt({ token, user }) {
+      if (user) token.verifiedEmail = user.verifiedEmail ?? null;
       // Never bind an existing JWT to a newly created account, and never trust
       // client update() payloads as profile or identity data.
       return refreshAccountToken({
@@ -188,6 +191,7 @@ export const authOptions: NextAuthOptions = {
         session.user.accountCreatedAt = token.accountCreatedAt as string;
         session.user.name = token.name as string | null;
         session.user.email = token.email as string | null;
+        session.user.emailVerified = typeof token.verifiedEmail === "string" && token.verifiedEmail === token.email;
         session.user.image = token.picture as string | null;
       }
       if (process.env.NODE_ENV === "development") {

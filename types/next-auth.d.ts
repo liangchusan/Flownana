@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 declare module "next-auth" {
   interface User {
     accountCreatedAt?: string;
+    verifiedEmail?: string;
   }
   interface Session {
     user: {
@@ -10,6 +11,7 @@ declare module "next-auth" {
       accountCreatedAt: string;
       name?: string | null;
       email?: string | null;
+      emailVerified?: boolean;
       image?: string | null;
     };
   }

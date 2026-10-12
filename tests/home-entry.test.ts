@@ -40,7 +40,7 @@ test("home footer appears only after the session is confirmed anonymous", () => 
   }
 });
 
-test("account menu opens existing pricing and exposes mail and separate legal tabs", () => {
+test("account menu opens pricing and privacy settings, and exposes mail and separate legal tabs", () => {
   let opened = 0;
   const stateChanges: unknown[] = [];
   let stateIndex = 0;
@@ -54,12 +54,14 @@ test("account menu opens existing pricing and exposes mail and separate legal ta
   const scoped = Menu({ user });
   const items = elements(scoped.type(scoped.props)).filter((item) => item.props?.role === "menuitem");
   const text = (item: any) => React.Children.toArray(item.props.children).filter((child) => typeof child === "string").join("").trim();
-  assert.deepEqual(items.map(text), ["Account Profile", "Pricing", "Plans and Billing", "Contact Us", "Privacy Policy", "Terms of Service", "Sign Out"]);
+  assert.deepEqual(items.map(text), ["Account Profile", "Pricing", "Plans and Billing", "Contact Us", "Privacy settings", "Privacy Policy", "Terms of Service", "Sign Out"]);
   items[1].props.onClick();
   assert.equal(opened, 1);
   assert.equal(stateChanges.at(-1), false);
   assert.equal(items[3].props.href, "mailto:support@flownana.com");
-  for (const [index, href] of [[4, "/privacy-policy"], [5, "/terms-of-service"]] as const) {
+  items[4].props.onClick();
+  assert.equal(stateChanges.at(-1), false);
+  for (const [index, href] of [[5, "/privacy-policy"], [6, "/terms-of-service"]] as const) {
     assert.equal(items[index].props.href, href);
     assert.equal(items[index].props.target, "_blank");
     assert.match(items[index].props.rel, /noopener/);

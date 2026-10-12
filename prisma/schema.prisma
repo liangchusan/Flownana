@@ -291,3 +291,18 @@ model AnalyticsReport {
   @@index([environment, status, nextAttemptAt])
   @@index([userId, name, occurredAt])
 }
+
+// Operational aggregates only, never user identity or conversion payloads.
+model AnalyticsMonitorState {
+  id                  String   @id
+  lastSuccessfulRunAt DateTime?
+  notifiedSignature   String?
+  notificationKey     String?
+  notificationPayload Json?
+  notificationSignature String?
+  notificationLease   DateTime?
+  nextNotificationAt  DateTime?
+  lastCoverageAuditAt DateTime?
+  coverageAudit       Json?
+  updatedAt           DateTime @updatedAt
+}

@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 /** 创作页（侧栏 + 表单 + 结果区）Suspense 占位，符合全站 Skeleton 加载规范 */
 export function CreateFlowSkeleton() {
   return (
-    <div role="status" aria-label="Loading page" className="flex h-dvh overflow-hidden bg-background">
+    <div role="status" aria-label="Loading page" className="workspace-viewport flex overflow-hidden bg-background">
       <span className="sr-only">Loading page…</span>
       <div aria-hidden="true" className="hidden w-[260px] shrink-0 space-y-4 bg-surface-soft p-5 lg:block">
         <Skeleton className="mb-8 h-6 w-24" />

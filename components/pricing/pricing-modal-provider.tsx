@@ -55,16 +55,11 @@ export function PricingModalProvider({ children }: { children: ReactNode }) {
     <PricingModalContext.Provider value={value}>
       {children}
       {open && (
-        <Modal onClose={closePricing} aria-labelledby="pricing-modal-title"
+        <Modal onClose={closePricing} dismissible={false} aria-labelledby="pricing-modal-title"
           className="fixed inset-0 z-[70] overflow-y-auto bg-surface-soft"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget ||
-              (event.target instanceof HTMLElement && event.target.dataset.pricingBackdrop === "true")) closePricing();
-          }}
         >
           <section
             className="mx-auto min-h-full w-full max-w-7xl px-4 pb-10 pt-16 sm:px-8 sm:pb-14 sm:pt-16"
-            data-pricing-backdrop="true"
           >
             <header className="mb-5 text-center">
               <h2
@@ -83,7 +78,7 @@ export function PricingModalProvider({ children }: { children: ReactNode }) {
               </button>
             </header>
 
-            <div data-pricing-backdrop="true">
+            <div>
               <PricingPlans
                 stripeEnabled
                 initialBilling="yearly"

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { usePricingModal } from "@/components/pricing/pricing-modal-provider";
 import { getAccountScope } from "@/lib/account-scope";
+import { PrivacySettingsTrigger } from "@/components/analytics/privacy-settings-trigger";
 import { CreditCard, LogOut, UserRound, Tags, Mail, ShieldCheck, FileText } from "lucide-react";
 import {
   clearCachedBillingSummary,
@@ -184,6 +185,10 @@ function ScopedUserMenu({ user, align, compact, variant, accountScope }: UserMen
           <Mail className="mr-3 h-4 w-4 text-muted-foreground" />
           Contact Us
         </a>
+        <PrivacySettingsTrigger role="menuitem" className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" onClick={() => setIsOpen(false)}>
+          <ShieldCheck className="mr-3 h-4 w-4 text-muted-foreground" />
+          Privacy settings
+        </PrivacySettingsTrigger>
         <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" role="menuitem" className="flex min-h-11 w-full items-center rounded-ui px-3 text-sm text-foreground transition-all duration-300 hover:bg-surface-soft active:bg-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40" onClick={() => setIsOpen(false)}>
           <ShieldCheck className="mr-3 h-4 w-4 text-muted-foreground" />
           Privacy Policy

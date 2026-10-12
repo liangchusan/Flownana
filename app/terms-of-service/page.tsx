@@ -5,7 +5,7 @@ export const metadata = {
 };
 
 export default function TermsOfServicePage() {
-  const lastUpdated = "January 20, 2026";
+  const lastUpdated = "October 10, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,7 +47,8 @@ export default function TermsOfServicePage() {
 
           <h2 id="services">3. The Services</h2>
           <p>
-            Flownana provides AI-assisted generation tools for videos, images, and music/audio. The Services may change
+            Flownana provides AI-assisted generation tools for images and videos. New music and audio generation is
+            unavailable; existing audio remains available to view, download, and delete. The Services may change
             over time, and we may add, remove, or modify features.
           </p>
 
@@ -60,7 +61,7 @@ export default function TermsOfServicePage() {
 
           <h3>4.2 Outputs</h3>
           <p>
-            The Services may generate videos, images, and music/audio (“Outputs”). Outputs are generated automatically
+            The Services may generate images and videos (“Outputs”). Outputs are generated automatically
             and may be inaccurate or unsuitable. You are responsible for reviewing Outputs before using or sharing them.
           </p>
 
@@ -78,6 +79,12 @@ export default function TermsOfServicePage() {
           <p>
             Some features may require payment. Pricing, credits, and subscription details (if applicable) will be shown
             at the time of purchase. Taxes may apply. We may update pricing with notice where required by law.
+          </p>
+          <p>
+            Yearly plans are billed for the full year upfront, with credits issued monthly rather than all at once.
+            Each monthly credit batch expires 30 days after it is issued. You can manage your subscription through
+            Plans and Billing. If a generation fails after credits are deducted, those credits are returned;
+            this is a credit adjustment, not a cash refund of your subscription payment.
           </p>
 
           <h2 id="ip">6. Intellectual Property</h2>

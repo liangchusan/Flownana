@@ -1,5 +1,6 @@
 import { allowedAnalyticsHost, safePage, TEST_GA_ID, validContext, type AnalyticsContext, type CommerceEvent } from "./analytics-policy";
 import { analyticsCollectionBasis, type AnalyticsCollectionPolicy } from "./analytics-collection-policy";
+import { configureAdvertisingDefault, hasAdvertisingConsent, revokeAdvertising } from "./advertising-consent";
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 export const GA_ENABLED = process.env.NEXT_PUBLIC_GA_ENABLED === "true";
 export type AnalyticsEventName = "page_view" | "pricing_view" | "begin_checkout";
@@ -14,6 +15,7 @@ export function analyticsChoice(): string | null {
 export function configureAnalyticsCollection(policy: AnalyticsCollectionPolicy) {
   const previouslyGpc = collectionPolicy?.gpc;
   collectionPolicy = policy;
+  configureAdvertisingDefault(policy.defaultAdvertising === true && analyticsCollectionBasis(policy, analyticsChoice()) !== null);
   if (policy.gpc && !previouslyGpc) requestAnalyticsRevocation();
   window.dispatchEvent(new Event("flownana:analytics-consent"));
 }
@@ -55,6 +57,7 @@ export function reconcileAnalyticsRevocation(): Promise<boolean> {
   return revocationRequest;
 }
 function requestAnalyticsRevocation() {
+  revokeAdvertising();
   revocationPending = true;
   revocationVersion++;
   try { window.localStorage.setItem(REVOCATION_KEY, crypto.randomUUID()); } catch { /* Memory remains blocked. */ }
@@ -67,10 +70,12 @@ export function analyticsRevocationPending() { return hasPendingRevocation(); }
 export function setAnalyticsConsent(granted: boolean) {
   consentDenied = !granted;
   try { window.localStorage.setItem("flownana_analytics_consent", granted ? "granted" : "denied"); } catch { /* Fail closed. */ }
+  configureAdvertisingDefault(granted && collectionPolicy?.defaultAdvertising === true && hasAnalyticsConsent());
   if (!granted) requestAnalyticsRevocation();
   const allowed = granted && hasAnalyticsConsent() && GA_ENABLED && !!GA_MEASUREMENT_ID && allowedAnalyticsHost(GA_MEASUREMENT_ID, window.location.hostname);
   setTagDisabled(!allowed);
-  window.gtag?.("consent", "update", { analytics_storage: allowed ? "granted" : "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
+  const ads = allowed && hasAdvertisingConsent() ? "granted" : "denied";
+  window.gtag?.("consent", "update", { analytics_storage: allowed ? "granted" : "denied", ad_storage: ads, ad_user_data: ads, ad_personalization: "denied" });
   window.dispatchEvent(new Event("flownana:analytics-consent"));
   if (hasPendingRevocation()) void reconcileAnalyticsRevocation();
 }
