@@ -68,6 +68,9 @@ export function PricingModalProvider({ children }: { children: ReactNode }) {
               >
                 Choose your plan
               </h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                Start with your own references. Refine the details. Explore more versions of your idea.
+              </p>
               <button
                 type="button"
                 onClick={closePricing}

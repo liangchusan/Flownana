@@ -28,21 +28,21 @@ import { isAccountOperationCancelled } from "@/lib/account-operation";
 import { clearPricingLoginIntent, readPricingLoginIntent, savePricingLoginIntent } from "@/lib/pricing-login-intent";
 
 const SHARED_FEATURES = [
-  { icon: Sparkles, label: "All available image and video models" },
-  { icon: ImagePlus, label: "Turn your words into original images" },
-  { icon: WandSparkles, label: "Refine images with your own references" },
-  { icon: Film, label: "Create videos from text or images" },
-  { icon: MessageSquare, label: "Plan and create with your AI Agent" },
-  { icon: LayoutTemplate, label: "16 creative templates to get you started" },
-  { icon: Layers, label: "Explore up to 4 images per generation" },
-  { icon: RefreshCw, label: "Reuse your creations as references" },
+  { icon: ImagePlus, label: "Create product scenes, characters and backgrounds" },
+  { icon: WandSparkles, label: "Explore new directions with your reference images" },
+  { icon: Layers, label: "Compare up to 4 image variations per generation" },
+  { icon: RefreshCw, label: "Reuse a result to create your next version" },
+  { icon: Film, label: "Bring scenes to life from text or images" },
+  { icon: MessageSquare, label: "Develop ideas and create with your AI Agent" },
+  { icon: LayoutTemplate, label: "Start with 16 guided creative templates" },
+  { icon: Sparkles, label: "Choose from all available image and video models" },
   { icon: ShieldCheck, label: "Private creations, watermark-free downloads" },
 ];
 
 const PLAN_POSITIONING: Record<PlanKey, string> = {
-  starter: "Bring your ideas to life",
-  pro: "Power your everyday creativity",
-  max: "More room for your biggest ideas",
+  starter: "For focused projects and fresh ideas",
+  pro: "For regular creation and more variations",
+  max: "For bigger projects and deeper exploration",
 };
 
 const PLANS = PLAN_KEYS.map((planKey) => ({

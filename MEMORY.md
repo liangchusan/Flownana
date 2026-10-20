@@ -1,5 +1,35 @@
 # Flownana 工程记忆
 
+## 2026-10-20 高付费创作需求订阅介绍（已批准生产发布）
+
+- 根据 DeeVid 高付费用户创作研究中参考素材、重复迭代、多版本比较及持续创作需求，
+  调整共享 Pricing 文案：优先展示商品场景、角色、背景、参考图、多图比较与结果复用；
+  新增 references → refine details → explore versions 的简短介绍。
+- Starter/Pro/Max 分别强调专注项目、经常创作与更多版本、更大项目与深入探索。
+  三档仍共用原有功能；价格、积分、年付说明、结账、GA4 及关闭规则均未改。
+  本次为既有能力的局部文案调整，未改变 PRODUCT/DESIGN 定义的产品行为。
+- design:check 通过；两文件 ESLint 0 errors，保留原有 3 条 window.location.href 警告。
+  独立本地 Chrome 验证 1440/768/390px：三档各九项、无卡片横向溢出、最末条可滚动查看；
+  月付/年付金额与积分、Esc 保持打开、×关闭及重新打开默认年付已核对。
+- 用户体验本地测试页后明确批准生产发布；npm run build 通过，发布结果另补。
+  未执行真实支付；仍需手测登录后 Current plan/Upgrade 入口与结账金额。
+  吸引高付费用户是文案假设，效果需后续投放与购买转化验证，不视为已证实提升。
+
+## 2026-10-18 本聊天发布请求复核（已在线，无重复部署）
+
+- 用户在本聊天要求发布 Pricing 防误关闭与下载命名修复。回查发现两项均已
+  收入 b489166，后续仅文档提交 e2d8d52103d1627049fdcde9bab011a010b35aab；
+  本轮初始工作区干净、HEAD 与 origin/main 一致，没有新增待发布源码。
+- 实时 Vercel get_deployment(www.flownana.com) 回读 production READY
+  dpl_9ZbWHcaTpHSyrxBmKK64rmmaPfgo，Git SHA 与本地 HEAD 相同，正式别名
+  www.flownana.com/flownana.com 均在该部署。两项修复已经在线，因此未重复构建、
+  发布或推送。本聊天此前“未发布”为 10 月 10 日当时状态，已由 10 月 12 日发布覆盖。
+- 本轮重新执行 npm run smoke:prod 全通过，覆盖公开路由、演示视频、匿名受保护
+  API、音乐下线、Cron 鉴权与视频 options。未运行登录态浏览器或真实下载；仍需
+  手测 Pricing 空白/Esc 不关闭与 ×/重开，Assets/Agent/创作结果新文件名、多图序号、
+  手机 Safari 及大视频下载速度/完整性。代理下载流量与平台时限风险仍保留。
+- 本轮仅补记本节本地工程记录，无应用源码变化；未提交/推送该记录。
+
 ## 2026-10-12 正式发布结果
 
 - 全部53个本地变更已提交b489166并推送main，Vercel Git生产发布
