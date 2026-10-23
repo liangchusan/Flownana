@@ -19,7 +19,7 @@ import { buildCreationDownloadPath } from "@/lib/creation-download";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import type { AgentSnapshot, AgentTurnView, AgentOutput } from "./types";
 import { fetchAgentSnapshot } from "@/lib/shared-agent-read";
-import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, getVideoModelName } from "@/lib/generation-pricing";
+import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, AVAILABLE_IMAGE_MODEL_IDS, AVAILABLE_VIDEO_MODEL_IDS, DEFAULT_VIDEO_RESOLUTIONS, canonicalVideoModelName, videoFollowsInputRatio, getVideoGenerationCredits, getImageGenerationCredits, getVideoModelName } from "@/lib/generation-pricing";
 import { getImageAspectRatios } from "@/lib/image-model-capabilities";
 import type { AgentQuote } from "@/lib/agent/contract";
 
@@ -198,21 +198,26 @@ function QuoteCard({ turn, current, busy, onConfirm, onReprice }: { turn: AgentT
   const imageResolutions = imageModel ? imageModel.flatCredits ? [] : (imageModel.resolutions ?? Object.keys(imageModel.credits)) : [];
   const imageRatios = imageModel ? getImageAspectRatios(imageModel.id, draft.resolution as never, imageReferences) : [];
   const videoModels = [...new Map(VIDEO_MODEL_OPTIONS.map(option => [getVideoModelName(option), { id: getVideoModelName(option), label: getVideoModelName(option) }])).values()];
-  const videoOptions = draft.type === "video" ? VIDEO_MODEL_OPTIONS.filter(option => getVideoModelName(option) === draft.model) : [];
+  const videoOptions = draft.type === "video" ? VIDEO_MODEL_OPTIONS.filter(option => getVideoModelName(option) === canonicalVideoModelName(draft.model) && DEFAULT_VIDEO_RESOLUTIONS.includes(option.resolution as never) && !(option.family === "wan" && draft.inputs.some(input => input.kind === "video") && option.duration > 15)) : [];
   const videoResolutions = [...new Set(videoOptions.map(option => option.resolution))];
   const videoAtResolution = videoOptions.filter(option => option.resolution === draft.resolution);
-  const videoRatios = [...new Set(videoAtResolution.flatMap(option => option.aspectRatios ?? []))];
+  const followsImage = draft.type === "video" && videoFollowsInputRatio(canonicalVideoModelName(draft.model), imageReferences);
+  const videoRatios = followsImage ? ["Auto"] : [...new Set(videoAtResolution.flatMap(option => option.aspectRatios ?? []))];
+  const activeVideo = VIDEO_MODEL_OPTIONS.find(option => option.id === draft.modelId);
+  const unitCredits = draft.type === "image" ? getImageGenerationCredits(draft.modelId, draft.resolution as never, imageReferences) : activeVideo ? getVideoGenerationCredits(activeVideo, draft.inputs) : undefined;
+  const unavailableQuote = draft.type === "image" ? !AVAILABLE_IMAGE_MODEL_IDS.has(draft.modelId) : !AVAILABLE_VIDEO_MODEL_IDS.has(draft.modelId);
+  const quoteNotice = unavailableQuote || unitCredits == null || unitCredits * draft.count !== draft.credits ? "This model or price is no longer available. Choose a model to update this quote." : "";
   const videoDurations = [...new Set(videoAtResolution.map(option => option.duration))].sort((a, b) => a - b);
   return <div className={compact ? "" : "space-y-4"}>
     {compact ? <p className="whitespace-pre-wrap text-sm">{q.prompt}</p> : <>
       <textarea aria-label="Optimized prompt" value={draft.prompt} disabled={repricing || busy} onChange={event => setDraft(current => ({ ...current, prompt: event.target.value }))} onBlur={() => { if (draft.prompt.trim() && draft.prompt !== q.prompt) void updateQuote({ ...draft, prompt: draft.prompt.trim() }); }} className="min-h-24 w-full resize-y rounded-ui-xl bg-surface-soft px-4 py-3 text-sm leading-relaxed transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" />
-      <div className="flex min-w-0 items-center gap-2"><GenerationSettings models={draft.type === "image" ? IMAGE_MODEL_OPTIONS.map(model => ({ id: model.id, label: model.label })) : videoModels} model={draft.type === "image" ? draft.modelId : draft.model} onModel={value => {
+      <div className="flex min-w-0 items-center gap-2"><GenerationSettings models={draft.type === "image" ? IMAGE_MODEL_OPTIONS.map(model => ({ id: model.id, label: model.label })) : videoModels} model={draft.type === "image" ? unavailableQuote ? draft.model : draft.modelId : canonicalVideoModelName(draft.model)} onModel={value => {
         if (draft.type === "image") { const model = IMAGE_MODEL_OPTION_MAP[value as keyof typeof IMAGE_MODEL_OPTION_MAP]; const resolution = model.flatCredits ? "Auto" : (model.resolutions ?? Object.keys(model.credits))[0]; void updateQuote({ ...draft, model: value, modelId: value, resolution, aspectRatio: getImageAspectRatios(value as never, resolution as never, imageReferences)[0] ?? "1:1" }); return; }
-        const option = VIDEO_MODEL_OPTIONS.find(item => getVideoModelName(item) === value)!; void updateQuote({ ...draft, model: value, resolution: option.resolution, duration: option.duration, aspectRatio: (option.aspectRatios ?? ["Auto"])[0], sound: !!option.hasAudio });
-      }} ratios={draft.type === "image" ? imageRatios : videoRatios} ratio={draft.aspectRatio} onRatio={value => void updateQuote({ ...draft, aspectRatio: value })} resolutions={draft.type === "image" ? imageResolutions : videoResolutions} resolution={draft.resolution} onResolution={value => {
+        const option = VIDEO_MODEL_OPTIONS.find(item => getVideoModelName(item) === value)!; void updateQuote({ ...draft, model: value, resolution: option.resolution, duration: option.duration, aspectRatio: videoFollowsInputRatio(getVideoModelName(option), imageReferences) ? "Auto" : (option.aspectRatios ?? ["Auto"])[0], sound: !!option.hasAudio });
+      }} followsImage={followsImage} notice={quoteNotice} ratios={unavailableQuote ? [] : draft.type === "image" ? imageRatios : videoRatios} ratio={draft.aspectRatio} onRatio={value => void updateQuote({ ...draft, aspectRatio: value })} resolutions={unavailableQuote ? [] : draft.type === "image" ? imageResolutions : videoResolutions} resolution={draft.resolution} onResolution={value => {
         if (draft.type === "image") { const ratio = getImageAspectRatios(draft.modelId as never, value as never, imageReferences).includes(draft.aspectRatio) ? draft.aspectRatio : getImageAspectRatios(draft.modelId as never, value as never, imageReferences)[0]; void updateQuote({ ...draft, resolution: value, aspectRatio: ratio }); return; }
-        const option = videoOptions.find(item => item.resolution === value)!; void updateQuote({ ...draft, resolution: value, duration: option.duration, aspectRatio: (option.aspectRatios ?? ["Auto"])[0], sound: !!option.hasAudio });
-      }} count={draft.type === "image" ? draft.count : undefined} onCount={draft.type === "image" ? value => void updateQuote({ ...draft, count: value }) : undefined} durations={draft.type === "video" ? videoDurations : undefined} duration={draft.type === "video" ? draft.duration : undefined} onDuration={draft.type === "video" ? value => void updateQuote({ ...draft, duration: value }) : undefined} placement="auto" /><Button className="shrink-0 gap-2" disabled={busy || repricing || draft.prompt !== q.prompt || !current} onClick={onConfirm}><span>{draft.credits} credits</span><Send className="h-4 w-4" /></Button></div>
+        const option = videoOptions.find(item => item.resolution === value)!; void updateQuote({ ...draft, resolution: value, duration: option.duration, aspectRatio: videoFollowsInputRatio(getVideoModelName(option), imageReferences) ? "Auto" : (option.aspectRatios ?? ["Auto"])[0], sound: !!option.hasAudio });
+      }} count={draft.type === "image" ? draft.count : undefined} onCount={!unavailableQuote && draft.type === "image" ? value => void updateQuote({ ...draft, count: value }) : undefined} durations={draft.type === "video" && videoDurations.length ? videoDurations : undefined} duration={draft.type === "video" ? draft.duration : undefined} onDuration={draft.type === "video" ? value => void updateQuote({ ...draft, duration: value }) : undefined} placement="auto" /><Button className="shrink-0 gap-2" disabled={!!quoteNotice || busy || repricing || draft.prompt !== q.prompt || !current} onClick={onConfirm}><span>{draft.credits} credits</span><Send className="h-4 w-4" /></Button></div>
       {editError && <p role="alert" className="text-xs text-destructive">{editError}</p>}
     </>}
   </div>;

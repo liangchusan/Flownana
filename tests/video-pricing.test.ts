@@ -1,123 +1,61 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  KIE_VIDEO_CREDIT_MULTIPLIER,
-  VIDEO_MODEL_OPTION_MAP,
-  VIDEO_MODEL_OPTIONS,
-  getDisplayAspectRatios,
-  getDisplayResolutions,
-  getDisplaySoundOptions,
-} from "../lib/generation-pricing.ts";
+import { KIE_VIDEO_CREDIT_MULTIPLIER, VIDEO_MODEL_OPTION_MAP, VIDEO_MODEL_OPTIONS, getVideoModelName, getVideoGenerationCredits, getDisplayAspectRatios, getDisplayResolutions, getDisplaySoundOptions } from "../lib/generation-pricing.ts";
 
-test("all KIE video model platform credits follow API credits times 0.2", () => {
+test("only five officially named video models can be selected", () => {
+  assert.deepEqual([...new Set(VIDEO_MODEL_OPTIONS.map(getVideoModelName))], ["Seedance 2.0 Mini", "Gemini Omni 1.1 Flash", "Wan 3.0 Video", "MiniMax H3 (Hailuo-03)", "Grok Imagine Video 1.5"]);
   assert.equal(KIE_VIDEO_CREDIT_MULTIPLIER, 0.2);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.credits, 14);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_4.credits, 23);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_15.credits, 87);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.grok15_720_8.credits, 40);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.happyhorse11_1080_15.credits, 102);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.geminiomni_720_4.credits, 18);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.geminiomni_4k_10.credits, 60);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.wan30_480_5.credits, 30);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.wan30_720_5.credits, 50);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.wan30_1080_5.credits, 90);
-});
-
-test("Seedance Mini uses KIE no-video pricing for every input mode with 480P first", () => {
   assert.equal(VIDEO_MODEL_OPTIONS[0].id, "seedance2mini_480_4");
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.credits, 8);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_15.credits, 66);
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.provider, "kie");
-  assert.equal(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_4.providerModel, "bytedance/seedance-2-mini");
+  for (const option of VIDEO_MODEL_OPTIONS) assert.equal(option.provider, "kie");
 });
-
-test("new video model options use their KIE provider models", () => {
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.providerModel,
-    "minimax-h3/text-to-video"
-  );
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.minimaxh3_720_4.imageToVideoProviderModel,
-    "minimax-h3/image-to-video"
-  );
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.grok15_480_1.providerModel,
-    "grok-imagine-video-1-5-preview"
-  );
-  assert.equal(VIDEO_MODEL_OPTION_MAP.grok15_480_1.requiresImageInput, true);
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.happyhorse11_720_3.imageToVideoProviderModel,
-    "happyhorse-1-1/image-to-video"
-  );
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.geminiomni_720_4.providerModel,
-    "gemini-omni-video"
-  );
-  assert.equal(
-    VIDEO_MODEL_OPTION_MAP.wan30_480_2.providerModel,
-    "wan/3-0-video"
-  );
+test("Grok 480P one second keeps the approved minimum one-credit price", () => {
+  assert.equal(VIDEO_MODEL_OPTION_MAP.grok15_480_1.credits, 1);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.grok15_480_1), 1);
 });
-
-test("retired video models are no longer exposed as generation options", () => {
-  const providerModels = new Set(VIDEO_MODEL_OPTIONS.map((option) => option.providerModel));
-  assert.equal(providerModels.has("veo3_lite"), false);
-  assert.equal(providerModels.has("veo3_fast"), false);
-  assert.equal(providerModels.has("veo3"), false);
-  assert.equal(providerModels.has("kling-3.0/video"), false);
-  assert.equal(providerModels.has("kling/v3-turbo-text-to-video"), false);
-  assert.equal(providerModels.has("bytedance/seedance-2"), false);
-  assert.equal(providerModels.has("bytedance/seedance-2-mini"), true);
-  assert.equal(providerModels.has("bytedance/seedance-2-fast"), false);
-  assert.equal(providerModels.has("doubao-seedance-2-0-mini-260615"), false);
-  assert.equal(providerModels.has("happyhorse/text-to-video"), false);
+test("all no-video rates match the verified KIE price table", () => {
+  for (const option of VIDEO_MODEL_OPTIONS) {
+    const rates: Record<string, Record<string, number>> = { seedance: { "480P": 3.8, "720P": 8.2 }, wan: { "480P": 8, "720P": 16, "1080P": 32 }, minimax: { "720P": 8 }, grok: { "480P": 2.4, "720P": 4.5 } };
+    if (option.family === "gemini") {
+      assert.equal(option.providerModel, "google/gemini-omni-flash-1-1");
+      const position = [4, 6, 8, 10].indexOf(option.duration);
+      const costs = option.resolution === "4K" ? [147, 168, 189, 210] : [63, 84, 105, 126];
+      assert.equal(option.credits, Math.round(costs[position] * 0.2));
+    } else {
+      const rounded = Math.round(rates[option.family][option.resolution] * option.duration * 0.2);
+      assert.equal(option.credits, option.family === "grok" ? Math.max(1, rounded) : rounded);
+    }
+  }
 });
-
-test("video parameter display rules keep only canonical aspect ratios", () => {
-  const happyHorseOptions = VIDEO_MODEL_OPTIONS.filter((option) =>
-    option.providerModel.startsWith("happyhorse-1-1/")
-  );
-  assert.deepEqual(getDisplayAspectRatios(happyHorseOptions), [
-    "Auto",
-    "21:9",
-    "16:9",
-    "4:3",
-    "1:1",
-    "3:4",
-    "9:16",
-  ]);
+test("Seedance reference-video price includes actual input seconds at its separate rate", () => {
+  const inputs = [{ kind: "video", durationSeconds: 4.5 }, { kind: "video", durationSeconds: 2 }];
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_5, inputs), 12);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.seedance2mini_480_5, inputs), 6);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_5), 8);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_5, [{ kind: "video" }]), undefined);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.seedance2mini_720_5, [{ kind: "video", durationSeconds: NaN }]), undefined);
 });
-
-test("video parameter display rules keep only canonical resolutions", () => {
-  const grokOptions = VIDEO_MODEL_OPTIONS.filter(
-    (option) => option.providerModel === "grok-imagine-video-1-5-preview"
-  );
-  assert.deepEqual(getDisplayResolutions(grokOptions), ["480P", "720P"]);
-
-  const minimaxOptions = VIDEO_MODEL_OPTIONS.filter(
-    (option) => option.providerModel === "minimax-h3/text-to-video"
-  );
-  assert.deepEqual(getDisplayResolutions(minimaxOptions), ["720P"]);
-
-  const geminiOptions = VIDEO_MODEL_OPTIONS.filter(
-    (option) => option.providerModel === "gemini-omni-video"
-  );
-  assert.deepEqual(getDisplayResolutions(geminiOptions), ["720P", "1080P", "4K"]);
-
-  const wanOptions = VIDEO_MODEL_OPTIONS.filter(
-    (option) => option.providerModel === "wan/3-0-video"
-  );
-  assert.deepEqual(getDisplayResolutions(wanOptions), ["480P", "720P", "1080P"]);
+test("Wan video input contributes billable time and cannot exceed the upstream 30-second sum", () => {
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.wan30_720_10, [{ kind: "video", durationSeconds: 5 }]), 48);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.wan30_1080_15, [{ kind: "video", durationSeconds: 15 }]), 192);
+  assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP.wan30_1080_16, [{ kind: "video", durationSeconds: 15 }]), undefined);
 });
-
-test("video parameter display rules expose sound only when model supports it", () => {
-  const happyHorseOptions = VIDEO_MODEL_OPTIONS.filter((option) =>
-    option.providerModel.startsWith("happyhorse-1-1/")
-  );
-  assert.deepEqual(getDisplaySoundOptions(happyHorseOptions), []);
-  assert.deepEqual(getDisplaySoundOptions(VIDEO_MODEL_OPTIONS), ["Auto", "On", "Off"]);
-  const seedanceOptions = VIDEO_MODEL_OPTIONS.filter((option) => option.family === "seedance");
-  assert.deepEqual(getDisplaySoundOptions(seedanceOptions), ["On", "Off"]);
-  const wanOptions = VIDEO_MODEL_OPTIONS.filter((option) => option.family === "wan");
-  assert.deepEqual(getDisplaySoundOptions(wanOptions), ["On", "Off"]);
+test("retired video IDs retain metadata solely for paid-task polling", () => {
+  assert.equal(VIDEO_MODEL_OPTION_MAP.happyhorse11_720_3.credits, 13);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.geminiomni_720_4.credits, 18);
+  assert.equal(VIDEO_MODEL_OPTION_MAP.minimaxh3_2k_4.credits, 23);
+  for (const id of ["geminiomni_720_4", "happyhorse11_720_3", "minimaxh3_2k_4"]) {
+    assert.ok(VIDEO_MODEL_OPTION_MAP[id]);
+    assert.equal(VIDEO_MODEL_OPTIONS.some(option => option.id === id), false);
+    assert.equal(getVideoGenerationCredits(VIDEO_MODEL_OPTION_MAP[id]), undefined);
+  }
+});
+test("model parameter displays remain genuine whitelist intersections", () => {
+  const options = (family: string) => VIDEO_MODEL_OPTIONS.filter(option => option.family === family);
+  assert.deepEqual(getDisplayResolutions(options("grok")), ["480P", "720P"]);
+  assert.deepEqual(getDisplayResolutions(options("minimax")), ["720P"]);
+  assert.deepEqual(getDisplayResolutions(options("gemini")), ["720P", "1080P", "4K"]);
+  assert.deepEqual(getDisplayResolutions(options("wan")), ["480P", "720P", "1080P"]);
+  assert.deepEqual(getDisplayAspectRatios(options("grok")), ["Auto"]);
+  assert.deepEqual(getDisplaySoundOptions(options("grok")), ["On", "Off"]);
+  assert.deepEqual(getDisplaySoundOptions(options("gemini")), ["On"]);
 });

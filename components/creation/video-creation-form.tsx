@@ -13,6 +13,8 @@ import { isAccountOperationCancelled, type CaptureAccountOperation } from "@/lib
 import { uploadAccountMedia } from "@/lib/account-media-upload";
 import {
   VIDEO_MODEL_OPTIONS,
+  canonicalVideoModelName,
+  getVideoGenerationCredits,
   formatVideoResolution,
   getDisplayAspectRatios,
   getDisplayResolutions,
@@ -23,6 +25,7 @@ import {
   type VideoModelOption,
   type VideoResolutionOption,
 } from "@/lib/generation-pricing";
+import { getVideoPromptLimits, videoPromptIssue, videoInputMode } from "@/lib/video-model-capabilities";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
@@ -69,7 +72,7 @@ interface VideoCreationFormProps {
   initialPrompt?: string;
   initialImage?: string;
   initialImages?: string[];
-  inputAttachments?: Array<{ url: string; kind: "image" | "video" | "audio" }>;
+  inputAttachments?: Array<{ url: string; kind: "image" | "video" | "audio"; durationSeconds?: number }>;
   initialParameters?: GenerationParameters;
   variant?: "panel" | "composer";
   menuPlacement?: "above" | "below";
@@ -122,7 +125,7 @@ export function VideoCreationForm({
   const inputImageCount = requestInputs.filter((input) => input.kind === "image").length;
   const hasVideoInput = requestInputs.some((input) => input.kind === "video");
   const [selectedModelName, setSelectedModelName] = useState<string>(
-    initialParameters?.model || getVideoModelName(defaultOption)
+    canonicalVideoModelName(initialParameters?.model || getVideoModelName(defaultOption))
   );
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>(
     (initialParameters?.aspectRatio as VideoAspectRatio) || "Auto"
@@ -191,6 +194,10 @@ export function VideoCreationForm({
   const imagesOverLimit = inputImageCount > inputCapabilities.maxImages || (inputCapabilities.imageRequired && inputImageCount === 0);
 
   const selectedOption = optionsForModel.find(o => formatVideoResolution(o.resolution) === resolution && o.duration === duration);
+  const creditsCost = selectedOption ? getVideoGenerationCredits(selectedOption, requestInputs) : undefined;
+  const promptLimits = getVideoPromptLimits(selectedModelName);
+  const promptInvalid = !!videoPromptIssue(selectedModelName, prompt);
+  const unavailableModel = !modelNameOptions.includes(selectedModelName);
   const showSound = !!selectedOption?.hasAudio;
   const sound = showSound ? "On" : "Off";
   const usesConcurrentGenerationLimit = activeGenerationCount !== undefined;
@@ -198,10 +205,6 @@ export function VideoCreationForm({
     ? activeGenerationCount >= maxConcurrentGenerations
     : isGenerating;
 
-  useEffect(() => {
-    if (modelNameOptions.length > 0 && !modelNameOptions.includes(selectedModelName))
-      setSelectedModelName(modelNameOptions[0]);
-  }, [modelNameOptions, selectedModelName]);
   useEffect(() => {
     const changes: string[] = [];
     if (resolutionOptions.length && !resolutionOptions.includes(resolution)) {
@@ -309,7 +312,7 @@ export function VideoCreationForm({
   };
 
   const handleGenerate = async () => {
-    if (submissionBlocked || imagesOverLimit) return;
+    if (unavailableModel || submissionBlocked || imagesOverLimit || creditsCost == null || promptInvalid) return;
     if (status === "loading") {
       return;
     }
@@ -362,13 +365,7 @@ export function VideoCreationForm({
       duration,
       audio: showSound ? (sound === "Off" ? "Off" : "On") : undefined,
       inputKinds: requestInputs.map((input) => input.kind),
-      mode: requestInputs.some((input) => input.kind !== "image")
-        ? "Multimodal reference to video"
-        : uploadedImages.length === 2
-        ? "First and last frame to video"
-        : uploadedImages.length === 1
-          ? "Image to video"
-          : "Text to video",
+      mode: videoInputMode(selectedOption, requestInputs),
     };
     onGenerationStart?.({
       optimisticId,
@@ -388,6 +385,7 @@ export function VideoCreationForm({
         prompt: requestPrompt,
         inputs: requestInputs.length > 0 ? requestInputs : undefined,
         modelOptionId: selectedOption.id,
+        quotedCredits: creditsCost,
         aspectRatio: requestAspectRatio,
         generateAudio: showSound ? sound !== "Off" : false,
         runId: optimisticId,
@@ -410,7 +408,7 @@ export function VideoCreationForm({
             modelOptionId: response.data.modelOptionId || selectedOption.id,
             prompt: responsePrompt,
             optimisticId,
-            creditsCost: response.data.creditsCost || selectedOption.credits,
+            creditsCost: response.data.creditsCost ?? creditsCost,
             parameters: response.data.parameters || generationParameters,
           });
           return;
@@ -470,7 +468,7 @@ export function VideoCreationForm({
   };
 
   // ── Trigger button shared class ──────────────────────────────────────────
-  const settingsControl = <GenerationSettings placement={menuPlacement} models={modelNameOptions.map(name => ({ id: name, label: name }))} model={selectedModelName} onModel={setSelectedModelName} ratios={aspectRatioOptions} ratio={aspectRatio} onRatio={v => setAspectRatio(v as VideoAspectRatio)} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as VideoResolutionOption)} durations={durationOptions} duration={duration} onDuration={setDuration} followsImage={followsImage} notice={[settingsNotice, hasVideoInput && selectedModelName === "Wan 3.0 Video" ? "With a reference video, output is limited to 15 seconds." : ""].filter(Boolean).join(" ")} />;
+  const settingsControl = <GenerationSettings placement={menuPlacement} models={modelNameOptions.map(name => ({ id: name, label: name }))} model={selectedModelName} onModel={setSelectedModelName} ratios={aspectRatioOptions} ratio={aspectRatio} onRatio={v => setAspectRatio(v as VideoAspectRatio)} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as VideoResolutionOption)} durations={durationOptions} duration={duration} onDuration={setDuration} followsImage={followsImage} notice={[unavailableModel ? `${selectedModelName} is no longer available. Choose an available model to recheck settings and price.` : settingsNotice, hasVideoInput && creditsCost == null ? "Check reference video durations to calculate the price." : "", hasVideoInput && selectedModelName === "Wan 3.0 Video" ? "With a reference video, output is limited to 15 seconds." : ""].filter(Boolean).join(" ")} />;
 
   if (variant === "composer") {
     return (
@@ -481,14 +479,14 @@ export function VideoCreationForm({
             onChange={(event) => updatePrompt(event.target.value)}
             placeholder="Describe the video you want to create..."
             className="h-20 min-h-20 resize-none border-0 bg-transparent px-1 pb-1 pt-1 shadow-none focus-visible:ring-0"
-            maxLength={500}
+            maxLength={promptLimits.max}
           />
         </div>
         <div className="flex min-h-12 items-start gap-1 border-t border-border pt-2">
           {toolbarLeading}
           {settingsControl}
-          <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || !prompt.trim() || !selectedOption || submissionBlocked || imagesOverLimit))} className="ml-auto h-10 gap-2 px-4">
-            {!session ? getSignInLabel() : <><span>{selectedOption?.credits ?? 0} credits</span><Send className="h-4 w-4" /></>}
+          <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || promptInvalid || creditsCost == null || unavailableModel || !selectedOption || submissionBlocked || imagesOverLimit))} className="ml-auto h-10 gap-2 px-4">
+            {!session ? getSignInLabel() : <><span>{creditsCost ?? "—"} credits</span><Send className="h-4 w-4" /></>}
           </Button>
         </div>
       </div>
@@ -534,7 +532,7 @@ export function VideoCreationForm({
           onChange={(e) => updatePrompt(e.target.value)}
           placeholder="Describe the video you want to create..."
           className="h-36 w-full resize-none rounded-2xl border border-border/50 bg-background px-4 py-3 text-sm text-foreground shadow-sm transition-all duration-300 placeholder:text-muted-foreground focus:border-input focus:outline-none focus:ring-2 focus:ring-input"
-          maxLength={500}
+          maxLength={promptLimits.max}
         />
       </div>
 
@@ -545,7 +543,7 @@ export function VideoCreationForm({
           onClick={handleGenerate}
           disabled={
             status === "loading" ||
-            (!!session && (generationLimitReached || !prompt.trim() || !selectedOption || imagesOverLimit))
+            (!!session && (generationLimitReached || promptInvalid || creditsCost == null || unavailableModel || !selectedOption || imagesOverLimit))
           }
           className="w-full rounded-xl border-0 bg-primary text-primary-foreground shadow-sm transition-all duration-300 hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
           size="lg"
@@ -562,7 +560,7 @@ export function VideoCreationForm({
         </Button>
 
         <p className="text-xs text-muted-foreground">
-          This generation will cost {selectedOption?.credits ?? 0} credits.
+          This generation will cost {creditsCost ?? "—"} credits.
         </p>
       </div>
     </div>

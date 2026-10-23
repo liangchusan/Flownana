@@ -170,6 +170,7 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
   // Download validation runs before the account transaction; that transaction still
   // rechecks revision, ownership, entitlement and price before any charge.
   const preflight = await prisma.agentTurn.findFirst({ where: { id: turnId, conversationId: id, conversation: { userId: account.id, deletedAt: null } } });
+  let verifiedVideoInputs: AgentInput[] | undefined;
   if (preflight?.quote && !preflight.generationIds.length) {
     const q = preflight.quote as unknown as AgentQuote;
     if (q.type === "video") {
@@ -177,7 +178,10 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
         const owned = await prisma.mediaAsset.findUnique({ where: { userId_url: { userId: account.id, url: ref.url } } });
         if (!owned || owned.type !== (ref.kind === "audio" ? "music" : ref.kind)) throw new AgentError("A reference is no longer available.");
       }
-      try { await validateReferenceDurations(getVideoInputCapabilities(q.model), q.inputs); }
+      try {
+        const metadata = await validateReferenceDurations(getVideoInputCapabilities(q.model), q.inputs);
+        verifiedVideoInputs = q.inputs.map((input, index) => ({ ...input, durationSeconds: metadata[index]?.durationSeconds }));
+      }
       catch (e) { throw new AgentError(e instanceof Error ? e.message : "Could not verify references."); }
     }
   }
@@ -190,7 +194,8 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
     if (turn.revision !== c.revision || turn.status !== "completed" || !turn.quote) throw new AgentError("This quote changed. Ask Agent for a new plan.", "stale_quote", 409);
     const quote = turn.quote as unknown as AgentQuote;
     const rights = await accountEntitlements(tx, account.id);
-    const fresh = buildQuote(quote, quote.inputs, { userText: quote.exactText.join("\n"), maxVideoResolution: rights.maxVideoResolution, templateId: quote.templateId, templateVersion: quote.templateVersion });
+    if (quote.type === "video" && JSON.stringify(preflight?.quote) !== JSON.stringify(turn.quote)) throw new AgentError("This quote changed. Recheck the references.", "stale_quote", 409);
+    const fresh = buildQuote(quote, verifiedVideoInputs ?? quote.inputs, { userText: quote.exactText.join("\n"), maxVideoResolution: rights.maxVideoResolution, templateId: quote.templateId, templateVersion: quote.templateVersion });
     if (fresh.credits !== quote.credits || fresh.modelId !== quote.modelId) throw new AgentError("The price changed. Ask Agent for an updated quote.", "stale_quote", 409);
     if (quote.templateId && getImageTemplate(quote.templateId).version !== quote.templateVersion) throw new AgentError("The template changed. Update this quote.", "stale_quote", 409);
     const active = await tx.generation.count({ where: { userId: account.id, type: { in: ["image", "video"] }, status: { in: ["pending", "processing", "generating"] } } });

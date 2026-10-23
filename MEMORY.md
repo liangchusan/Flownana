@@ -1,5 +1,87 @@
 # Flownana 工程记忆
 
+## 2026-10-23 全模型名称、参数、计价与上下线开发（进行中，未发布）
+
+- 用户已明确授权对话中的模型改动开发上线，并要求全部在售模型名称与 KIE 官方
+  一致、所有参数和计价准确。PRODUCT 6.3/7.1 标为已批准，7.2 补全审计修正范围。
+- 已读取8个官方模型页面、14个模式 API schema 与独立 Pricing 表。公共事实记录在
+  docs/KIE-MODEL-AUDIT-2026-10-23.md / KIE-MODEL-CONTRACTS.json，不含任何凭据。
+- 在售图片为 Nano Banana 2.1、Grok Imagine Image 2.0、GPT Image 2.5 Flare/Sunburst；
+  视频为 Seedance 2.0 Mini、Gemini Omni 1.1 Flash、Wan 3.0 Video、MiniMax H3
+  (Hailuo-03)、Grok Imagine Video 1.5。旧模型元数据与轮询兼容保留，新请求在售校验独立。
+- 修正保留视频模型当前费率及 Seedance/Wan 输入视频时长计费。Agent、前端和后端
+  共用报价；服务端从真实文件重读时长，与用户报价不一致时在扣费前拒绝。
+  新增已有模型输入的尺寸/像素/FPS检查；sharp 0.35.5从已存在的间接依赖声明为直接依赖。
+- 用户已确认Grok 480P 1秒保留并最低收1积分；Grok视频统一采用取整后至少1积分，
+  前端、Agent与服务端共享报价，其他模型及历史已扣积分保持原规则。
+- 最终471项测试457通过/14隔离DB跳过；lint 0 errors/17原有warnings、design检查通过，
+  生产build（含类型检查）通过。开发缓存造成的Next生成类型冲突已清除.next/dev后修复。
+  Grok最低1积分的共享价格、Agent报价与POST仅扣1次/1积分已通过回归；本地GET选项为1积分。
+- 隔离Chrome已验证图片4项/视频5项、Nano/Gemini 4K重开保留、Grok图片隐藏分辨率；
+  图片/视频菜单390/768/1440px最终等待布局稳定后均无横向溢出。截图在output/playwright。
+- 隔离Agent UI（模拟session/API，不接业务库）确认退役Nano报价8积分按钮disabled，
+  改选2.1后4张1K变4积分且Prompt保留。普通旧GPT草稿阻止提交，改选2.1后保留2K/4张
+  并显示8积分；Home模型面板向下展开已核对。本地BASE_URL冒烟全部通过。
+- 已补齐38个旧Gemini/HappyHorse选项全部继续正确轮询、退役图片Provider ID的
+  历史名称恢复、保存参数不被官方重命名改写，以及Grok最低1积分的报价/扣费回归。
+- 本地所有已批准env文件均无KIE_API_KEY；只读核对Vercel生产/预览/开发均有该敏感
+  变量，未读取其值。没有执行真实付费生成/账单对账，也尚未生产部署。
+
+## 2026-10-23 视频模型替换与 HappyHorse 下线方案（待确认开发）
+
+- 用户要求下线 Gemini Omni Video、HappyHorse 1.1，接入所给链接对应的 Gemini
+  Omni 1.1 Flash。展示名拟用 Gemini Omni Video 1.1，真实 Provider ID 为
+  google/gemini-omni-flash-1-1；PRODUCT 7.1 已补方案，与图片 6.3 一并待确认。
+- 已核对官方模型页、API Reference 和 Pricing 表公开只读接口。无视频输入时
+  720P/1080P 的 4/6/8/10 秒为 63/84/105/126 KIE 积分；4K 为 147/168/189/210。
+  按现有 ×0.2 取整拟收 13/17/21/25 和 29/34/38/42 平台积分。
+- 本轮建议维持旧 Gemini 的 7 图、单张 10 MB、两种比例、三档分辨率及离散时长，
+  不新增 360P、视频续接、首尾帧、Audio/Character ID 或 Seed 控件；默认视频仍 Seedance Mini。
+- 开发需分离新在售列表与历史元数据，给新 Gemini 独立选项 ID；保留旧任务
+  轮询/结算和真实历史参数，旧草稿/Reprompt/Agent 报价需显式选新模型并重新核价。
+- 当前仍为方案阶段，未修改应用源码、未运行实现测试、未调用付费生成或部署。
+  手测需覆盖菜单所有入口/重开、三种视口、新模型真实尺寸/时长/音轨、旧作品与实际账单。
+
+## 2026-10-23 图片模型精简与 Nano Banana 2.1 方案（待确认开发）
+
+- 用户要求下线 GPT Image 2、Nano Banana 2、Qwen Image 3.0 Pro、Seedream 5.0 Pro，
+  上线 Nano Banana 2.1。已新增 PRODUCT 6.3 具体范围和验收，尚未修改应用源码或部署。
+- KIE 模型页/API Reference 核实 ID nano-banana-2-1，使用 image_input，最多 10 图，
+  1K/2K/4K。方案保留平台 20 MB、5000 字 Prompt 和比例白名单，不扩展高级编辑。
+- 独立 Pricing 表公开只读接口 /client/v1/model-pricing/page 返回 1K/2K/4K 为
+  4/6/9 KIE 积分，与英文页一致；中文内嵌字段 3/5/8 冲突，不能据此采用低价。
+  按现有换算拟收每输出 1/2/3 平台积分；未执行真实付费生成或账单验收。
+- 当前直接创作、API 默认和通用价格回退仍指向待下线 GPT Image 2；方案建议直接
+  创作默认 Nano Banana 2.1，Agent 默认 Flare 保持。待用户确认这些新增具体决策。
+- 下线需区分新生成列表与历史元数据；保留已受理任务结算和历史作品，旧草稿/
+  Reprompt/Agent 报价要求重新选模型、校验并核价，不静默替换或改写历史数据。
+- 尚未运行实现测试；开发后需验收所有菜单入口/重开、模型与参数边界、旧请求
+  扣费前拒绝、旧作品/任务、Agent 报价、移动桌面 UI 及真实 Provider 输出/账单。
+
+## 2026-10-20 Google Ads 局部文案优化（已保存，仍暂停）
+
+- 用户批准依据高付费画像报告优化广告文案。在现有系列
+  FN_US_Search_Image_Desktop_Test01（24366672863）、RSA 828373482663 中，
+  将两条泛标题改为 Explore Image Variations / Start With Your Own Image，
+  两条描述改为参考图入口和模型/图片格式/版本探索说明。
+- 保存后重新打开表单，四处新文案逐一回读一致；标题≤30、描述≤90字符。
+  平台素材详情广告效力为“良好”，不代表购买转化提升或政策审核通过。
+- 广告系列和广告保持暂停，列表回读总预算仍为 $500；未修改出价、关键词、
+  定向、落地页、UTM、网站代码或埋点。真实付款回传、广告归因和最终审核仍待验收。
+- 本次仅广告文案变化，无产品行为变化，不修改 PRODUCT；启用前手动核对
+  广告组合预览、参考图生成/下载和 purchase 金额/币种/去重。
+
+## 2026-10-20 订阅文案正式发布结果
+
+- 用户明确批准发布；提交 3539eb48cc667058f1a11efd0ff07d408d423029 已推送 main。
+  Vercel production dpl_4fqMKU4wPCb1bBB4npkjgFtP1f45 为 READY，构建约 37 秒，
+  www.flownana.com / flownana.com 别名均已指向该版本。
+- npm run build 与发布后 npm run smoke:prod 通过。独立 Chrome 在正式网址核对
+  新介绍、三档文案、月付/年付金额、Esc 不关闭、×关闭/重开默认年付、390px 无横向溢出。
+- 该部署近 10 分钟 error/fatal 查询无匹配日志；不等于长期无错误。
+  未执行真实登录态升级、付款或 GA4/Ads 购买收件验收；文案转化效果仍待真实投放验证。
+- 本节为发布后本地记录，未额外推送，以避免仅文档再次触发同代码部署。
+
 ## 2026-10-20 高付费创作需求订阅介绍（已批准生产发布）
 
 - 根据 DeeVid 高付费用户创作研究中参考素材、重复迭代、多版本比较及持续创作需求，

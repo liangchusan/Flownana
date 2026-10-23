@@ -18,8 +18,8 @@ test("all image models send mode-specific provider fields and preserve ordered r
       if (model.id === "qwen-image-3-pro") Object.assign(expected, { image_size: "16:9", resolution: "2K", output_format: "png" });
       else if (model.id === "seedream-5-pro") Object.assign(expected, { aspect_ratio: "16:9", quality: "high", output_format: "png", nsfw_checker: true });
       else if (model.id === "grok-imagine-image-2-0") Object.assign(expected, { aspect_ratio: "16:9" });
-      else Object.assign(expected, { aspect_ratio: "16:9", resolution: "2K", ...(model.id === "nano-banana-2" ? { output_format: "png" } : {}) });
-      if (editing) expected[model.id.startsWith("gpt-image-") ? "input_urls" : model.id === "nano-banana-2" ? "image_input" : "image_urls"] = inputUrls;
+      else Object.assign(expected, { aspect_ratio: "16:9", resolution: "2K", ...(model.id === "nano-banana-2-1" ? { output_format: "png" } : {}) });
+      if (editing) expected[model.id.startsWith("gpt-image-") ? "input_urls" : model.id === "nano-banana-2-1" ? "image_input" : "image_urls"] = inputUrls;
       assert.deepEqual(request.input, expected, `${model.id}: ${editing}`);
     }
   }
@@ -36,9 +36,9 @@ test("Grok Auto requires an input and Seedream has no Auto or 4K option", () => 
   assert.equal(getImageInputCapabilities("seedream-5-pro").maxImages, 10);
 });
 
-test("Seedream text pricing uses verified resolution costs and rejects unsupported 4K", () => {
-  assert.equal(getImageGenerationCredits("seedream-5-pro", "1K"), 2);
-  assert.equal(getImageGenerationCredits("seedream-5-pro", "2K"), 4);
+test("retired Seedream can no longer be quoted", () => {
+  assert.equal(getImageGenerationCredits("seedream-5-pro", "1K"), undefined);
+  assert.equal(getImageGenerationCredits("seedream-5-pro", "2K"), undefined);
   assert.equal(getImageGenerationCredits("seedream-5-pro", "4K"), undefined);
 });
 

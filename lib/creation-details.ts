@@ -4,7 +4,7 @@ import type {
 } from "./creation-history";
 import { normalizeGenerationParameters } from "./creation-history";
 import {
-  IMAGE_MODEL_OPTIONS,
+  IMAGE_MODEL_OPTION_MAP,
   VIDEO_MODEL_OPTION_MAP,
   formatVideoResolution,
   getVideoModelName,
@@ -18,7 +18,7 @@ function legacyModelName(creation: CreationHistoryItem): string | undefined {
     return option ? getVideoModelName(option) : undefined;
   }
 
-  const option = IMAGE_MODEL_OPTIONS.find(
+  const option = Object.values(IMAGE_MODEL_OPTION_MAP).find(
     (item) =>
       item.id === creation.modelOptionId ||
       item.textToImageModel === creation.modelOptionId ||

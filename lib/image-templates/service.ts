@@ -119,7 +119,7 @@ export async function generateTemplateRun(account: GenerationAccount, id: string
         userId: account.id, type: "image", status: "pending", prompt, inputUrls: input.images,
         modelOptionId: input.images.length ? "gpt-image-2-5-sunburst-image-to-image" : "gpt-image-2-5-sunburst-text-to-image", creditsCost: cost,
         creditConsumption: consumed as Prisma.InputJsonValue,
-        parameters: { model: "GPT-Image-2.5 Sunburst", resolution, aspectRatio, runId: id, outputIndex: index, outputCount: count,
+        parameters: { model: "GPT Image 2.5 Sunburst", resolution, aspectRatio, runId: id, outputIndex: index, outputCount: count,
           templateId: template.id, templateVersion: template.version, templateRunId: id, templateBrief: analysis.spec.summary, templateDirection: analysis.spec.variants[directionIndex].title,
           ...(input.parentGenerationId ? { parentGenerationId: input.parentGenerationId } : {}) },
       } });

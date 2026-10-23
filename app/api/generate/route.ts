@@ -12,6 +12,8 @@ import {
 import { generationErrorResponse, generationResponse, generationUncertainResponse } from "@/lib/generation-response";
 import {
   IMAGE_MODEL_OPTION_MAP,
+  AVAILABLE_IMAGE_MODEL_IDS,
+  DEFAULT_IMAGE_MODEL_ID,
   getImageGenerationCredits,
   type ImageModelOptionId,
   type ImageResolutionKey,
@@ -31,7 +33,6 @@ import {
 
 import { getImageAspectRatios, getImagePromptMinLength, IMAGE_PROMPT_MAX_LENGTH, isSupportedImageInputType } from "@/lib/image-model-capabilities";
 
-const DEFAULT_IMAGE_MODEL_ID: ImageModelOptionId = "gpt-image-2";
 type PersistedGenerationParameters = Record<string, string | number>;
 export const maxDuration = 300;
 
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     const { prompt, imageUrl, imageUrls, model, resolution, aspectRatio, runId, outputIndex, outputCount } = body;
     if (typeof prompt !== "string" || !prompt.trim()) return imageErrorResponse("prompt_required");
     if (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH) return imageErrorResponse("invalid_parameters");
-    if ((model != null && (typeof model !== "string" || !Object.hasOwn(IMAGE_MODEL_OPTION_MAP, model))) ||
+    if ((model != null && (typeof model !== "string" || !AVAILABLE_IMAGE_MODEL_IDS.has(model))) ||
       (resolution != null && typeof resolution !== "string") ||
       (aspectRatio != null && typeof aspectRatio !== "string")) return imageErrorResponse("invalid_parameters");
     const modelId = (model ?? DEFAULT_IMAGE_MODEL_ID) as ImageModelOptionId;

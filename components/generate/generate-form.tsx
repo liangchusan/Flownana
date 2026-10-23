@@ -14,6 +14,8 @@ import { uploadAccountMedia } from "@/lib/account-media-upload";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import {
   IMAGE_MODEL_OPTIONS,
+  DEFAULT_IMAGE_MODEL_ID,
+  findAvailableImageModel,
   getImageGenerationCredits,
   type ImageModelOptionId,
   type ImageResolutionKey,
@@ -113,8 +115,10 @@ export function GenerateForm({
     initialImages || (initialImage ? [initialImage] : [])
   );
   const [model, setModel] = useState<ImageModelOptionId>(() =>
-    IMAGE_MODEL_OPTIONS.find((option) => option.label === initialParameters?.model)?.id ??
-    "gpt-image-2"
+    findAvailableImageModel(initialParameters?.model ?? "")?.id ?? DEFAULT_IMAGE_MODEL_ID
+  );
+  const [unavailableModel, setUnavailableModel] = useState(() =>
+    initialParameters?.model && !findAvailableImageModel(initialParameters.model) ? initialParameters.model : ""
   );
   const [resolution, setResolution] = useState<ImageResolutionKey>(() =>
     (initialParameters?.resolution?.toUpperCase() as ImageResolutionKey) || "1K"
@@ -170,29 +174,30 @@ export function GenerateForm({
   useEffect(() => { capabilityChangeRef.current = onInputCapabilityChange; }, [onInputCapabilityChange]);
   useEffect(() => { parametersChangeRef.current = onParametersChange; }, [onParametersChange]);
   useEffect(() => {
-    if (!ratioOptions.includes(aspectRatio)) {
+    if (!unavailableModel && !ratioOptions.includes(aspectRatio)) {
       const next = ratioOptions[0] || "1:1";
       setSettingsNotice(`Aspect ratio changed to ${next} to match this model.`);
       setAspectRatio(next);
     }
-  }, [aspectRatio, ratioOptions]);
+  }, [aspectRatio, ratioOptions, unavailableModel]);
   useEffect(() => {
-    if (hasResolution && !resolutionOptions.includes(resolution)) {
+    if (!unavailableModel && hasResolution && !resolutionOptions.includes(resolution)) {
       setSettingsNotice(`Resolution changed to ${resolutionOptions[0]} to match this model.`);
       setResolution(resolutionOptions[0] || "1K");
     }
-  }, [resolution, resolutionOptions, hasResolution]);
+  }, [resolution, resolutionOptions, hasResolution, unavailableModel]);
   useEffect(() => {
     capabilityChangeRef.current?.(inputCapabilities);
   }, [inputCapabilities]);
   useEffect(() => {
+    if (unavailableModel) return;
     parametersChangeRef.current?.({
       model: currentModelLabel,
       ...(hasResolution ? { resolution } : {}),
       aspectRatio,
       outputCount,
     });
-  }, [aspectRatio, currentModelLabel, outputCount, resolution, hasResolution]);
+  }, [aspectRatio, currentModelLabel, outputCount, resolution, hasResolution, unavailableModel]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] },
@@ -234,7 +239,7 @@ export function GenerateForm({
       await signInForCurrentEnvironment();
       return;
     }
-    if (submissionBlocked || imagesOverLimit || !creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || !ratioOptions.includes(aspectRatio) || (hasResolution && !resolutionOptions.includes(resolution))) return;
+    if (unavailableModel || submissionBlocked || imagesOverLimit || !creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || !ratioOptions.includes(aspectRatio) || (hasResolution && !resolutionOptions.includes(resolution))) return;
     if (!prompt.trim()) {
       const display = getGenerationErrorDisplay(
         { errorCode: "prompt_required" },
@@ -374,7 +379,7 @@ export function GenerateForm({
     }
   };
 
-  const settingsControl = <GenerationSettings placement={menuPlacement} models={imageModels} model={model} onModel={v => setModel(v as ImageModelOptionId)} ratios={ratioOptions} ratio={aspectRatio} onRatio={setAspectRatio} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as ImageResolutionKey)} count={outputCount} onCount={setOutputCount} notice={settingsNotice} />;
+  const settingsControl = <GenerationSettings placement={menuPlacement} models={imageModels} model={unavailableModel || model} onModel={v => { setUnavailableModel(""); setModel(v as ImageModelOptionId); }} ratios={ratioOptions} ratio={aspectRatio} onRatio={setAspectRatio} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as ImageResolutionKey)} count={outputCount} onCount={setOutputCount} notice={unavailableModel ? `${unavailableModel} is no longer available. Choose an available model to recheck settings and price.` : settingsNotice} />;
 
   if (variant === "composer") {
     return (
@@ -392,8 +397,8 @@ export function GenerateForm({
         <div className="flex min-h-12 items-start gap-1 border-t border-border pt-2">
           {toolbarLeading}
           {settingsControl}
-          <Button type="button" onClick={handleGenerate} disabled={!creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
-            <span>{creditsCost ? `${creditsCost * outputCount} credits` : needsReferenceForPricing ? "Add a reference image" : "Temporarily unavailable"}</span><Send className="h-4 w-4" />
+          <Button type="button" onClick={handleGenerate} disabled={!!unavailableModel || !creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || submissionBlocked || imagesOverLimit} className="ml-auto h-10 gap-2 px-4">
+            <span>{unavailableModel ? "Choose a model" : creditsCost ? `${creditsCost * outputCount} credits` : needsReferenceForPricing ? "Add a reference image" : "Temporarily unavailable"}</span><Send className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -449,7 +454,7 @@ export function GenerateForm({
 
         <Button
           onClick={handleGenerate}
-          disabled={!creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || imagesOverLimit}
+          disabled={!!unavailableModel || !creditsCost || (prompt.trim().length > IMAGE_PROMPT_MAX_LENGTH || prompt.trim().length < getImagePromptMinLength(model)) || generationLimitReached || !prompt.trim() || imagesOverLimit}
           className="w-full"
           size="lg"
         >

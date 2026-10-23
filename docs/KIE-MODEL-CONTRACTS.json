@@ -1,0 +1,1288 @@
+{
+  "checkedAt": "2026-10-23",
+  "sources": {
+    "names": [
+      {
+        "name": "Nano Banana 2.1",
+        "url": "https://kie.ai/nano-banana-2-1"
+      },
+      {
+        "name": "Grok Imagine Image 2.0",
+        "url": "https://kie.ai/grok-imagine-image-2"
+      },
+      {
+        "name": "GPT Image 2.5 Flare",
+        "url": "https://kie.ai/gpt-image-2-5"
+      },
+      {
+        "name": "GPT Image 2.5 Sunburst",
+        "url": "https://kie.ai/gpt-image-2-5"
+      },
+      {
+        "name": "Seedance 2.0 Mini",
+        "url": "https://kie.ai/seedance-2-0-mini"
+      },
+      {
+        "name": "Gemini Omni 1.1 Flash",
+        "url": "https://kie.ai/gemini-omni-1-1-flash"
+      },
+      {
+        "name": "Wan 3.0 Video",
+        "url": "https://kie.ai/wan3.0-video"
+      },
+      {
+        "name": "MiniMax H3 (Hailuo-03)",
+        "url": "https://kie.ai/minimax-h3"
+      },
+      {
+        "name": "Grok Imagine Video 1.5",
+        "url": "https://kie.ai/grok-imagine-video-1.5"
+      }
+    ],
+    "apiDocs": {
+      "nano-banana-2-1": "https://docs.kie.ai/market/google/nanobanana-2-1",
+      "grok-imagine-video-1-5-preview": "https://docs.kie.ai/market/grok-imagine/1-5-preview",
+      "wan/3-0-video": "https://docs.kie.ai/market/wan/3-0-video",
+      "gpt-image-2-5-flare-text-to-image": "https://docs.kie.ai/market/gpt/gpt-image-2-5-flare-text-to-image",
+      "gpt-image-2-5-flare-image-to-image": "https://docs.kie.ai/market/gpt/gpt-image-2-5-flare-image-to-image",
+      "gpt-image-2-5-sunburst-image-to-image": "https://docs.kie.ai/market/gpt/gpt-image-2-5-sunburst-image-to-image",
+      "gpt-image-2-5-sunburst-text-to-image": "https://docs.kie.ai/market/gpt/gpt-image-2-5-sunburst-text-to-image",
+      "grok-imagine-image-2-0/image-edit": "https://docs.kie.ai/market/grok-imagine-image-2-0/image-to-image",
+      "grok-imagine-image-2-0/text-to-image": "https://docs.kie.ai/market/grok-imagine-image-2-0/text-to-image",
+      "google/gemini-omni-flash-1-1": "https://docs.kie.ai/market/google/gemini-omni-flash-1-1",
+      "minimax-h3/text-to-video": "https://docs.kie.ai/market/minimax-h3/text-to-video",
+      "minimax-h3/image-to-video": "https://docs.kie.ai/market/minimax-h3/image-to-video",
+      "minimax-h3/reference-to-video": "https://docs.kie.ai/market/minimax-h3/reference-to-video",
+      "bytedance/seedance-2-mini": "https://docs.kie.ai/market/bytedance/seedance-2-mini"
+    },
+    "pricing": "https://kie.ai/pricing"
+  },
+  "inputSchemas": {
+    "grok-imagine-image-2-0/image-edit": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "image_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "16:9",
+            "9:16",
+            "auto"
+          ]
+        }
+      },
+      "required": [
+        "image_urls",
+        "aspect_ratio"
+      ]
+    },
+    "gpt-image-2-5-sunburst-text-to-image": {
+      "properties": {
+        "aspect_ratio": {
+          "enum": [
+            "auto",
+            "1:1",
+            "3:2",
+            "2:3",
+            "4:3",
+            "3:4",
+            "16:9",
+            "9:16",
+            "21:9",
+            "27:16",
+            "16:27",
+            "9:8",
+            "8:9"
+          ],
+          "type": "string"
+        },
+        "background": {
+          "enum": [
+            "transparent",
+            "opaque",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "resolution": {
+          "enum": [
+            "1K",
+            "2K",
+            "4K"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "type": "object"
+    },
+    "google/gemini-omni-flash-1-1": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "image_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "first_frame_url": {
+          "type": "string"
+        },
+        "last_frame_url": {
+          "type": "string"
+        },
+        "audio_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "video_list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "url",
+              "start",
+              "ends"
+            ],
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "start": {
+                "type": "number",
+                "minimum": 0
+              },
+              "ends": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "character_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "duration": {
+          "type": "string",
+          "enum": [
+            "4",
+            "6",
+            "8",
+            "10"
+          ]
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "16:9",
+            "9:16"
+          ]
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "360p",
+            "720p",
+            "1080p",
+            "4k"
+          ],
+          "default": "720p"
+        }
+      },
+      "required": [
+        "prompt",
+        "duration"
+      ]
+    },
+    "gpt-image-2-5-sunburst-image-to-image": {
+      "properties": {
+        "aspect_ratio": {
+          "enum": [
+            "auto",
+            "1:1",
+            "3:2",
+            "2:3",
+            "4:3",
+            "3:4",
+            "16:9",
+            "9:16",
+            "21:9",
+            "27:16",
+            "16:27",
+            "9:8",
+            "8:9"
+          ],
+          "type": "string"
+        },
+        "background": {
+          "enum": [
+            "transparent",
+            "opaque",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "input_urls": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "resolution": {
+          "enum": [
+            "1K",
+            "2K",
+            "4K"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "type": "object"
+    },
+    "gpt-image-2-5-flare-image-to-image": {
+      "properties": {
+        "aspect_ratio": {
+          "enum": [
+            "auto",
+            "1:1",
+            "3:2",
+            "2:3",
+            "4:3",
+            "3:4",
+            "16:9",
+            "9:16",
+            "21:9",
+            "27:16",
+            "16:27",
+            "9:8",
+            "8:9"
+          ],
+          "type": "string"
+        },
+        "background": {
+          "enum": [
+            "transparent",
+            "opaque",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "input_urls": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "resolution": {
+          "enum": [
+            "1K",
+            "2K",
+            "4K"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "type": "object"
+    },
+    "minimax-h3/image-to-video": {
+      "type": "object",
+      "required": [
+        "prompt",
+        "duration"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 7000
+        },
+        "duration": {
+          "type": "integer",
+          "enum": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "default": 6,
+          "minimum": 4,
+          "maximum": 15
+        },
+        "first_frame_url": {
+          "type": "string"
+        },
+        "last_frame_url": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "768P",
+            "2K"
+          ],
+          "default": "2K"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "first_frame_url"
+          ]
+        },
+        {
+          "required": [
+            "last_frame_url"
+          ]
+        }
+      ]
+    },
+    "minimax-h3/reference-to-video": {
+      "type": "object",
+      "required": [
+        "prompt",
+        "duration"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 7000
+        },
+        "reference_image_urls": {
+          "type": "array",
+          "maxItems": 9,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_video_urls": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_audio_urls": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string"
+          }
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "adaptive",
+            "21:9",
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16"
+          ],
+          "default": "adaptive"
+        },
+        "duration": {
+          "type": "integer",
+          "enum": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "default": 6,
+          "minimum": 4,
+          "maximum": 15
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "768P",
+            "2K"
+          ],
+          "default": "2K"
+        }
+      }
+    },
+    "nano-banana-2-1": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "image_input": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "1:4",
+            "4:1",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "1:8",
+            "8:1",
+            "9:16",
+            "16:9",
+            "21:9",
+            "auto"
+          ],
+          "default": "auto"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "1K",
+            "2K",
+            "4K"
+          ],
+          "default": "1K"
+        },
+        "output_format": {
+          "type": "string",
+          "enum": [
+            "png",
+            "jpg"
+          ],
+          "default": "jpg"
+        }
+      },
+      "required": [
+        "prompt"
+      ]
+    },
+    "grok-imagine-image-2-0/text-to-image": {
+      "type": "object",
+      "required": [
+        "prompt",
+        "aspect_ratio"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "2:3",
+            "3:2",
+            "16:9",
+            "9:16"
+          ]
+        }
+      }
+    },
+    "minimax-h3/text-to-video": {
+      "type": "object",
+      "required": [
+        "prompt",
+        "aspect_ratio",
+        "duration"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 7000
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "21:9",
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16"
+          ]
+        },
+        "duration": {
+          "type": "integer",
+          "enum": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "default": 6,
+          "minimum": 4,
+          "maximum": 15
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "768P",
+            "2K"
+          ],
+          "default": "2K"
+        }
+      }
+    },
+    "gpt-image-2-5-flare-text-to-image": {
+      "properties": {
+        "aspect_ratio": {
+          "enum": [
+            "auto",
+            "1:1",
+            "3:2",
+            "2:3",
+            "4:3",
+            "3:4",
+            "16:9",
+            "9:16",
+            "21:9",
+            "27:16",
+            "16:27",
+            "9:8",
+            "8:9"
+          ],
+          "type": "string"
+        },
+        "background": {
+          "enum": [
+            "transparent",
+            "opaque",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "prompt": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "resolution": {
+          "enum": [
+            "1K",
+            "2K",
+            "4K"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "type": "object"
+    },
+    "bytedance/seedance-2-mini": {
+      "type": "object",
+      "properties": {
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "480p",
+            "720p"
+          ],
+          "default": "720p"
+        },
+        "duration": {
+          "type": "integer",
+          "default": 5
+        },
+        "generate_audio": {
+          "type": "boolean",
+          "default": true
+        },
+        "web_search": {
+          "type": "boolean"
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "4:3",
+            "3:4",
+            "16:9",
+            "9:16",
+            "21:9",
+            "adaptive"
+          ],
+          "default": "16:9"
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 20000
+        },
+        "reference_image_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 9
+        },
+        "reference_audio_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3
+        },
+        "first_frame_url": {
+          "type": "string"
+        },
+        "last_frame_url": {
+          "type": "string"
+        },
+        "reference_video_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 3
+        }
+      }
+    },
+    "wan/3-0-video": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 20000
+        },
+        "first_frame_url": {
+          "type": "string"
+        },
+        "last_frame_url": {
+          "type": "string"
+        },
+        "reference_image_urls": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_video_urls": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_audio_urls": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_file_urls": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reference_link_urls": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "480P",
+            "720P",
+            "1080P"
+          ],
+          "default": "1080P"
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "adaptive",
+            "16:9",
+            "4:3",
+            "1:1",
+            "3:4",
+            "9:16"
+          ],
+          "default": "adaptive"
+        },
+        "duration": {
+          "type": "integer",
+          "default": 5
+        },
+        "audio": {
+          "type": "boolean",
+          "default": true
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        }
+      },
+      "required": []
+    },
+    "grok-imagine-video-1-5-preview": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "image_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 1
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "enum": [
+            "1:1",
+            "16:9",
+            "9:16",
+            "4:3",
+            "3:4",
+            "3:2",
+            "2:3",
+            "auto"
+          ],
+          "default": "auto"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "480p",
+            "720p",
+            "1080p"
+          ],
+          "default": "480p"
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 15,
+          "default": 8
+        },
+        "nsfw_checker": {
+          "type": "boolean"
+        },
+        "first_frame_url": {
+          "type": "string"
+        },
+        "last_frame_url": {
+          "type": "string"
+        },
+        "loop_url": {
+          "type": "string"
+        },
+        "keyframes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "timestamp_s": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "url",
+              "timestamp_s"
+            ]
+          },
+          "maxItems": 4
+        },
+        "enable_audio": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "image_urls"
+      ]
+    }
+  },
+  "pricingRows": [
+    {
+      "modelDescription": "nano-banana-2-1, 4K",
+      "creditPrice": "9",
+      "creditUnit": "per image",
+      "usdPrice": "0.045",
+      "anchor": "https://kie.ai/nano-banana-2-1"
+    },
+    {
+      "modelDescription": "nano-banana-2-1, 2K",
+      "creditPrice": "6",
+      "creditUnit": "per image",
+      "usdPrice": "0.030",
+      "anchor": "https://kie.ai/nano-banana-2-1"
+    },
+    {
+      "modelDescription": "nano-banana-2-1, 1K",
+      "creditPrice": "4",
+      "creditUnit": "per image",
+      "usdPrice": "0.020",
+      "anchor": "https://kie.ai/nano-banana-2-1"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-sunburst, image-to-image, 4K",
+      "creditPrice": "16",
+      "creditUnit": "per image",
+      "usdPrice": "0.08",
+      "anchor": "https://kie.ai/gpt-image-2-5?model=gpt-image-2-5-sunburst-image-to-image"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-sunburst, image-to-image, 2K",
+      "creditPrice": "10",
+      "creditUnit": "per image",
+      "usdPrice": "0.05",
+      "anchor": "https://kie.ai/gpt-image-2-5?model=gpt-image-2-5-sunburst-image-to-image"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-sunburst, image-to-image, 1K",
+      "creditPrice": "6",
+      "creditUnit": "per image",
+      "usdPrice": "0.03",
+      "anchor": "https://kie.ai/gpt-image-2-5?model=gpt-image-2-5-sunburst-image-to-image"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-sunburst, text-to-image, 4K",
+      "creditPrice": "16",
+      "creditUnit": "per image",
+      "usdPrice": "0.08",
+      "anchor": "https://kie.ai/gpt-image-2-5?model=gpt-image-2-5-sunburst-text-to-image"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-sunburst, text-to-image, 2K",
+      "creditPrice": "10",
+      "creditUnit": "per image",
+      "usdPrice": "0.05",
+      "anchor": "https://kie.ai/gpt-image-2-5?model=gpt-image-2-5-sunburst-text-to-image"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-sunburst, text-to-image, 1K",
+      "creditPrice": "6",
+      "creditUnit": "per image",
+      "usdPrice": "0.03",
+      "anchor": "https://kie.ai/gpt-image-2-5?model=gpt-image-2-5-sunburst-text-to-image"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-flare, image-to-image, 4K",
+      "creditPrice": "16",
+      "creditUnit": "per image",
+      "usdPrice": "0.08",
+      "anchor": "https://kie.ai/gpt-image-2-5"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-flare, image-to-image, 2K",
+      "creditPrice": "10",
+      "creditUnit": "per image",
+      "usdPrice": "0.05",
+      "anchor": "https://kie.ai/gpt-image-2-5"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-flare, image-to-image, 1K",
+      "creditPrice": "6",
+      "creditUnit": "per image",
+      "usdPrice": "0.03",
+      "anchor": "https://kie.ai/gpt-image-2-5"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-flare, text-to-image, 4K",
+      "creditPrice": "16",
+      "creditUnit": "per image",
+      "usdPrice": "0.08",
+      "anchor": "https://kie.ai/gpt-image-2-5"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-flare, text-to-image, 2K",
+      "creditPrice": "10",
+      "creditUnit": "per image",
+      "usdPrice": "0.05",
+      "anchor": "https://kie.ai/gpt-image-2-5"
+    },
+    {
+      "modelDescription": "gpt-image-2-5-flare, text-to-image, 1K",
+      "creditPrice": "6",
+      "creditUnit": "per image",
+      "usdPrice": "0.03",
+      "anchor": "https://kie.ai/gpt-image-2-5"
+    },
+    {
+      "modelDescription": "grok-imagine-image-2-0, segment-map",
+      "creditPrice": "0",
+      "creditUnit": "per image",
+      "usdPrice": "0",
+      "anchor": "https://kie.ai/grok-imagine-image-2?model=grok-imagine-image-2-0%2Fsegment-map"
+    },
+    {
+      "modelDescription": "grok-imagine-image-2-0, segment-edit",
+      "creditPrice": "4",
+      "creditUnit": "per image",
+      "usdPrice": "0.02",
+      "anchor": "https://kie.ai/grok-imagine-image-2?model=grok-imagine-image-2-0%2Fsegment-edit"
+    },
+    {
+      "modelDescription": "grok-imagine-image-2-0, Text to Image",
+      "creditPrice": "4",
+      "creditUnit": "per image",
+      "usdPrice": "0.02",
+      "anchor": "https://kie.ai/grok-imagine-image-2?model=grok-imagine-image-2-0%2Ftext-to-image"
+    },
+    {
+      "modelDescription": "grok-imagine-image-2-0, Image Edit",
+      "creditPrice": "4",
+      "creditUnit": "per image",
+      "usdPrice": "0.02",
+      "anchor": "https://kie.ai/grok-imagine-image-2?model=grok-imagine-image-2-0%2Fimage-edit"
+    },
+    {
+      "modelDescription": "bytedance/seedance-2-mini, 720P no video",
+      "creditPrice": "8.2",
+      "creditUnit": "per second",
+      "usdPrice": "0.041",
+      "anchor": "https://kie.ai/seedance-2-0-mini"
+    },
+    {
+      "modelDescription": "bytedance/seedance-2-mini, 720P with video",
+      "creditPrice": "5",
+      "creditUnit": "per second",
+      "usdPrice": "0.025",
+      "anchor": "https://kie.ai/seedance-2-0-mini"
+    },
+    {
+      "modelDescription": "bytedance/seedance-2-mini, 480P no video",
+      "creditPrice": "3.8",
+      "creditUnit": "per second",
+      "usdPrice": "0.019",
+      "anchor": "https://kie.ai/seedance-2-0-mini"
+    },
+    {
+      "modelDescription": "bytedance/seedance-2-mini, 480P with video",
+      "creditPrice": "2.4",
+      "creditUnit": "per second",
+      "usdPrice": "0.012",
+      "anchor": "https://kie.ai/seedance-2-0-mini"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 360p with video input",
+      "creditPrice": "168",
+      "creditUnit": "per video",
+      "usdPrice": "0.84",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 720p with video input",
+      "creditPrice": "168",
+      "creditUnit": "per video",
+      "usdPrice": "0.84",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 1080p with video input",
+      "creditPrice": "168",
+      "creditUnit": "per video",
+      "usdPrice": "0.84",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 10s 360p no video input",
+      "creditPrice": "126",
+      "creditUnit": "per video",
+      "usdPrice": "0.63",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 10s 720p no video input",
+      "creditPrice": "126",
+      "creditUnit": "per video",
+      "usdPrice": "0.63",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 10s 1080p no video input",
+      "creditPrice": "126",
+      "creditUnit": "per video",
+      "usdPrice": "0.63",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 4k with video input",
+      "creditPrice": "252",
+      "creditUnit": "per video",
+      "usdPrice": "1.26",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 10s 4k no video input",
+      "creditPrice": "210",
+      "creditUnit": "per video",
+      "usdPrice": "1.05",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 8s 360p no video input",
+      "creditPrice": "105",
+      "creditUnit": "per video",
+      "usdPrice": "0.525",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 8s 720p no video input",
+      "creditPrice": "105",
+      "creditUnit": "per video",
+      "usdPrice": "0.525",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 8s 1080p no video input",
+      "creditPrice": "105",
+      "creditUnit": "per video",
+      "usdPrice": "0.525",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 8s 4k no video input",
+      "creditPrice": "189",
+      "creditUnit": "per video",
+      "usdPrice": "0.945",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 6s 360p no video input",
+      "creditPrice": "84",
+      "creditUnit": "per video",
+      "usdPrice": "0.42",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 6s 720p no video input",
+      "creditPrice": "84",
+      "creditUnit": "per video",
+      "usdPrice": "0.42",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 6s 1080p no video input",
+      "creditPrice": "84",
+      "creditUnit": "per video",
+      "usdPrice": "0.42",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 6s 4k no video input",
+      "creditPrice": "168",
+      "creditUnit": "per video",
+      "usdPrice": "0.84",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 4s 360p no video input",
+      "creditPrice": "63",
+      "creditUnit": "per video",
+      "usdPrice": "0.315",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 4s 720p no video input",
+      "creditPrice": "63",
+      "creditUnit": "per video",
+      "usdPrice": "0.315",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 4s 1080p no video input",
+      "creditPrice": "63",
+      "creditUnit": "per video",
+      "usdPrice": "0.315",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "google/gemini-omni-flash-1-1, video, 4s 4k no video input",
+      "creditPrice": "147",
+      "creditUnit": "per video",
+      "usdPrice": "0.735",
+      "anchor": "https://kie.ai/gemini-omni-1-1-flash"
+    },
+    {
+      "modelDescription": "wan 3.0 video, 1080p, video",
+      "creditPrice": "32",
+      "creditUnit": "per second",
+      "usdPrice": "0.16",
+      "anchor": "https://kie.ai/wan3.0-video"
+    },
+    {
+      "modelDescription": "wan 3.0 video, 720p, video",
+      "creditPrice": "16",
+      "creditUnit": "per second",
+      "usdPrice": "0.08",
+      "anchor": "https://kie.ai/wan3.0-video"
+    },
+    {
+      "modelDescription": "wan 3.0 video, 480p, video",
+      "creditPrice": "8",
+      "creditUnit": "per second",
+      "usdPrice": "0.04",
+      "anchor": "https://kie.ai/wan3.0-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, video input, 768p",
+      "creditPrice": "8",
+      "creditUnit": "per second",
+      "usdPrice": "0.04",
+      "anchor": "https://kie.ai/minimax-h3"
+    },
+    {
+      "modelDescription": "MiniMax H3, reference to video, 768p",
+      "creditPrice": "8",
+      "creditUnit": "per second",
+      "usdPrice": "0.04",
+      "anchor": "https://kie.ai/minimax-h3?model=minimax-h3%2Freference-to-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, image to video, 768p",
+      "creditPrice": "8",
+      "creditUnit": "per second",
+      "usdPrice": "0.04",
+      "anchor": "https://kie.ai/minimax-h3?model=minimax-h3%2Fimage-to-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, text to video, 768p",
+      "creditPrice": "8",
+      "creditUnit": "per second",
+      "usdPrice": "0.04",
+      "anchor": "https://kie.ai/minimax-h3?model=minimax-h3%2Ftext-to-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, text to video, 2K",
+      "creditPrice": "13",
+      "creditUnit": "per second",
+      "usdPrice": "0.065",
+      "anchor": "https://kie.ai/minimax-h3?model=minimax-h3%2Ftext-to-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, image to video, 2K",
+      "creditPrice": "13",
+      "creditUnit": "per second",
+      "usdPrice": "0.065",
+      "anchor": "https://kie.ai/minimax-h3?model=minimax-h3%2Fimage-to-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, reference to video, 2K",
+      "creditPrice": "13",
+      "creditUnit": "per second",
+      "usdPrice": "0.065",
+      "anchor": "https://kie.ai/minimax-h3?model=minimax-h3%2Freference-to-video"
+    },
+    {
+      "modelDescription": "MiniMax H3, video input, 2k",
+      "creditPrice": "13",
+      "creditUnit": "per second",
+      "usdPrice": "0.065",
+      "anchor": "https://kie.ai/minimax-h3"
+    },
+    {
+      "modelDescription": "MiniMax H3, image input, 768p, 2k",
+      "creditPrice": "4",
+      "creditUnit": "per image",
+      "usdPrice": "0.02",
+      "anchor": "https://kie.ai/minimax-h3"
+    },
+    {
+      "modelDescription": "grok-imagine-video-1-5-preview, 720p",
+      "creditPrice": "4.5",
+      "creditUnit": "per second",
+      "usdPrice": "0.0225",
+      "anchor": "https://kie.ai/grok-imagine-video-1.5"
+    },
+    {
+      "modelDescription": "grok-imagine-video-1-5-preview, 480p",
+      "creditPrice": "2.4",
+      "creditUnit": "per second",
+      "usdPrice": "0.012",
+      "anchor": "https://kie.ai/grok-imagine-video-1.5"
+    }
+  ]
+}

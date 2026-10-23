@@ -16,6 +16,7 @@ import {
   videoFollowsInputRatio,
   formatVideoResolution,
   getVideoModelName,
+  getVideoGenerationCredits,
   VIDEO_MODEL_OPTIONS
 } from "@/lib/generation-pricing";
 import { generationErrorResponse, generationResponse, generationUncertainResponse } from "@/lib/generation-response";
@@ -29,6 +30,8 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 import { createVideoTask, resolveVideoOption, settleVideoTask, videoErrorResponse } from "@/lib/video-generation-service";
+import { videoInputMode, videoPromptIssue } from "@/lib/video-model-capabilities";
+import { referenceBatchIssue } from "@/lib/reference-validation";
 export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
     account = session.user;
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return videoErrorResponse("invalid_parameters");
-    const { prompt, imageUrls, inputs, modelOptionId, model, aspectRatio, watermark, runId, generateAudio } = body;
+    const { prompt, imageUrls, inputs, modelOptionId, model, aspectRatio, watermark, runId, generateAudio, quotedCredits } = body;
     if (typeof prompt !== "string" || !prompt.trim()) return videoErrorResponse("prompt_required");
     if ((modelOptionId != null && typeof modelOptionId !== "string") ||
       (model != null && typeof model !== "string") ||
@@ -64,8 +67,7 @@ export async function POST(request: NextRequest) {
       (watermark != null && typeof watermark !== "string")) return videoErrorResponse("invalid_parameters");
     const option = resolveVideoOption({ modelOptionId, model });
     if (!option || !DEFAULT_VIDEO_RESOLUTIONS.includes(formatVideoResolution(option.resolution))) return videoErrorResponse("invalid_parameters");
-    const ratio = aspectRatio || option.aspectRatios?.[0] || "Auto";
-    if (!DEFAULT_VIDEO_ASPECT_RATIOS.includes(ratio) || !(option.aspectRatios || DEFAULT_VIDEO_ASPECT_RATIOS).includes(ratio)) return videoErrorResponse("invalid_parameters");
+    if (videoPromptIssue(getVideoModelName(option), prompt)) return videoErrorResponse("invalid_parameters");
     if (inputs != null && (!Array.isArray(inputs) || inputs.some((input) =>
       !input || typeof input.url !== "string" || !input.url.trim() || !["image", "video", "audio"].includes(input.kind)
     ))) return videoErrorResponse("invalid_parameters");
@@ -77,6 +79,10 @@ export async function POST(request: NextRequest) {
     const capabilities = getVideoInputCapabilities(getVideoModelName(option));
     const counts = requestedInputs.reduce((sum, input) => ({ ...sum, [input.kind]: sum[input.kind] + 1 }),
       { image: 0, video: 0, audio: 0 });
+    const followsImage = videoFollowsInputRatio(getVideoModelName(option), counts.image);
+    const ratios = followsImage ? ["Auto"] : option.aspectRatios || DEFAULT_VIDEO_ASPECT_RATIOS;
+    const ratio = aspectRatio || (ratios.includes("Auto") ? "Auto" : ratios.includes("16:9") ? "16:9" : ratios[0]);
+    if (!DEFAULT_VIDEO_ASPECT_RATIOS.includes(ratio) || !ratios.includes(ratio)) return videoErrorResponse("invalid_parameters");
     if (counts.image > capabilities.maxImages || counts.video > capabilities.maxVideos || counts.audio > capabilities.maxAudios ||
       (option.family === "wan" && counts.video > 0 && option.duration > 15)) return videoErrorResponse("invalid_parameters");
     if (option.requiresImageInput && !counts.image) return videoErrorResponse("input_image_required");
@@ -87,23 +93,36 @@ export async function POST(request: NextRequest) {
         source: input.url.trim(), userId: account!.id, requestId: `${crypto.randomUUID()}-${index}`, kind: input.kind,
       }), input.kind === "image" ? capabilities.maxImageBytes : input.kind === "video" ? capabilities.maxVideoBytes : capabilities.maxAudioBytes, input.kind)
     ));
-    try { await validateReferenceDurations(capabilities, requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }))); }
+    const metadataIssue = referenceBatchIssue(capabilities, requestedInputs.map((input, index) => ({
+      kind: input.kind, contentType: inputMedia[index].contentType, sizeBytes: inputMedia[index].sizeBytes,
+    })));
+    if (metadataIssue) return videoErrorResponse("invalid_parameters", 400, { message: metadataIssue });
+    let metadata;
+    try { metadata = await validateReferenceDurations(capabilities, requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }))); }
     catch (e) { return videoErrorResponse("invalid_parameters", 400, { message: e instanceof Error ? e.message : "Check your reference files." }); }
-    const normalizedInputs = requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }));
+    const normalizedInputs = requestedInputs.map((input, index) => ({
+      kind: input.kind, url: inputMedia[index].url,
+      ...(metadata?.[index]?.durationSeconds != null ? { durationSeconds: metadata[index].durationSeconds } : {}),
+    }));
+    const creditsCost = getVideoGenerationCredits(option, normalizedInputs);
+    if (creditsCost == null || (counts.video > 0 && quotedCredits == null) ||
+      (quotedCredits != null && (!Number.isInteger(quotedCredits) || quotedCredits !== creditsCost))) {
+      return videoErrorResponse("invalid_parameters", 400, { message: "The reference duration or price changed. Check the references and generate a new quote." });
+    }
     const normalizedImageUrls = normalizedInputs.filter((input) => input.kind === "image").map((input) => input.url);
     const parameters: Prisma.InputJsonObject = {
       model: getVideoModelName(option), provider: option.provider,
       resolution: formatVideoResolution(option.resolution), aspectRatio: ratio, duration: option.duration,
       audio: option.hasAudio && generateAudio !== false ? "On" : "Off",
       inputKinds: normalizedInputs.map((input) => input.kind),
-      mode: counts.video || counts.audio || counts.image > 2 ? "Multimodal reference to video"
-        : counts.image === 2 ? "First and last frame to video" : counts.image === 1 ? "Image to video" : "Text to video",
+      mode: videoInputMode(option, normalizedInputs),
+      ...(counts.video ? { inputVideoDuration: normalizedInputs.reduce((sum, input) => sum + (input.kind === "video" ? input.durationSeconds ?? 0 : 0), 0) } : {}),
       ...(typeof runId === "string" && runId.trim() ? { runId: runId.trim().slice(0, 120), outputIndex: 0, outputCount: 1 } : {}),
     };
     await recoverGenerationObligations(account);
     reservationAttempted = true;
     reserved = await reserveGeneration({ account, type: "video", prompt: prompt.trim(), modelOptionId: option.id,
-      creditsCost: option.credits, parameters,
+      creditsCost, parameters,
       inputs: inputMedia.map((media, position) => ({ media, position, role: "input",
         type: requestedInputs[position].kind === "audio" ? "music" : requestedInputs[position].kind as "image" | "video" })),
     });

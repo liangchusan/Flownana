@@ -119,7 +119,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
         return Response.json({ code: 200, data: { state: "success", resultJson: JSON.stringify({ resultUrls: ["https://example.test/output.png"] }) } });
       });
       const pending = Array.from({ length: 12 }, (_, index) => (index % 2
-        ? f.video.POST(request("/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni_720_4", aspectRatio: "16:9" }))
+        ? f.video.POST(request("/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni11_720_4", aspectRatio: "16:9" }))
         : f.image.POST(request("/api/generate", { prompt: "Fixture", model: "gpt-image-2", outputCount: 4 }))).then((response) => {
           if (response.status === 429 && ++rejectedCount === 7) sevenRejected();
           return response;
@@ -144,7 +144,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       const imageRequest = request("/api/generate", { prompt: "Fixture" });
       imageRequest.headers.set(ACCOUNT_SCOPE_HEADER, oldScope);
       assert.equal((await f.image.POST(imageRequest)).status, 401);
-      const videoRequest = request("/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni_720_4" });
+      const videoRequest = request("/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni11_720_4" });
       videoRequest.headers.set(ACCOUNT_SCOPE_HEADER, oldScope);
       assert.equal((await f.video.POST(videoRequest)).status, 401);
       const deleteRequest = new Request("http://localhost/api/account", { method: "DELETE",
@@ -181,7 +181,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       t.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
         urls.push(String(input)); return Response.json({ code: 200, data: { successFlag: 0 } });
       });
-      const response = await f.video.GET(request(`/api/veo/generate?taskId=${attached.taskId}&modelOptionId=geminiomni_720_4`));
+      const response = await f.video.GET(request(`/api/veo/generate?taskId=${attached.taskId}&modelOptionId=geminiomni11_720_4`));
       assert.equal((await response.json()).pending, true);
       assert.ok(urls[0].includes("/api/v1/veo/record-info"));
       await db.generation.update({ where: { id: generation.id }, data: { status: "failed", modelOptionId: null, error: "Generation timeout" } });
@@ -223,7 +223,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       for (const body of [
         { prompt: "Fixture", modelOptionId: "veo31_fast_8" },
         { prompt: "Fixture", modelOptionId: "constructor" },
-        { prompt: "Fixture", modelOptionId: "geminiomni_720_4", inputs: [{ url: media.url, kind: "unknown" }] },
+        { prompt: "Fixture", modelOptionId: "geminiomni11_720_4", inputs: [{ url: media.url, kind: "unknown" }] },
       ]) assert.equal((await f.video.POST(request("/api/veo/generate", body))).status, 400);
       assert.equal(calls, 0);
       assert.equal(await f.balance(), 1000);
@@ -346,7 +346,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       t.mock.method(f.lifecycle, "failGeneration", async () => { throw new Error("Database unavailable"); });
       t.mock.method(globalThis, "fetch", async () => { throw new Error("Provider response lost"); });
       for (const [route, path, body] of [[f.image, "/api/generate", { prompt: "Fixture" }],
-        [f.video, "/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni_720_4", aspectRatio: "16:9" }]] as const) {
+        [f.video, "/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni11_720_4", aspectRatio: "16:9" }]] as const) {
         const response = await route.POST(request(path, body));
         const data = await response.json();
         assert.equal(response.status, 503); assert.equal(data.status, "unknown");

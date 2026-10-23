@@ -172,23 +172,22 @@ Flownana 是一个 0→1 的 AI 媒体生成产品，当前重点是快速上线
 
 每个 Prompt 支持生成 1–4 张图片。
 
-| 模型 | 模式 | 输入 | 分辨率与平台积分 |
+| 模型 | 模式 | 输入 | 分辨率与平台积分（每输出） |
 | --- | --- | --- | --- |
-| GPT Image 2 | 文生图、图生图 | 最多 1 张图片 | 1K：2，2K：3，4K：5 |
-| Nano Banana 2 | 文生图、图生图 | 最多 1 张图片 | 1K：2，2K：4，4K：5 |
-| Qwen Image 3.0 Pro | 文生图、图生图 | 最多 3 张图片，每张 10 MB | 1K：2，2K：4 |
+| Nano Banana 2.1 | 文生图、图生图 | 最多 10 张，单张 20 MB | 1K：1，2K：2，4K：3 |
+| Grok Imagine Image 2.0 | 文生图、图生图 | 最多 5 张，单张 20 MB | 无分辨率控件；1 积分 |
+| GPT Image 2.5 Flare | 文生图、图生图 | 最多 16 张，单张 20 MB | 1K：2，2K：3，4K：5 |
+| GPT Image 2.5 Sunburst | 文生图、图生图 | 最多 16 张，单张 20 MB | 1K：2，2K：3，4K：5 |
 
-允许的图片比例为 `Auto`、`9:16`、`16:9`、`1:1`、`3:4`、`4:3`，
-并遵守模型限制：
-
-- GPT Image 2 只有 1K 支持 Auto，4K 不支持 1:1。
-- Qwen Image 3.0 Pro 不支持 Auto，只提供 1K/2K。
-- 其他在售图片模型继续使用现有 20 MB 客户端上传上限。
+图片比例采用第 22 节七项白名单与模型能力交集；Grok 文生图仅 1:1、16:9、9:16，
+编辑额外支持 Auto。其余三个在售模型提供七项。输入格式 JPEG/PNG/WebP，Prompt
+非空且最多 5000 字符。GPT Image 2、Nano Banana 2、Qwen Image 3.0 Pro、Seedream
+5.0 Pro 已获下线授权，历史规则保留用于既有任务；新生成范围以第 6.3 节为准。
 
 只有结果已经保存到 Flownana 自有存储后，任务才能被视为成功。存储失败
 必须让任务失败并退款，不能静默保存短期 Provider URL。
 
-### 6.1 已批准：新增图片模型与参数核对
+### 6.1 历史合同参考（当前在售范围由 6.3 覆盖）
 
 2026-09-05 用户批准开发；以下能力已在本地实现。用户随后提供并批准采用
 Seedream 图生图价格截图，图生图已在本地启用；Grok 两种模式已按 Kie 价格页核实并在本地启用。
@@ -232,12 +231,12 @@ Seedream 图生图价格截图，图生图已在本地启用；Grok 两种模式
 移动端切换模型不丢附件、不提供无效选项。需要真实 Provider 出图与账单对账，
 本地 Mock 测试不能代替此项。
 
-### 6.2 已批准：GPT Image 2.5 双版本接入
+### 6.2 GPT Image 2.5 双版本合同（名称与范围以 6.3 及模型审计为准）
 
 2026-09-10 用户请求新增两个独立模型。用户已确认以下接入范围。
 来源：Kie GPT Image 2.5 页面及四个模式各自的 API Reference，核对日期同上。
 
-- 模型选择器分别展示 `GPT-Image-2.5 Flare`、`GPT-Image-2.5 Sunburst`；
+- 模型选择器分别展示 `GPT Image 2.5 Flare`、`GPT Image 2.5 Sunburst`；
   保留现有模型及默认选择。
 - 每个版本均支持文生图和图生图，分别使用
   `gpt-image-2-5-flare-text-to-image`、`gpt-image-2-5-flare-image-to-image`、
@@ -259,6 +258,89 @@ Seedream 图生图价格截图，图生图已在本地启用；Grok 两种模式
   真实 Provider 出图和账单核对单独标记；Mock 通过不代表上游实测通过。
   本范围不包含生产部署。
 
+### 6.3 已批准开发与上线：图片模型精简与 Nano Banana 2.1 接入（2026-10-23）
+
+用户已提出下线 GPT Image 2、Nano Banana 2、Qwen Image 3.0 Pro、Seedream 5.0 Pro，
+并上线 Nano Banana 2.1。用户随后明确授权本对话改动开发上线，并要求逐模型核对
+KIE 官方名称、所有参数及价格。本节覆盖第 6、18、21、22 节涉及这些模型的冲突规则；
+实现与部署状态以 MEMORY 为准。所有在售模型名称须与 KIE 官方模型/模式名称一致，
+历史真实参数不改写；完整上游参数核查、平台开放子集与成本依据记录在模型审计文档。
+
+#### 模型范围与默认值
+
+- 新生成只提供以下四项，按此顺序显示：Nano Banana 2.1、Grok Imagine Image 2.0、
+  GPT Image 2.5 Flare、GPT Image 2.5 Sunburst。后三项能力和价格保持。
+- 四个下线模型从 Home、Image、Agent 模型菜单与 Agent 候选列表移除；服务端
+  同样禁止对它们发起新生成，不允许旧客户端、旧报价或直接 API 请求绕过。
+- 建议新的直接图片创作默认 Nano Banana 2.1、1K、1:1、1 张，替代当前 GPT Image 2。
+  Agent 默认 Flare 及现有数量规则保持；模板既有模型策略保持。
+- Qwen Image 3.0 Pro 仅下线图片生成能力；Agent 理解/对话使用的独立 Qwen 通路保持。
+- 本图片方案不修改视频；同轮视频模型调整另见第 7.1 节。套餐、数据库结构、GA4
+  事件含义或结果生命周期保持；生产发布已由用户在本轮明确授权。
+
+#### Nano Banana 2.1 能力与价格
+
+核对日期：2026-10-23。来源：[模型页](https://kie.ai/nano-banana-2-1)、
+[API Reference](https://docs.kie.ai/market/google/nanobanana-2-1)、
+[独立 Pricing 表](https://kie.ai/pricing)。
+
+| 项目 | 拟接入合同 |
+| --- | --- |
+| 展示名称 / 平台 ID | Nano Banana 2.1 / `nano-banana-2-1` |
+| Provider | 文生图、图生图均使用 `nano-banana-2-1`，沿用 KIE Market createTask / recordInfo |
+| 请求字段 | `prompt`、`image_input`、`aspect_ratio`、`resolution`、`output_format`；文生图不传参考图或传空数组，图生图传实际有序参考图 |
+| 参考图 | 最多 10 张，JPEG/PNG/WebP；平台单图仍限 20 MB（上传与 Assets 同步），不扩至上游页面的 30 MB |
+| 比例 | Auto、21:9、16:9、4:3、1:1、3:4、9:16，与既有产品白名单一致；不扩展其他上游比例 |
+| 分辨率 | 1K、2K、4K；默认 1K，不提供额外质量档或高级参数 |
+| Prompt / 格式 | 沿用平台非空且最多 5000 字符；固定请求 PNG，不增加输出格式选择 |
+| 数量 | 每次 1–4 张，每张独立生成、计费、持久化与失败结算 |
+| 英文简介 | Create and edit with up to ten reference images, from 1K to 4K. |
+
+| 分辨率 | KIE 每输出积分 / USD | Flownana 每输出积分 |
+| --- | --- | --- |
+| 1K | 4 / $0.020 | 1 |
+| 2K | 6 / $0.030 | 2 |
+| 4K | 9 / $0.045 | 3 |
+
+- 平台积分沿用 `Math.round(KIE 积分 × 0.3)`，先按单输出取整，再乘张数；
+  直接创作、Agent 确认卡与服务端扣费共用规则，不采用旧 Nano Banana 2 的 2/4/5 价格。
+- 独立 Pricing 表的公开查询接口在核对时返回上述三档，模型英文页相同。
+  模型页内嵌中文价格字段仍为 3/5/8 KIE 积分，存在冲突；本方案采用已交叉核对的
+  英文页与独立 Pricing 表 4/6/9，不采用充值赠送后的成本。真实 API 账单仍需实测核对。
+- 不新增 Mask、涂抹、局部编辑工具或自动压缩/裁剪；不依据营销文案承诺编辑精度。
+
+#### 下线兼容与提交边界
+
+- 已有作品继续正常显示真实模型名称、规格和积分，支持预览、下载、删除及作为
+  兼容模型的参考素材；不得修改历史模型 ID、价格或原作品参数。
+- 已受理任务继续按原 Provider 通路轮询、持久化、成功/失败结算和退款，不因下线
+  中断、重新提交到其他模型或重复扣费。
+- 旧草稿、Reprompt 或旧 Agent 报价若引用下线模型，保留 Prompt、附件及可恢复参数，
+  明确提示模型已下线，要求用户选择在售模型后重新校验和核价。不得自动把旧 Nano
+  模型 ID 改成 2.1，或用默认模型静默提交。参数必须调整时明确告知。
+- 原下线模型 Agent 付费确认失效；选择新模型后重新报价并由用户确认，旧确认
+  不得授权新模型或新价格。服务端在扣费/创建任务前再次检查模型在售状态。
+- 空白新创作可使用新默认模型；未知或下线模型 ID 不得被服务端默认为新模型。
+  历史展示所需模型元数据与新生成可用模型列表应分别处理。
+
+#### 验收要求
+
+1. Home、Image、Agent 三类菜单首次打开、关闭重开和刷新均只有四项；新直接创作
+   默认 2.1，Agent 默认 Flare，历史作品保留原模型名与参数。
+2. 2.1 文生图/图生图实际发送正确 Provider ID 与字段；1K/2K/4K、七项比例、
+   0/1/10/11 张输入、20 MB 边界、格式、Prompt 长度在扣费前统一校验。
+3. 各分辨率 1/4 输出显示、报价与服务端扣费一致；伪造旧模型/未知 ID 请求、
+   已打开旧页和过期报价均在扣费前拒绝；失败输出按原规则退款。
+4. 旧草稿/Reprompt 保留内容并要求选新模型；旧 Agent 报价不能执行；已有任务继续
+   完成或失败结算，历史预览/下载/参考功能不回归。
+5. 桌面 1440px、平板 768px、手机 390px 检查菜单、参数面板、附件上限、
+   所有触发入口及重开状态；运行 design:check、相关测试、lint 和生产构建。
+6. 保留第 12 节当前 GA4 事件合同，尤其 generation_completed 的持久化成功与逐记录
+   去重规则；不恢复已停用事件，不上传 Prompt、文件名或素材 URL。视频、积分/退款、
+   Assets 与 Agent 确认流程回归。
+7. 真实 Provider 出图、10 图上限、输出尺寸及实际账单与 Mock/合同测试分别记录；
+   未实测不能宣称通过，生产发布另需明确授权。
+
 ## 7. 视频生成
 
 视频请求每次生成一个输出。生成前必须显示已批准的模型积分价格。KIE 模型
@@ -267,20 +349,18 @@ Seedream 图生图价格截图，图生图已在本地启用；Grok 两种模式
 
 | 模型 | 输出选项 | 已批准的参考输入 |
 | --- | --- | --- |
-| Gemini Omni Video | 720P/1080P/4K；4/6/8/10 秒；16:9 或 9:16 | 最多 7 张图片 |
-| Wan 3.0 Video | 480P/720P/1080P；2–30 秒；标准比例；Sound On/Off | 当前 P0 最多 10 张图片、1 个视频和 1 个音频 |
-| Seedance 2.0 Mini | 480P/720P；4–15 秒；Auto 和标准比例；Sound On/Off | 最多 9 张图片、3 个视频和 3 个音频 |
-| MiniMax H3 | 720P/2K；4–15 秒 | 可选首帧和尾帧 |
-| Grok Imagine Video 1.5 | 480P/720P；1–15 秒 | 必须且只能有 1 张图片 |
-| HappyHorse 1.1 | 720P/1080P；3–15 秒 | 最多 1 张可选图片 |
+| Seedance 2.0 Mini | 480P/720P；4–15 秒 | 最多 9 图、3 视频、3 音频 |
+| Gemini Omni 1.1 Flash | 720P/1080P/4K；4/6/8/10 秒；16:9/9:16 | 最多 7 图，单张 10 MB |
+| Wan 3.0 Video | 480P/720P/1080P；2–30 秒 | 最多 10 图、1 视频、1 音频；带视频时输出最长 15 秒 |
+| MiniMax H3 (Hailuo-03) | 720P 档（实际768P）；4–15 秒 | 可选首帧、尾帧，最多 2 图 |
+| Grok Imagine Video 1.5 | 480P/720P；1–15 秒 | 必须且仅 1 图；比例跟随输入图片 |
 
 用户可见比例只允许 `Auto`、`16:9`、`9:16`、`1:1`、`4:3`、
-`3:4`、`21:9`；分辨率只允许 `Auto`、`480P`、`720P`、`1080P`、
-`2K`、`4K`。界面只能显示当前模型真正支持的值。
+`3:4`、`21:9`；分辨率只允许 `480P`、`720P`、`1080P`、`4K`。界面只能显示当前模型真正支持的值。
 
 模型特定规则：
 
-- MiniMax、HappyHorse 和 Grok 的图生视频由输入图片决定比例。
+- MiniMax 与 Grok 的当前单图通路跟随输入图片比例；HappyHorse 仅保留历史兼容。
 - Seedance 和 Wan 把 Auto 映射为各自安全的自适应值。
 - Gemini 始终发送其要求的 16:9 或 9:16。
 - Wan 带参考视频时，输出最长 15 秒。
@@ -289,6 +369,102 @@ Seedream 图生图价格截图，图生图已在本地启用；Grok 两种模式
 - 视频任务等待超过 45 分钟后标记超时并退款。
 - 同一视频任务的成功与失败结算必须通过数据库事务争夺唯一终态；并发轮询不得
   重复退款、覆盖已成功任务或产生“成功且已退款”的状态。
+
+### 7.1 已批准开发与上线：Gemini Omni 1.1 Flash 替换与 HappyHorse 下线（2026-10-23）
+
+用户已提出下线 Gemini Omni Video、HappyHorse 1.1，上线链接对应的新 Gemini 模型。
+用户随后明确授权本对话全部模型调整开发上线，并要求网站名称与 KIE 官方名称一致。
+本节与第 6.3 节图片方案一并执行，覆盖第 7、18、21、22 节相关冲突规则。
+
+#### 在售范围与默认值
+
+- 新视频生成按顺序提供五项：Seedance 2.0 Mini、Gemini Omni 1.1 Flash、Wan 3.0 Video、
+  MiniMax H3 (Hailuo-03)、Grok Imagine Video 1.5。新 Gemini 替换原菜单位置，HappyHorse 1.1 移除。
+- 展示名采用链接对应的 KIE 官方名称 `Gemini Omni 1.1 Flash`，替代方案阶段的
+  Gemini Omni Video 1.1 名称；不表示接入其他未指定 Gemini 版本。
+- 直接创作、Home、Agent 候选、参数面板及服务端统一在售范围；旧 Gemini/HappyHorse
+  新请求必须在扣费前拒绝，不能通过旧选项 ID、旧客户端或 Agent 旧报价绕过。
+- Seedance、Wan、MiniMax、Grok 的现有开放范围保持；当前单价与计费修正见第 7.2 节。
+  视频默认仍为 Seedance
+  2.0 Mini；Agent 默认 720P、5 秒、有声、1 个输出保持。
+
+#### 新 Gemini 接入合同与范围
+
+核对日期：2026-10-23。来源：[KIE 模型页](https://kie.ai/gemini-omni-1-1-flash)、
+[API Reference](https://docs.kie.ai/market/google/gemini-omni-flash-1-1)、
+[独立 Pricing 表](https://kie.ai/pricing)。
+
+| 项目 | 本轮拟接入合同 |
+| --- | --- |
+| Provider ID | `google/gemini-omni-flash-1-1`，使用 KIE Market createTask / recordInfo |
+| 新平台选项 ID | 为新版本分配独立 ID，不复用旧 `geminiomni_*` ID，以免旧报价被解释为新模型 |
+| 模式 | 文生视频、普通图片参考生成；不因上游支持就自动开放新的输入角色 |
+| 图片输入 | 0–7 张 JPEG/PNG/WebP，沿用旧 Gemini 的平台单张 10 MB 上限，上传与 Assets 一致 |
+| 输出 | 每次 1 个；720P、1080P、4K；4/6/8/10 秒；比例 16:9 或 9:16 |
+| 请求字段 | `prompt`、可选 `image_urls`、字符串 `duration`、`aspect_ratio`、`resolution`；分辨率真实值为 `720p`、`1080p`、`4k` |
+| Prompt | 沿用平台非空、最多 5000 字符；不扩至上游 20000 字符 |
+| 声音 | 沿用现有默认有声意图和播放器默认静音；不新增声音开关，不发送未定义的静音参数；真实输出音轨另行验收 |
+| 英文简介 | Create 4–10 second videos with up to seven reference images, up to 4K. |
+
+- 本轮建议仅替换现有普通图片参考通路，不新增 360P（不在产品分辨率白名单）、
+  视频输入/续接、首尾帧、Audio/Character ID、声音克隆、Seed 控件或后处理升分辨率工具。
+- 上游首帧模式与 image_urls/video_list/audio_ids/character_ids 互斥，带视频时 duration
+  不再控制输出；这些语义与当前流程不同，本轮不接入，不将原附件顺序暗中改成首尾帧。
+- 上游图片上限 20 MB，本轮维持已有 10 MB，若后续需要扩容另行明确范围。
+- 自然语言要求未接入的功能时 Agent 需说明限制并协商方案；不得忽略用户要求后收费。
+
+#### 新 Gemini 价格
+
+官方英文模型页与独立 Pricing 表公开查询在核对时一致。下表仅适用于本轮无视频
+输入的通路，文生视频与图片参考同价；沿用 `Math.round(KIE 积分 × 0.2)`，不按秒
+再次相乘，不计入充值赠送。
+
+| 分辨率 | 4 秒 KIE / 平台积分 | 6 秒 KIE / 平台积分 | 8 秒 KIE / 平台积分 | 10 秒 KIE / 平台积分 |
+| --- | --- | --- | --- | --- |
+| 720P / 1080P | 63 / 13 | 84 / 17 | 105 / 21 | 126 / 25 |
+| 4K | 147 / 29 | 168 / 34 | 189 / 38 | 210 / 42 |
+
+直接创作、Agent 确认卡、服务端扣费统一使用新价格；旧 Gemini 价格及任务扣费快照
+不改写。新旧模型需要独立元数据，不用复用旧 ID 的方式直接覆盖价格。
+
+#### 下线兼容、验收与发布边界
+
+- 旧 Gemini/HappyHorse 作品继续显示真实模型名、规格、积分，支持预览、下载、
+  删除与兼容模型参考；已受理任务继续使用原通路轮询、持久化、结算和失败退款。
+- 旧草稿、Reprompt、旧 Agent 报价引用下线模型时，保留 Prompt/附件/可恢复参数，
+  提示下线并要求用户选在售模型、重新校验和核价；不自动换模型、丢附件或沿用旧付费确认。
+- 验收所有 Home/Video/Agent 菜单入口、首次/再次打开、关闭重开、刷新与切模式，
+  必须只出现五个视频模型；检查 390/768/1440px、键盘及触控，运行 design:check。
+- 合同与服务端测试覆盖新 Provider ID、字段及大小写、12 个分辨率/时长组合、
+  两种比例、0/1/7/8 图、10 MB 边界、非法类型、未知/旧模型 ID、过期报价扣费前拒绝。
+- 验证显示积分与真实扣费、失败退款、轮询重试/超时、历史元数据与旧任务结算；
+  保留现有五输出并发限制、账号隔离、Assets 规则和第 12 节当前 GA4 事件合同。
+- 手动验收真实生成、输出时长/尺寸/音轨、参考图效果、下载和 KIE 实际账单；与 Mock
+  结果分开记录，未执行不能宣称通过。图片方案先保证生成链路稳定，再验收本视频替换。
+- 不迁移或删除历史业务数据，不改套餐；所有保留模型按用户授权核对上游当前价格，
+  确有漂移时按既有换算规则修正并在审计文档记录。用户已明确批准本轮生产发布。
+
+### 7.2 已授权：全部在售模型官方合同与价格校准（2026-10-23）
+
+用户明确要求核对所有模型的官方名称、KIE 全部参数、计价并开发上线。本节覆盖上文
+过时费率、名称及第 21/22 节相冲突的描述；逐字段来源、全部上游参数与平台开放子集见
+[模型审计](./KIE-MODEL-AUDIT-2026-10-23.md)和[结构化合同/价格证据](./KIE-MODEL-CONTRACTS.json)。
+
+- Seedance Mini：无视频输入 480P/720P 为 3.8/8.2 KIE 积分/秒；有视频输入为
+  2.4/5 ×（输入视频合计时长+输出时长）。
+- Wan 3.0：480P/720P/1080P 为 8/16/32 ×（输入视频合计时长+输出时长）。
+- MiniMax H3 (Hailuo-03)：界面720P实际768P，8 KIE 积分/秒；不开放2K或参考模式。
+- Grok Imagine Video 1.5：480P/720P 为 2.4/4.5 KIE 积分/秒。单图比例字段不生效，
+  显示跟随输入图片，不发送固定比例；默认 enable_audio=true，Agent 可明确要求关闭。
+- Gemini 新版按 7.1 离散整次价格；其他视频均在整次 KIE 成本上乘0.2后四舍五入。
+- 视频参考报价使用已读取的实际时长。服务端扣费前重新读取账号素材，不信任浏览器
+  时长；实际价格与用户已见报价不一致时拒绝并要求重新报价，不静默多扣或少扣。
+- Seedance Prompt 3–5000 字符，Grok 视频 1–4096，其他视频 1–5000；页面与 Agent
+  方案、实际出站 Prompt 使用同一限制。默认声音与实际 Provider 字段一致。
+- 新增已有输入合同的边长/比例/像素/FPS复核，损坏或未知不能作为有效输入继续扣费；
+  上游更宽的素材数量、格式、智能时长、360P、背景、Loop、关键帧等不自动开放。
+- 用户已确认：Grok 保留480P、1秒档位；Grok 视频单次报价最低1积分，即
+  `Math.max(1, Math.round(KIE成本 × 0.2))`。其他模型换算及历史已扣积分保持原规则。
 
 ## 8. Assets 与媒体生命周期
 
@@ -1011,7 +1187,7 @@ Home 布局、普通创作输入、模板封面、问答面板、生成确认、
 - Home 使用紧凑图片卡片：桌面一行 6 个，名称叠在图片左下角，不展示模块副标题或卡片用途文案。界面沿用英文，支持中英文输入。
 - 需求理解与多模态问答固定使用 OpenRouter 的 Qwen3-VL-32B-Instruct；不做
   LLM 路由、无声 fallback 或无限问答。准确 API ID 和能力在接入时核验。
-- 模板生图统一使用现有 KIE GPT-Image-2.5 Sunburst，包括初次生成和继续编辑；
+- 模板生图统一使用现有 KIE GPT Image 2.5 Sunburst，包括初次生成和继续编辑；
   不提供任意图片模型选择，不自动切到 Flare。确认区明确展示固定模型。
 - 普通创作不受模板模型限制。选择图片模板进入图片模式，但不销毁原 Image/Video
   草稿；退出模板恢复普通草稿与模型。
@@ -1141,7 +1317,7 @@ Image/Video 直接创作继续沿用现有流程；Agent 会话独立于其操�
 - 模板仍为现有 16 个图片模板。模板初次默认 4 张、允许 1–4 张；编辑默认 1 张并
   锁定所选方向。普通 Agent 按需求决定数量并在确认卡片中展示，不统一默认 4 张。
 - Agent 自动确定适用模型及参数；用户通过对话提出规格要求，确认卡片展示实际
-  模型和规格。默认图片模型为 GPT-Image-2.5 Flare；理解使用现有 Qwen，先验收
+  模型和规格。默认图片模型为 GPT Image 2.5 Flare；理解使用现有 Qwen，先验收
   多轮能力、不自动切换其他理解模型。视频默认 Seedance 2.0 Mini、720P、5 秒、
   有声、一个输出，可通过对话修改（2026-09-14 更新，尚未开发，见第 22 节）。旧模板固定 Qwen/Sunburst 组合不再约束新 Agent，
   不新增在售模型。
@@ -1183,7 +1359,7 @@ Image/Video 直接创作继续沿用现有流程；Agent 会话独立于其操�
 - 会话保留历史，通过新消息修正要求，不覆盖已执行任务；首版不做历史消息分支。
 - 删除会话保留 Assets 作品；生成中或退款未完成时等待处理结束后再删除。
 - 理解先用现有 Qwen 验收，负责需求理解与方案整理，不自动切换其他模型。
-  图片默认 GPT-Image-2.5 Flare；视频默认 Seedance 2.0 Mini、720P、5 秒、有声（第 22 节更新，尚未开发），
+  图片默认 GPT Image 2.5 Flare；视频默认 Seedance 2.0 Mini、720P、5 秒、有声（第 22 节更新，尚未开发），
   每次一个视频。用户可通过对话修改生成规格，每次付费仍需明确确认。
 - 技术方向为一个 Agent 调用现有图片/视频能力，会话保存、报价和扣费由服务端管理。
 - 新增以下四个事件，采用 `docs/AGENT-SPEC.md` 第 7 节对应的触发与去重口径：
@@ -1379,23 +1555,21 @@ Image/Video 直接创作继续沿用现有流程；Agent 会话独立于其操�
 
 | 模型 | 图片数量 / 单张 MB | 视频数量 / 单个 MB | 音频数量 / 单个 MB | 角色与组合 |
 | --- | --- | --- | --- | --- |
-| GPT Image 2 / Nano Banana 2 | 1 / 20 | 0 | 0 | 单图参考 |
-| Qwen Image 3.0 Pro | 3 / 10 | 0 | 0 | 顺序参考 |
+| Nano Banana 2.1 | 10 / 20 | 0 | 0 | 顺序参考 |
 | Grok Imagine Image 2.0 | 5 / 20 | 0 | 0 | 顺序参考 |
-| Seedream 5.0 Pro | 10 / 20 | 0 | 0 | 顺序参考 |
 | GPT Image 2.5 Flare / Sunburst | 16 / 20 | 0 | 0 | 顺序参考 |
 | Seedance 2.0 Mini | 9 / 30 | 3 / 50 | 3 / 15 | 多模态参考；本地图片仍限 20 MB |
-| Gemini Omni Video | 7 / 10 | 0 | 0 | 图片参考 |
+| Gemini Omni 1.1 Flash | 7 / 10 | 0 | 0 | 图片参考 |
 | Wan 3.0 Video | 10 / 20 | 1 / 50 | 1 / 15 | 首尾帧或多模态参考；带视频时输出最长 15 秒 |
-| MiniMax H3 | 2 / 20 | 0 | 0 | 首帧、尾帧；有图跟图 |
+| MiniMax H3 (Hailuo-03) | 2 / 20 | 0 | 0 | 首帧、尾帧；有图跟图 |
 | Grok Imagine Video 1.5 | 1 / 20 | 0 | 0 | 必须有图；允许接口比例参数 |
-| HappyHorse 1.1 | 1 / 20 | 0 | 0 | 开始图片；有图跟图 |
 | Agent 添加阶段 | 共 22 / 20 | 共 22 / 50 | 共 22 / 15 | 三类合计最多 22 个，暂不限制生成模型时长 |
 
 Seedance/Wan 本轮保留已批准单参考 2–15 秒，视频合计 ≤15 秒、音频合计 ≤15 秒，
 与输出时长分开处理。官方 [Seedance Mini](https://kie.ai/seedance-2-0-mini) 和
 [Wan 3.0](https://kie.ai/wan3.0-video) 支持更宽的部分输入范围，本轮不扩容。
 真实字节或时长未知时先检查，失败不能当作有效素材继续生成。
+
 
 ### 21.4 Agent 两阶段校验
 
@@ -1492,7 +1666,7 @@ Seedance/Wan 本轮保留已批准单参考 2–15 秒，视频合计 ≤15 秒�
 - Auto/跟随输入图属于自适应模式，不承诺输出一定等于某一个白名单固定比例；
   输入图本身仍必须满足模型允许的宽高、比例范围。明确选择固定比例时不得
   当作 Auto 执行。逐模型区分首尾帧和参考模式，不把所有图生视频一概归为跟图。
-- 当前本地 MiniMax/HappyHorse 有图时不发送 aspect_ratio，Grok 则会发送；旧
+- 历史本地 MiniMax/HappyHorse 有图时不发送 aspect_ratio，Grok 曾会发送；旧
   产品条款将三者一并描述为跟图，存在需要核对的差异。开发前以实际使用接口的
   官方合同和必要输出验证确认，不以旧 UI 可选值证明输出可控。
 - 2026-09-14 核查 [Kie MiniMax H3](https://kie.ai/minimax-h3)：图生视频表单
@@ -1523,21 +1697,18 @@ Seedance/Wan 本轮保留已批准单参考 2–15 秒，视频合计 ≤15 秒�
 
 | 模型 | 英文简介 |
 | --- | --- |
-| GPT Image 2 | Create and edit images with one reference, up to 4K. |
-| Nano Banana 2 | Generate images from text or a single reference, from 1K to 4K. |
-| Qwen Image 3.0 Pro | Combine up to three reference images in 1K or 2K. |
+| Nano Banana 2.1 | Create and edit with up to ten reference images, from 1K to 4K. |
 | Grok Imagine Image 2.0 | Create and edit with up to five reference images. |
-| Seedream 5.0 Pro | Work with up to ten reference images in 1K or 2K. |
-| GPT-Image-2.5 Flare | Create and edit with up to sixteen references, up to 4K. |
-| GPT-Image-2.5 Sunburst | Generate up to 4K images with multi-image references and flexible framing. |
+| GPT Image 2.5 Flare | Create and edit with up to sixteen references, up to 4K. |
+| GPT Image 2.5 Sunburst | Generate up to 4K images with multi-image references and flexible framing. |
 | Seedance 2.0 Mini | Combine image, video and audio references in 4–15 second clips. |
-| Gemini Omni Video | Create up to 4K video with sound and up to seven reference images. |
+| Gemini Omni 1.1 Flash | Create up to 4K video with sound and up to seven reference images. |
 | Wan 3.0 Video | Generate up to 30 seconds, with image, video and audio references. |
-| MiniMax H3 | Guide 4–15 second clips with optional first and last frames. |
+| MiniMax H3 (Hailuo-03) | Guide 4–15 second clips with optional first and last frames. |
 | Grok Imagine Video 1.5 | Turn a single image into a 1–15 second video. |
-| HappyHorse 1.1 | Create 3–15 second videos from text or an image, up to 1080P. |
 
 Wan 带参考视频最长 15 秒等限制在选中模型的参数区提示，简介不替代有效约束。
+
 
 ### 22.6 验收要求
 

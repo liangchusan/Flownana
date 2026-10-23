@@ -49,5 +49,5 @@ test("all displayed ratios are ordered whitelist intersections; removed resoluti
   for (const name of new Set(VIDEO_MODEL_OPTIONS.map(getVideoModelName))) assert.ok(getDisplayResolutions(VIDEO_MODEL_OPTIONS.filter(o => getVideoModelName(o) === name)).every(r => DEFAULT_VIDEO_RESOLUTIONS.includes(r)));
   assert.equal(videoFollowsInputRatio("MiniMax H3", 1), true);
   assert.equal(videoFollowsInputRatio("HappyHorse 1.1", 0), false);
-  assert.equal(videoFollowsInputRatio("Grok Imagine Video 1.5", 1), false);
+  assert.equal(videoFollowsInputRatio("Grok Imagine Video 1.5", 1), true);
 });

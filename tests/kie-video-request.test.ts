@@ -88,7 +88,7 @@ test("Grok image-to-video sends image_urls only after an image is provided", () 
     resolution: "720p",
     duration: 15,
     nsfw_checker: true,
-    aspect_ratio: "9:16",
+    enable_audio: true,
   });
 });
 
@@ -110,7 +110,6 @@ test("Seedance Mini keeps pure two-image input in first-and-last-frame mode", ()
     duration: 4,
     generate_audio: false,
     aspect_ratio: "adaptive",
-    web_search: false,
     nsfw_checker: true,
     first_frame_url: "https://example.com/first.png",
     last_frame_url: "https://example.com/last.png",
@@ -139,8 +138,7 @@ test("Seedance Mini uses mutually exclusive multimodal reference arrays", () => 
       duration: 15,
       generate_audio: true,
       aspect_ratio: "21:9",
-      web_search: false,
-      nsfw_checker: true,
+        nsfw_checker: true,
       reference_image_urls: ["https://example.com/image.png"],
       reference_video_urls: ["https://example.com/video.mp4"],
       reference_audio_urls: ["https://example.com/audio.mp3"],
@@ -158,7 +156,7 @@ test("Gemini Omni sends documented text and image-reference fields", () => {
       "https://example.com/scene.png",
     ],
     aspectRatio: "9:16",
-    option: VIDEO_MODEL_OPTION_MAP.geminiomni_4k_8,
+    option: VIDEO_MODEL_OPTION_MAP.geminiomni11_4k_8,
   });
 
   assert.deepEqual(input, {
@@ -263,6 +261,7 @@ test("active KIE video models use their documented request contracts", () => {
         resolution: "720p",
         duration: 15,
         nsfw_checker: true,
+        enable_audio: true,
       },
     }
   );

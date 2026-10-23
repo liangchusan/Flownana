@@ -29,6 +29,7 @@ export function buildKieImageRequest(params: {
       if (hasImages) input.image_urls = params.inputUrls;
       break;
     case "nano-banana-2":
+    case "nano-banana-2-1":
       input.aspect_ratio = params.aspectRatio;
       input.resolution = params.resolution;
       input.output_format = "png";

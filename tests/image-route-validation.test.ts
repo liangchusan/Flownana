@@ -25,7 +25,7 @@ test("invalid image requests never reserve credits or call Kie", async () => {
       [{ prompt: "x".repeat(5001) }, "invalid_parameters"],
       [{ model: "gpt-image-2", resolution: "4K", aspectRatio: "1:1" }, "invalid_parameters"],
       [{ model: "qwen-image-3-pro", resolution: "4K" }, "invalid_parameters"],
-      [{ model: "nano-banana-2", imageUrls: ["https://example.test/image"] }, "unsupported_file_type"],
+      [{ model: "nano-banana-2-1", imageUrls: ["https://example.test/image"] }, "unsupported_file_type"],
       [{ model: "grok-imagine-image-2-0", aspectRatio: "auto" }, "invalid_parameters"],
       [{ model: "grok-imagine-image-2-0", resolution: "1K" }, "invalid_parameters"],
       [{ model: "seedream-5-pro", resolution: "4K" }, "invalid_parameters"],
@@ -73,7 +73,7 @@ test("image routes dispatch all models through reservation, storage and settleme
             "@/lib/generation-lifecycle": {
               recoverGenerationObligations: async () => undefined,
               reserveGeneration: async (request: { parameters: Record<string, unknown>; creditsCost: number }) => {
-                assert.equal(request.creditsCost, model.id === "grok-imagine-image-2-0" ? 1 : model.id === "seedream-5-pro" && editing ? 3 : 2);
+                assert.equal(request.creditsCost, ["grok-imagine-image-2-0", "nano-banana-2-1"].includes(model.id) ? 1 : 2);
                 events.push("reserve"); parameters = request.parameters; return generation;
               },
               attachGenerationTask: async () => generation,

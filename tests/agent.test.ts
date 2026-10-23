@@ -38,11 +38,16 @@ test("Agent whitelist and sound are enforced independently of hidden UI controls
   const video = { ...proposal, type: "video", directions: [] };
   assert.equal(buildQuote({ ...video, sound: false }, [], { userText: "silent" }).sound, false);
   assert.equal(buildQuote({ ...video, model: "MiniMax H3" }, [], { userText: "" }).sound, true);
-  assert.equal(buildQuote({ ...video, model: "Gemini Omni Video", duration: 4 }, [], { userText: "" }).sound, true);
-  assert.throws(() => buildQuote({ ...video, model: "Gemini Omni Video", duration: 4, sound: false }, [], { userText: "" }), /sound/);
+  assert.equal(buildQuote({ ...video, model: "Gemini Omni 1.1 Flash", duration: 4 }, [], { userText: "" }).sound, true);
+  assert.throws(() => buildQuote({ ...video, model: "Gemini Omni 1.1 Flash", duration: 4, sound: false }, [], { userText: "" }), /sound/);
   assert.throws(() => buildQuote({ ...video, model: "MiniMax H3", resolution: "2K" }, [], { userText: "", maxVideoResolution: "4K" }), /resolution/);
   assert.throws(() => buildQuote({ ...proposal, aspectRatio: "3:2" }, [], { userText: "" }), /ratio/);
   const refs = [{ url: "https://example.test/input.png", kind: "image", role: "subject" }];
   assert.equal(buildQuote({ ...video, model: "MiniMax H3" }, refs, { userText: "" }).aspectRatio, "Auto");
   assert.throws(() => buildQuote({ ...video, model: "MiniMax H3", aspectRatio: "16:9" }, refs, { userText: "" }), /input image/);
+});
+test("Agent Grok one-second quote uses the approved one-credit minimum", () => {
+  const quote = buildQuote({ ...proposal, type: "video", model: "Grok Imagine Video 1.5", resolution: "480P", duration: 1, aspectRatio: "Auto" }, [{ url: "https://example.test/input.png", kind: "image", role: "subject" }], { userText: "" });
+  assert.equal(quote.credits, 1);
+  assert.equal(quote.modelId, "grok15_480_1");
 });

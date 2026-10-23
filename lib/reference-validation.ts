@@ -1,7 +1,7 @@
 import type { GenerationInputCapabilities, ComposerAttachmentKind } from "./generation-input-capabilities.ts";
 import { MEDIA_UPLOAD_RULES } from "./media-upload-policy.ts";
 
-export type ReferenceMetadata = { kind: ComposerAttachmentKind; contentType?: string; sizeBytes?: number; durationSeconds?: number; name?: string };
+export type ReferenceMetadata = { kind: ComposerAttachmentKind; contentType?: string; sizeBytes?: number; durationSeconds?: number; name?: string; width?: number; height?: number; frameRate?: number; codec?: string; hasTransparency?: boolean };
 export function referenceLimit(caps: GenerationInputCapabilities, kind: ComposerAttachmentKind) {
   return kind === "image" ? caps.maxImages : kind === "video" ? caps.maxVideos : caps.maxAudios;
 }
@@ -17,6 +17,19 @@ export function referenceIssue(caps: GenerationInputCapabilities, ref: Reference
   const max = referenceMaxBytes(caps, ref.kind, options.upload);
   if (ref.sizeBytes != null && (!Number.isFinite(ref.sizeBytes) || ref.sizeBytes <= 0 || ref.sizeBytes > max)) return `File is ${(ref.sizeBytes / 1024 ** 2).toFixed(1)} MB. Maximum: ${max / 1024 ** 2} MB per ${ref.kind}.`;
   if (options.requireMetadata && (!ref.contentType || ref.sizeBytes == null)) return "Check this file before adding it.";
+  if (ref.kind === "image" && caps.requiresOpaqueImages && ref.hasTransparency) return "This model does not accept transparent images. Export an opaque image and try again.";
+  const geometry = ref.kind === "image" ? caps.imageGeometry : ref.kind === "video" ? caps.videoGeometry : undefined;
+  if (geometry && (ref.width != null || ref.height != null)) {
+    const w = ref.width ?? 0, h = ref.height ?? 0, ratio = w / h;
+    const exclusive = "exclusive" in geometry && geometry.exclusive;
+    if (!Number.isFinite(w * h) || w <= 0 || h <= 0 ||
+      (exclusive ? Math.min(w, h) <= geometry.minSide || Math.max(w, h) >= geometry.maxSide || ratio <= geometry.minRatio || ratio >= geometry.maxRatio
+        : Math.min(w, h) < geometry.minSide || Math.max(w, h) > geometry.maxSide || ratio < geometry.minRatio || ratio > geometry.maxRatio)) {
+      return `Reference ${ref.kind} dimensions must be ${exclusive ? "inside" : "within"} ${geometry.minSide}–${geometry.maxSide}px per side, with width/height ${geometry.minRatio}–${geometry.maxRatio}.`;
+    }
+    if ("minPixels" in geometry && ((geometry.minPixels != null && w * h < geometry.minPixels) || (geometry.maxPixels != null && w * h > geometry.maxPixels))) return `Reference video pixel count must be ${geometry.minPixels}–${geometry.maxPixels}.`;
+    if ("minFrameRate" in geometry && geometry.minFrameRate != null && (!ref.frameRate || ref.frameRate < geometry.minFrameRate || ref.frameRate > (geometry.maxFrameRate ?? Infinity))) return `Reference video frame rate must be ${geometry.minFrameRate}–${geometry.maxFrameRate} FPS.`;
+  }
   if (ref.kind !== "image") {
     if (options.requireMetadata && ref.durationSeconds == null) return "Could not read the duration. Retry or choose another file.";
     const d = ref.durationSeconds;

@@ -16,6 +16,7 @@ import {
 } from "@/lib/generation-lifecycle";
 import {
   VIDEO_MODEL_OPTION_MAP,
+  AVAILABLE_VIDEO_MODEL_IDS,
   VIDEO_MODEL_OPTIONS,
   type VideoModelOption,
   type VideoModelOptionId
@@ -112,14 +113,14 @@ export function resolveVideoOption(params: {
   modelOptionId?: string;
   model?: string;
 }): VideoModelOption | null {
-  if (params.modelOptionId) {
+  if (params.modelOptionId != null) {
     const byId = Object.hasOwn(VIDEO_MODEL_OPTION_MAP, params.modelOptionId)
       ? VIDEO_MODEL_OPTION_MAP[params.modelOptionId as VideoModelOptionId] : null;
-    if (byId) return byId;
+    if (byId && AVAILABLE_VIDEO_MODEL_IDS.has(byId.id)) return byId;
     return null;
   }
 
-  if (params.model) {
+  if (params.model != null) {
     return null;
   }
 

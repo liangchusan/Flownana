@@ -4,6 +4,9 @@ import { getImageInputTypes } from "./image-model-capabilities.ts";
 export type ComposerAttachmentKind = "image" | "video" | "audio";
 
 export interface GenerationInputCapabilities {
+  imageGeometry?: { minSide: number; maxSide: number; minRatio: number; maxRatio: number; exclusive?: boolean };
+  requiresOpaqueImages?: boolean;
+  videoGeometry?: { minSide: number; maxSide: number; minRatio: number; maxRatio: number; minPixels?: number; maxPixels?: number; minFrameRate?: number; maxFrameRate?: number };
   maxReferences?: number;
   referenceDurationLimits?: boolean;
   maxImages: number;
@@ -44,11 +47,11 @@ export function getImageInputCapabilities(
   }
 
   return {
-    maxImages: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1,
+    maxImages: modelId === "grok-imagine-image-2-0" ? 5 : (modelId === "seedream-5-pro" || modelId === "nano-banana-2-1") ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1,
     imageContentTypes: getImageInputTypes(modelId),
     maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
     imageRequired: false,
-    imageRoles: Array.from({ length: modelId === "grok-imagine-image-2-0" ? 5 : modelId === "seedream-5-pro" ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1 }, (_, i) => `Reference ${i + 1}`),
+    imageRoles: Array.from({ length: modelId === "grok-imagine-image-2-0" ? 5 : (modelId === "seedream-5-pro" || modelId === "nano-banana-2-1") ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1 }, (_, i) => `Reference ${i + 1}`),
     acceptsVideo: false,
     acceptsAudio: false,
     maxVideos: 0,
@@ -61,8 +64,9 @@ export function getImageInputCapabilities(
 export function getVideoInputCapabilities(
   modelName: string
 ): GenerationInputCapabilities {
-  if (modelName === "Gemini Omni Video") {
+  if (["Gemini Omni Video", "Gemini Omni 1.1 Flash"].includes(modelName)) {
     return {
+      imageContentTypes: ["image/jpeg", "image/png", "image/webp"],
       maxImages: 7,
       maxImageBytes: 10 * 1024 * 1024,
       imageRequired: false,
@@ -77,6 +81,10 @@ export function getVideoInputCapabilities(
   }
   if (modelName === "Wan 3.0 Video") {
     return {
+      requiresOpaqueImages: true,
+      imageContentTypes: ["image/jpeg", "image/png", "image/webp"],
+      imageGeometry: { minSide: 240, maxSide: 8000, minRatio: 1 / 8, maxRatio: 8 },
+      videoGeometry: { minSide: 240, maxSide: 4096, minRatio: 1 / 8, maxRatio: 8 },
       maxImages: 10,
       maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
       imageRequired: false,
@@ -94,6 +102,9 @@ export function getVideoInputCapabilities(
   }
   if (modelName === "Seedance 2.0 Mini") {
     return {
+      imageContentTypes: ["image/jpeg", "image/png", "image/webp"],
+      imageGeometry: { minSide: 300, maxSide: 6000, minRatio: 0.4, maxRatio: 2.5, exclusive: true },
+      videoGeometry: { minSide: 300, maxSide: 6000, minRatio: 0.4, maxRatio: 2.5, minPixels: 409600, maxPixels: 927408, minFrameRate: 24, maxFrameRate: 60 },
       maxImages: 9,
       maxImageBytes: 30 * 1024 * 1024,
       imageRequired: false,
@@ -106,8 +117,10 @@ export function getVideoInputCapabilities(
       maxAudioBytes: DEFAULT_MAX_AUDIO_BYTES,
     };
   }
-  if (modelName === "MiniMax H3") {
+  if (["MiniMax H3", "MiniMax H3 (Hailuo-03)"].includes(modelName)) {
     return {
+      imageContentTypes: ["image/jpeg", "image/png", "image/webp"],
+      imageGeometry: { minSide: 256, maxSide: 5760, minRatio: 0.4, maxRatio: 2.5 },
       maxImages: 2,
       maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
       imageRequired: false,
@@ -122,6 +135,7 @@ export function getVideoInputCapabilities(
   }
 
   return {
+      imageContentTypes: ["image/jpeg", "image/png", "image/webp"],
     maxImages: 1,
     maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
     imageRequired: modelName === "Grok Imagine Video 1.5",

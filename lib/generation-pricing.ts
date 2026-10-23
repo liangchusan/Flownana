@@ -42,11 +42,11 @@ export type VideoModelOption = {
 
 export function getVideoModelName(option: VideoModelOption): string {
   if (option.family === "seedance") return "Seedance 2.0 Mini";
-  if (option.family === "gemini") return "Gemini Omni Video";
+  if (option.family === "gemini") return option.providerModel === "google/gemini-omni-flash-1-1" ? "Gemini Omni 1.1 Flash" : "Gemini Omni Video";
   if (option.family === "wan") return "Wan 3.0 Video";
   if (option.providerModel.startsWith("happyhorse-1-1/")) return "HappyHorse 1.1";
   if (option.family === "grok") return "Grok Imagine Video 1.5";
-  if (option.family === "minimax") return "MiniMax H3";
+  if (option.family === "minimax") return "MiniMax H3 (Hailuo-03)";
   return option.label.split(" · ")[0] || option.label;
 }
 
@@ -67,7 +67,7 @@ const WAN_30_DURATIONS = Array.from({ length: 29 }, (_, index) => index + 2);
 export const DEFAULT_VIDEO_ASPECT_RATIOS: VideoAspectRatio[] = ["Auto", "21:9", "16:9", "4:3", "1:1", "3:4", "9:16"];
 export const DEFAULT_VIDEO_RESOLUTIONS: VideoResolutionOption[] = ["480P", "720P", "1080P", "4K"];
 export function videoFollowsInputRatio(modelName: string, imageCount: number) {
-  return imageCount > 0 && ["MiniMax H3", "HappyHorse 1.1"].includes(modelName);
+  return imageCount > 0 && ["MiniMax H3 (Hailuo-03)", "MiniMax H3", "HappyHorse 1.1", "Grok Imagine Video 1.5"].includes(modelName);
 }
 export const DEFAULT_VIDEO_SOUND_OPTIONS: VideoSoundOption[] = ["Auto", "On", "Off"];
 
@@ -98,7 +98,7 @@ export function getDisplaySoundOptions(options: VideoModelOption[]): VideoSoundO
     return ["On", "Off"];
   }
   const supportsAudioOn = options.some((option) => option.hasAudio);
-  const supportsAudioOff = options.some((option) => !option.hasAudio);
+  const supportsAudioOff = options.some((option) => !option.hasAudio || option.audioConfigurable);
 
   if (supportsAudioOn && supportsAudioOff) {
     return DEFAULT_VIDEO_SOUND_OPTIONS;
@@ -134,8 +134,8 @@ function createHappyHorse11Options(): VideoModelOption[] {
 
 function createGrokImagineVideo15Options(): VideoModelOption[] {
   const priceByResolution: Partial<Record<VideoModelOption["resolution"], number>> = {
-    "480P": 14.5,
-    "720P": 25,
+    "480P": 2.4,
+    "720P": 4.5,
   };
 
   return Object.entries(priceByResolution).flatMap(
@@ -148,25 +148,27 @@ function createGrokImagineVideo15Options(): VideoModelOption[] {
         providerModel: "grok-imagine-video-1-5-preview",
         imageToVideoProviderModel: "grok-imagine-video-1-5-preview",
         requiresImageInput: true,
+        hasAudio: true,
+        audioConfigurable: true,
         resolution: resolution as VideoModelOption["resolution"],
         duration,
-        aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
-        credits: platformVideoCredits(apiCreditsPerSecond, duration),
+        aspectRatios: ["Auto"],
+        credits: Math.max(1, platformVideoCredits(apiCreditsPerSecond, duration)),
       }))
   );
 }
 
 function createMiniMaxH3Options(): VideoModelOption[] {
   const priceByResolution: Partial<Record<VideoModelOption["resolution"], number>> = {
-    "720P": 18,
-    "2K": 29,
+    "720P": 8,
+    "2K": 13,
   };
 
   return Object.entries(priceByResolution).flatMap(
     ([resolution, apiCreditsPerSecond]) =>
       MINIMAX_H3_DURATIONS.map((duration) => ({
         id: `minimaxh3_${resolution.toLowerCase().replace("p", "")}_${duration}`,
-        label: `MiniMax H3 · ${resolution} · ${duration}s`,
+        label: `MiniMax H3 (Hailuo-03) · ${resolution} · ${duration}s`,
         family: "minimax",
         provider: "kie",
         providerModel: "minimax-h3/text-to-video",
@@ -175,17 +177,17 @@ function createMiniMaxH3Options(): VideoModelOption[] {
         hasAudio: true,
         resolution: resolution as VideoModelOption["resolution"],
         duration,
-        aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS,
+        aspectRatios: DEFAULT_VIDEO_ASPECT_RATIOS.filter(ratio => ratio !== "Auto"),
         credits: platformVideoCredits(apiCreditsPerSecond, duration),
       }))
   );
 }
 
 function createSeedanceMiniOptions(): VideoModelOption[] {
-  // KIE's no-video-input tiers are used for every input combination.
+  // Official no-video rates. Reference-video pricing uses verified input duration below.
   const apiCreditsPerSecond: Record<"480P" | "720P", number> = {
-    "480P": 10,
-    "720P": 22,
+    "480P": 3.8,
+    "720P": 8.2,
   };
 
   return (["480P", "720P"] as const).flatMap((resolution) =>
@@ -211,18 +213,18 @@ function createGeminiOmniVideoOptions(): VideoModelOption[] {
     "720P" | "1080P" | "4K",
     Record<number, number>
   > = {
-    "720P": { 4: 90, 6: 120, 8: 150, 10: 180 },
-    "1080P": { 4: 90, 6: 120, 8: 150, 10: 180 },
-    "4K": { 4: 210, 6: 240, 8: 270, 10: 300 },
+    "720P": { 4: 63, 6: 84, 8: 105, 10: 126 },
+    "1080P": { 4: 63, 6: 84, 8: 105, 10: 126 },
+    "4K": { 4: 147, 6: 168, 8: 189, 10: 210 },
   };
 
   return (["720P", "1080P", "4K"] as const).flatMap((resolution) =>
     GEMINI_OMNI_DURATIONS.map((duration) => ({
-      id: `geminiomni_${resolution.toLowerCase().replace("p", "")}_${duration}`,
-      label: `Gemini Omni Video · ${resolution} · ${duration}s`,
+      id: `geminiomni11_${resolution.toLowerCase().replace("p", "")}_${duration}`,
+      label: `Gemini Omni 1.1 Flash · ${resolution} · ${duration}s`,
       family: "gemini" as const,
       provider: "kie" as const,
-      providerModel: "gemini-omni-video",
+      providerModel: "google/gemini-omni-flash-1-1",
       resolution,
       duration,
       hasAudio: true,
@@ -236,9 +238,9 @@ function createGeminiOmniVideoOptions(): VideoModelOption[] {
 
 function createWan30VideoOptions(): VideoModelOption[] {
   const apiCreditsPerSecond: Record<"480P" | "720P" | "1080P", number> = {
-    "480P": 30,
-    "720P": 50,
-    "1080P": 90,
+    "480P": 8,
+    "720P": 16,
+    "1080P": 32,
   };
 
   return (["480P", "720P", "1080P"] as const).flatMap((resolution) =>
@@ -262,19 +264,38 @@ export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
   ...createSeedanceMiniOptions(),
   ...createGeminiOmniVideoOptions(),
   ...createWan30VideoOptions(),
-  ...createMiniMaxH3Options(),
+  ...createMiniMaxH3Options().filter(option => option.resolution === "720P"),
   ...createGrokImagineVideo15Options(),
-  ...createHappyHorse11Options(),
 ];
 
+// Retired options exist solely for paid-task polling and historical parameter display.
+export const LEGACY_VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
+  ...createHappyHorse11Options(),
+  ...createMiniMaxH3Options().filter(option => option.resolution === "2K").map(option => ({ ...option,
+    credits: platformVideoCredits(29, option.duration),
+  })),
+  ...createGeminiOmniVideoOptions().map(option => ({ ...option,
+    id: option.id.replace("geminiomni11_", "geminiomni_"),
+    label: option.label.replace("Gemini Omni 1.1 Flash", "Gemini Omni Video"),
+    providerModel: "gemini-omni-video",
+    credits: platformVideoTaskCredits((option.resolution === "4K"
+      ? { 4: 210, 6: 240, 8: 270, 10: 300 }
+      : { 4: 90, 6: 120, 8: 150, 10: 180 })[option.duration as 4 | 6 | 8 | 10]),
+  })),
+];
+export const AVAILABLE_VIDEO_MODEL_IDS = new Set(VIDEO_MODEL_OPTIONS.map(option => option.id));
+export function canonicalVideoModelName(name: string) {
+  return name === "MiniMax H3" ? "MiniMax H3 (Hailuo-03)" : name;
+}
+
 export const VIDEO_MODEL_OPTION_MAP: Record<VideoModelOptionId, VideoModelOption> =
-  VIDEO_MODEL_OPTIONS.reduce((acc, item) => {
+  [...LEGACY_VIDEO_MODEL_OPTIONS, ...VIDEO_MODEL_OPTIONS].reduce((acc, item) => {
     acc[item.id] = item;
     return acc;
   }, {} as Record<VideoModelOptionId, VideoModelOption>);
 
 export type ImageResolutionKey = "1K" | "2K" | "4K";
-export type ImageModelOptionId = "gpt-image-2-5-flare" | "gpt-image-2-5-sunburst" | "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro";
+export type ImageModelOptionId = "gpt-image-2-5-flare" | "gpt-image-2-5-sunburst" | "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro" | "nano-banana-2-1";
 
 export type ImageModelOption = {
   id: ImageModelOptionId;
@@ -293,7 +314,7 @@ export type ImageModelOption = {
   };
 };
 
-export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
+const ALL_IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   {
     id: "gpt-image-2",
     label: "GPT Image 2",
@@ -354,7 +375,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   },
   {
     id: "gpt-image-2-5-flare",
-    label: "GPT-Image-2.5 Flare",
+    label: "GPT Image 2.5 Flare",
     textToImageModel: "gpt-image-2-5-flare-text-to-image",
     imageToImageModel: "gpt-image-2-5-flare-image-to-image",
     resolutions: ["1K", "2K", "4K"],
@@ -362,7 +383,7 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   },
   {
     id: "gpt-image-2-5-sunburst",
-    label: "GPT-Image-2.5 Sunburst",
+    label: "GPT Image 2.5 Sunburst",
     textToImageModel: "gpt-image-2-5-sunburst-text-to-image",
     imageToImageModel: "gpt-image-2-5-sunburst-image-to-image",
     resolutions: ["1K", "2K", "4K"],
@@ -370,16 +391,29 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   },
 ];
 
+export const DEFAULT_IMAGE_MODEL_ID: ImageModelOptionId = "nano-banana-2-1";
+export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
+  { id: "nano-banana-2-1", label: "Nano Banana 2.1",
+    textToImageModel: "nano-banana-2-1", imageToImageModel: "nano-banana-2-1",
+    resolutions: ["1K", "2K", "4K"], credits: { "1K": 1, "2K": 2, "4K": 3 } },
+  ...ALL_IMAGE_MODEL_OPTIONS.filter(option => ["grok-imagine-image-2-0", "gpt-image-2-5-flare", "gpt-image-2-5-sunburst"].includes(option.id)),
+];
+export const AVAILABLE_IMAGE_MODEL_IDS = new Set<string>(IMAGE_MODEL_OPTIONS.map(option => option.id));
+export function findAvailableImageModel(value: string) {
+  const canonical = value.replace("GPT-Image-2.5", "GPT Image 2.5");
+  return IMAGE_MODEL_OPTIONS.find(option => option.id === value || option.label === canonical);
+}
+
 export const IMAGE_MODEL_OPTION_MAP: Record<ImageModelOptionId, ImageModelOption> =
-  IMAGE_MODEL_OPTIONS.reduce((acc, item) => {
+  [...ALL_IMAGE_MODEL_OPTIONS, ...IMAGE_MODEL_OPTIONS].reduce((acc, item) => {
     acc[item.id] = item;
     return acc;
   }, {} as Record<ImageModelOptionId, ImageModelOption>);
 
 export const IMAGE_RESOLUTION_CREDITS: Record<ImageResolutionKey, number> = {
-  "1K": 2,
-  "2K": 3,
-  "4K": 5,
+  "1K": 1,
+  "2K": 2,
+  "4K": 3,
 };
 
 export function getImageGenerationCredits(
@@ -387,9 +421,8 @@ export function getImageGenerationCredits(
   resolution: ImageResolutionKey,
   inputCount = 0
 ) {
-  const option =
-    IMAGE_MODEL_OPTION_MAP[modelId as ImageModelOptionId] ||
-    IMAGE_MODEL_OPTION_MAP["gpt-image-2"];
+  if (!modelId || !AVAILABLE_IMAGE_MODEL_IDS.has(modelId)) return undefined;
+  const option = IMAGE_MODEL_OPTION_MAP[modelId as ImageModelOptionId];
   if (!Number.isInteger(inputCount) || inputCount < 0) return undefined;
   if (inputCount > 0 && option.imageToImagePricing) {
     const pricing = option.imageToImagePricing;
@@ -398,4 +431,22 @@ export function getImageGenerationCredits(
     return Math.round((base + Math.max(0, inputCount - pricing.freeInputs) * pricing.extraInputKieCredits) * 0.3);
   }
   return option.resolutions?.length === 0 ? option.flatCredits : option.credits[resolution];
+}
+
+/** Shared quote calculation. Durations must be inspected by the server before charging. */
+export function getVideoGenerationCredits(option: VideoModelOption, inputs: Array<{ kind: string; durationSeconds?: number }> = []): number | undefined {
+  if (!AVAILABLE_VIDEO_MODEL_IDS.has(option.id)) return undefined;
+  const videos = inputs.filter(input => input.kind === "video");
+  if (!videos.length) return Number.isSafeInteger(option.credits) && option.credits > 0 ? option.credits : undefined;
+  if (videos.some(input => input.durationSeconds == null || !Number.isFinite(input.durationSeconds) || input.durationSeconds <= 0)) return undefined;
+  const inputDuration = videos.reduce((sum, input) => sum + input.durationSeconds!, 0);
+  if (option.family === "seedance") {
+    const rate = option.resolution === "480P" ? 2.4 : option.resolution === "720P" ? 5 : undefined;
+    return rate == null ? undefined : platformVideoCredits(rate, option.duration + inputDuration);
+  }
+  if (option.family === "wan") {
+    const rate = { "480P": 8, "720P": 16, "1080P": 32 }[option.resolution as "480P" | "720P" | "1080P"];
+    return rate == null || option.duration + inputDuration > 30 ? undefined : platformVideoCredits(rate, option.duration + inputDuration);
+  }
+  return undefined;
 }

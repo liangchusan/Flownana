@@ -1,6 +1,7 @@
-import { referenceBatchIssue } from "../reference-validation.ts";
+import { referenceBatchIssue, referenceIssue } from "../reference-validation.ts";
 import { z } from "zod";
-import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, getImageGenerationCredits, getVideoModelName, DEFAULT_VIDEO_RESOLUTIONS, DEFAULT_VIDEO_ASPECT_RATIOS, videoFollowsInputRatio, type ImageModelOptionId, type ImageResolutionKey } from "../generation-pricing.ts";
+import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, findAvailableImageModel, canonicalVideoModelName, getImageGenerationCredits, getVideoGenerationCredits, getVideoModelName, DEFAULT_VIDEO_RESOLUTIONS, DEFAULT_VIDEO_ASPECT_RATIOS, videoFollowsInputRatio, type ImageModelOptionId, type ImageResolutionKey } from "../generation-pricing.ts";
+import { videoPromptIssue } from "../video-model-capabilities.ts";
 import { getImageInputCapabilities, getVideoInputCapabilities } from "../generation-input-capabilities.ts";
 import { getImageAspectRatios, isSupportedImageInputType } from "../image-model-capabilities.ts";
 
@@ -58,7 +59,7 @@ export function buildQuote(value: unknown, inputs: AgentInput[], context: {
   inputs.forEach(input => counts[input.kind]++);
   const base = { ...p, inputs, ...(context.templateId ? { templateId: context.templateId, templateVersion: context.templateVersion } : {}) };
   if (p.type === "image") {
-    const modelId = (p.model ? IMAGE_MODEL_OPTIONS.find(m => m.id === p.model || m.label === p.model)?.id : "gpt-image-2-5-flare") as ImageModelOptionId | undefined;
+    const modelId = (p.model ? findAvailableImageModel(p.model)?.id : "gpt-image-2-5-flare") as ImageModelOptionId | undefined;
     if (!modelId) throw new AgentError("Choose an available image model.");
     const model = IMAGE_MODEL_OPTION_MAP[modelId];
     const caps = getImageInputCapabilities(modelId);
@@ -74,12 +75,14 @@ export function buildQuote(value: unknown, inputs: AgentInput[], context: {
     return { ...base, directions: [], model: model.label, modelId, resolution, aspectRatio, count, unitCredits, credits: unitCredits * count };
   }
   if (p.count && p.count !== 1) throw new AgentError("Video requests create one output at a time.");
-  const name = p.model ?? "Seedance 2.0 Mini";
+  const name = canonicalVideoModelName(p.model ?? "Seedance 2.0 Mini");
   const resolution = p.resolution ?? "720P", duration = p.duration ?? 5;
   if (!DEFAULT_VIDEO_RESOLUTIONS.includes(resolution as never)) throw new AgentError("Choose an available video resolution.");
   const options = VIDEO_MODEL_OPTIONS.filter(m => (getVideoModelName(m) === name || m.id === name) && m.resolution === resolution && m.duration === duration);
   const option = options.sort((a, b) => a.credits - b.credits)[0];
   if (!option) throw new AgentError("This video model does not support those settings. Offer a supported alternative.");
+  const promptIssue = videoPromptIssue(getVideoModelName(option), `${p.prompt}${p.exactText.length ? `\nExact visible text: ${p.exactText.join(" | ")}` : ""}`);
+  if (promptIssue) throw new AgentError(promptIssue);
   const sound = p.sound ?? !!option.hasAudio;
   const caps = getVideoInputCapabilities(getVideoModelName(option));
   if (counts.image > caps.maxImages || counts.video > caps.maxVideos || counts.audio > caps.maxAudios || (caps.imageRequired && !counts.image) || (option.family === "wan" && counts.video > 0 && duration > 15)) throw new AgentError("The references do not fit this video model. Ask for compatible inputs.");
@@ -92,14 +95,18 @@ export function buildQuote(value: unknown, inputs: AgentInput[], context: {
   const aspectRatio = p.aspectRatio ?? (followsImage ? "Auto" : "16:9");
   if (followsImage && aspectRatio !== "Auto") throw new AgentError("This model follows the input image ratio. Explain this and offer a compatible image or model for a fixed ratio.");
   if (!DEFAULT_VIDEO_ASPECT_RATIOS.includes(aspectRatio as never)) throw new AgentError("Choose an available video ratio.");
-  if (!(option.aspectRatios ?? ["Auto", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]).includes(aspectRatio as never)) throw new AgentError("Choose a supported video ratio.");
-  return { ...base, model: getVideoModelName(option), modelId: option.id, resolution, aspectRatio, duration, sound, count: 1, unitCredits: option.credits, credits: option.credits };
+  if (!followsImage && !(option.aspectRatios ?? ["Auto", "16:9", "9:16", "1:1", "4:3", "3:4", "21:9"]).includes(aspectRatio as never)) throw new AgentError("Choose a supported video ratio.");
+  const credits = getVideoGenerationCredits(option, inputs);
+  if (credits == null) throw new AgentError("Check the reference video durations and generate a new quote.");
+  return { ...base, model: getVideoModelName(option), modelId: option.id, resolution, aspectRatio, duration, sound, count: 1, unitCredits: credits, credits };
 }
 export function validateInputMetadata(quote: AgentQuote, media: Array<{ type: string; sizeBytes: number | null; contentType: string | null }>) {
   const caps = quote.type === "image" ? getImageInputCapabilities(quote.modelId as ImageModelOptionId) : getVideoInputCapabilities(quote.model);
   for (const asset of media) {
     const max = asset.type === "image" ? caps.maxImageBytes : asset.type === "video" ? caps.maxVideoBytes : caps.maxAudioBytes;
     if (!asset.sizeBytes || asset.sizeBytes > max) throw new AgentError("A reference exceeds this model's size limit.");
+    const issue = referenceIssue(caps, { kind: asset.type === "music" ? "audio" : asset.type as "image" | "video", sizeBytes: asset.sizeBytes, contentType: asset.contentType ?? undefined });
+    if (issue) throw new AgentError(issue);
     if (quote.type === "image" && !isSupportedImageInputType(quote.modelId as ImageModelOptionId, asset.contentType)) throw new AgentError("A reference format is unsupported by this image model.");
   }
 }

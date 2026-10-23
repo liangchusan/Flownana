@@ -86,6 +86,7 @@ export function getGrokVideoInput(params: {
   imageUrls: string[];
   aspectRatio?: string;
   option: VideoModelOption;
+  generateAudio?: boolean;
 }) {
   const input: Record<string, unknown> = {
     prompt: params.prompt,
@@ -93,9 +94,10 @@ export function getGrokVideoInput(params: {
     resolution: getKieVideoResolution(params.option),
     duration: params.option.duration,
     nsfw_checker: true,
+    enable_audio: params.generateAudio !== false,
   };
 
-  if (params.aspectRatio) {
+  if (params.aspectRatio && params.imageUrls.length !== 1) {
     input.aspect_ratio = params.aspectRatio;
   }
 
@@ -124,9 +126,10 @@ export function getSeedanceMiniVideoInput(params: {
       params.aspectRatio && params.aspectRatio !== "Auto"
         ? params.aspectRatio
         : "adaptive",
-    web_search: false,
     nsfw_checker: true,
   };
+
+  if (!inputs.length) input.web_search = false;
 
   if (useMultimodalReferences) {
     if (imageUrls.length > 0) input.reference_image_urls = imageUrls;
@@ -257,6 +260,7 @@ export function getKieMarketVideoTaskBody(params: {
       prompt: params.prompt,
       imageUrls,
       aspectRatio,
+      generateAudio: params.generateAudio,
       option: params.option,
     });
   } else if (params.option.family === "minimax") {

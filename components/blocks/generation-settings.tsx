@@ -4,19 +4,15 @@ import { useId, useState, useLayoutEffect, useRef } from "react";
 import { Check, ChevronDown, Maximize } from "lucide-react";
 
 const descriptions: Record<string, string> = {
-  "GPT Image 2": "Create and edit images with one reference, up to 4K.",
-  "Nano Banana 2": "Generate images from text or a single reference, from 1K to 4K.",
-  "Qwen Image 3.0 Pro": "Combine up to three reference images in 1K or 2K.",
+  "Nano Banana 2.1": "Create and edit with up to ten reference images, from 1K to 4K.",
   "Grok Imagine Image 2.0": "Create and edit with up to five reference images.",
-  "Seedream 5.0 Pro": "Work with up to ten reference images in 1K or 2K.",
-  "GPT-Image-2.5 Flare": "Create and edit with up to sixteen references, up to 4K.",
-  "GPT-Image-2.5 Sunburst": "Generate up to 4K images with multi-image references and flexible framing.",
+  "GPT Image 2.5 Flare": "Create and edit with up to sixteen references, up to 4K.",
+  "GPT Image 2.5 Sunburst": "Generate up to 4K images with multi-image references and flexible framing.",
   "Seedance 2.0 Mini": "Combine image, video and audio references in 4–15 second clips.",
-  "Gemini Omni Video": "Create up to 4K video with sound and up to seven reference images.",
+  "Gemini Omni 1.1 Flash": "Create up to 4K video with sound and up to seven reference images.",
   "Wan 3.0 Video": "Generate up to 30 seconds, with image, video and audio references.",
-  "MiniMax H3": "Guide 4–15 second clips with optional first and last frames.",
+  "MiniMax H3 (Hailuo-03)": "Guide 4–15 second clips with optional first and last frames.",
   "Grok Imagine Video 1.5": "Turn a single image into a 1–15 second video.",
-  "HappyHorse 1.1": "Create 3–15 second videos from text or an image, up to 1080P.",
 };
 const interaction = "transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 const shapes: Record<string, string> = {
