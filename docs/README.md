@@ -18,39 +18,34 @@
 
 - [测试环境及隔离边界](./operations/TEST-ENVIRONMENT.md)
 - [数据库安全上线手册](./operations/DATABASE_SECURITY_ROLLOUT.md)
-- [旧 Checkout 归属索引切换](./operations/CHECKOUT-HISTORY-CUTOVER.md)：本地完成，生产切换尚未执行
+- [旧 Checkout 归属索引切换](./operations/CHECKOUT-HISTORY-CUTOVER.md)：2026-11-04 已完成生产切换与历史导入
 - [注册赠送发布与验证](./operations/SIGNUP-BONUS-RELEASE.md)
 - [登录弹窗设计验收](./design/login-dialog-qa-20261102.md)
 
 运维文档中的部署和资源信息均为各自记录日期的快照，操作前重新核对。
 
-## 历史归档
+## 仍需保留的历史依据
 
-`archive/` 中的审计、提案、研究和旧 UI 方案按原文件名保存，只供追溯；
-“待开发”“已上线”等均是当时状态，不能覆盖当前 PRODUCT、DESIGN 或 MEMORY。
-例如独立 Google popup 已撤回，早期模型、套餐和 Analytics 方案已有后续版本。
+`archive/` 只保留当前 PRODUCT / DESIGN 仍引用的六份材料；它们用于追溯合同、
+授权边界与设计依据，不能覆盖当前规范中的后续决定。
 
-- [完整工程历史](./archive/ENGINEERING-HISTORY.md)：整理前 3,321 行 MEMORY 原文，完整保留。
-  原文中的路径按整理前仓库根目录理解；搬迁后的文档同名可在本索引分类中定位。
-- [注册归因诊断](./archive/SIGNUP-ATTRIBUTION-DIAGNOSIS-2026-10-27.md)与
-  [浏览器复核](./archive/SIGNUP-ATTRIBUTION-BROWSER-AUDIT-2026-10-27.md)
-- [旧支付审计](./archive/PAYMENT-FLOW-AUDIT-2026-09-22.md)、
-  [性能调查](./archive/PERFORMANCE-INVESTIGATION-2026-09-14.md)与
-  [风险复核](./archive/RISK_REVIEW_2026-08-31.md)
 - [原 GA4/Ads 方案](./archive/GA4-ADS-MEASUREMENT-PLAN.md)、
-  [GA4 实施验证](./archive/GA4-IMPLEMENTATION-VALIDATION-2026-10-05.md)、
-  [Ads 就绪审计](./archive/ADS-READINESS-AUDIT-2026-10-10.md)、
-  [GA/Ads 审计](./archive/GA-ADS-AUDIT-2026-10-12.md)、
   [增强型转化提案](./archive/ENHANCED-CONVERSIONS-PROPOSAL-2026-10-12.md)与
   [衡量改进方案](./archive/ADS-MEASUREMENT-IMPROVEMENT-PLAN-2026-10-12.md)
-- [早期图片模型审计](./archive/IMAGE-MODEL-AUDIT.md)、
-  [模板研究](./archive/IMAGE-TEMPLATES-RESEARCH.md)、
-  [模板交接](./archive/TEMPLATE-INTERACTION-HANDOFF.md)、
-  [封面提示词](./archive/template-cover-prompts.json)与
-  [封面预览](./archive/template-covers-preview.html)
-- [Runway 视觉迁移](./archive/UI-MIGRATION-PLAN.md)与
-  [已撤回的 Google popup 方案](./archive/GOOGLE-POPUP-LOGIN-PLAN.md)
+- [早期图片模型审计](./archive/IMAGE-MODEL-AUDIT.md)与
+  [模板研究](./archive/IMAGE-TEMPLATES-RESEARCH.md)
+- [Runway 视觉迁移](./archive/UI-MIGRATION-PLAN.md)
 
-历史截图移至 `output/archive/design-qa-20260902/`。
-`output/releases/` 的生产补丁和 manifest、`output/diagnostics/` 与 `output/playwright/`
-中的验收证据仍在原位；它们是本地材料，受 Git 和部署忽略规则保护，不随克隆自动恢复。
+## 历史资料
+
+旧流水账、已撤回的 popup 方案、被替代的审计及封面预览已从工作目录删除。
+完整版本保存在整理前提交 `35087da`，例如：
+
+```sh
+git show 35087da:docs/archive/ENGINEERING-HISTORY.md
+git show 35087da:docs/archive/GOOGLE-POPUP-LOGIN-PLAN.md
+```
+
+`output/` 仅保留选定的登录参考稿、桌面/手机正式截图、Pricing 叠层截图和必要发布材料。
+旧浏览器诊断脚本、重复截图、未选设计稿及临时构建已清除。
+这些本地材料不随克隆恢复；GitHub 同步成功前须保留发布补丁与恢复 bundle。

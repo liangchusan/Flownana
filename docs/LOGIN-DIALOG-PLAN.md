@@ -61,11 +61,9 @@ Google按钮优先使用官方浅色胶囊资产/规范，完整多色G、不重
 真实Google回调、新账号赠送、GA4/Ads收件与真机须独立人工验收；本轮生产发布已明确授权。
 
 ## 视觉稿交付（2026-11-02）
-三张独立视觉稿已生成，顺序按本聊天实际显示顺序固定：
-1. output/design/login-dialog-20261102/visual-option-1.png
-2. output/design/login-dialog-20261102/visual-option-2.png
-3. output/design/login-dialog-20261102/visual-option-3.png
-对应源文件、尺寸与出处记于同目录manifest.json；原始生成文件保留。
+曾交付三张独立视觉稿，用户选择第二种；2026-11-04 整理时已删除候选稿和临时参考截图，
+只保留选定修订稿 `output/design/login-dialog-20261102/selected-option-2-refined-v1.png`。
+选定稿的尺寸与出处记于同目录 manifest.json。
 素材均为已检查的真实首页、Flownana Logo、Google官方按钮与既有作品封面；未使用含私人账号信息的Google截图。
 视觉稿用于选择信息层级与版式，不是可交互原型；生成图的字体、按钮品牌细节、间距、尺寸须在后续实现时按规范复核。
 本轮只修改方案/设计文档并新增视觉资产，未改应用代码、未接真实入口、未部署。

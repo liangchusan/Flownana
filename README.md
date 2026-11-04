@@ -35,9 +35,11 @@ npm run dev
 | `tests/` | Node 测试；`helpers/` 提供隔离数据库和源码加载工具 |
 | `scripts/` | 设计检查、Stripe 构建校验、冒烟与运维工具 |
 | `docs/` | 当前规范、运维手册、设计验收及历史归档 |
-| `output/` | 本地设计稿、浏览器证据及发布重建补丁，不入库、不随网站部署 |
+| `output/` | 选定设计稿、必要验收证据及发布恢复材料，不入库、不随网站部署 |
 
-`.next/`、`node_modules/`、`*.tsbuildinfo` 是生成内容，不作为源码整理。
+`.next/`、`*.tsbuildinfo` 和 `node_modules/.cache/` 是可再生缓存，可在开发服务停止后删除。
+`node_modules/` 保留当前依赖；删除整个目录后须先重新安装。清除 `.next/` 后，
+`npm run dev` 会重新生成缓存，`npm run start` 前须先执行 `npm run build`。
 `.env*`、`.vercel/` 是本地配置，不要当作无用文件删除。
 
 ## 常用检查
@@ -56,7 +58,9 @@ npm run build
 ## 整理约定
 
 - 新文档先进入现有分类，并更新文档导航。产品行为统一维护在 PRODUCT，设计维护在 DESIGN。
-- MEMORY 只保留当前工程摘要、未发布工作与风险；完整历史放入 `docs/archive/`。
-- 临时截图与调试输出放 `output/`；发布补丁与 manifest 必须保留，直到发布源码已在版本库完整保存。
+- MEMORY 只保留当前工程摘要、部署与风险；旧流水账、废弃方案和被替代的审计从工作目录删除，历史通过 Git 查阅。
+- `docs/archive/` 只保留当前 PRODUCT / DESIGN 仍引用的合同、授权边界与设计依据，不堆积旧报告。
+- 临时截图与调试输出放 `output/`，完成验证后删除废稿、重复截图和临时构建目录。
+  远端同步成功前保留 `output/releases/` 的 Git bundle、发布补丁与 manifest；忽略目录不是远端备份。
 - 删除源码前检查 import、动态加载、测试读取和配置引用。`legacy`、旧模型名、旧迁移不等于可以删除。
 - 不为整理目录搬动已使用的业务代码，不改变路由、积分、付款、媒体兼容或埋点。

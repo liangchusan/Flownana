@@ -637,7 +637,7 @@ KIE 官方名称、所有参数及价格。本节覆盖第 6、18、21、22 节�
 - 移除独立开窗协调、登录等待/恢复浮层及/auth/popup、/auth/popup-complete；
   不接入GIS/FedCM或站内Google账号选择面板。
 - 已上线的未登录积分按钮、新账号10积分、七地区/IP72小时等赠送规则及六事件不变。
-- 历史方案和验收记录保留于[Google弹窗方案（已撤回）](archive/GOOGLE-POPUP-LOGIN-PLAN.md)。
+- 已撤回的 Google popup 方案及验收记录通过 [Git 历史查阅](README.md#历史资料)。
   本次仅恢复本地代码；未授权或执行新的生产发布。
 
 

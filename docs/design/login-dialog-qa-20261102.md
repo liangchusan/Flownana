@@ -3,10 +3,11 @@
 final result: passed
 
 Reference: output/design/login-dialog-20261102/selected-option-2-refined-v1.png (1487 × 1058).
-Rendered: output/playwright/login-dialog-20261102/local-desktop.png (1487 × 1058).
-Combined comparison: output/playwright/login-dialog-20261102/reference-comparison.png (2974 × 1098). Visually inspected side by side.
-Mobile: output/playwright/login-dialog-20261102/local-mobile.png (390 × 844).
+Retained desktop: output/playwright/login-dialog-20261102/production-desktop.png (1487 × 1058).
+Retained mobile: output/playwright/login-dialog-20261102/production-mobile.png (390 × 844).
 Pricing stack: output/playwright/login-dialog-20261102/local-pricing-stack.png.
+
+Cleanup note (2026-11-04): redundant local desktop/mobile and combined comparison images were deleted after inspection. The QA below records the original November 2 checks; it does not claim a new browser run. Current deployment status is in MEMORY.md.
 
 The selected two-column hierarchy, blue/gold collage, centered top brand, merged message, single Google action and legal links are present. The illustration is a standalone generated asset; text and controls are real DOM with existing Inter. Minor illustration details and spacing differ from the generated reference; no P0/P1/P2 finding remains.
 
