@@ -2,14 +2,46 @@ import { queueAnalyticsReport, serverMeasurementId } from "@/lib/analytics-serve
 import type { AnalyticsContext } from "@/lib/analytics-policy";
 import { prisma } from "@/lib/prisma";
 import { isMissingProfileSchemaError } from "@/lib/account-profile";
+import { awardSignupBonus } from "@/lib/signup-bonus";
+import type { SignupBonusEvidence } from "@/lib/signup-bonus-policy";
 
-export async function upsertAppUser(params: {
+type AppUserInput = {
   id: string;
   email: string;
   name?: string | null;
   image?: string | null;
   analyticsContext?: AnalyticsContext | null;
-}) {
+  signupBonus?: SignupBonusEvidence;
+};
+
+// Explicit projection keeps the legacy profile-schema fallback usable without
+// bypassing the new-account/bonus/analytics transaction.
+const accountSelect = {
+  id: true, email: true, name: true, image: true, stripeCustomerId: true,
+  createdAt: true, updatedAt: true,
+} as const;
+
+async function createAppUser(params: AppUserInput, legacyProfile = false) {
+  return prisma.$transaction(async tx => {
+    const created = await tx.user.createMany({ data: {
+      id: params.id, email: params.email, name: params.name ?? undefined,
+      image: params.image ?? undefined,
+      ...(!legacyProfile ? { providerImage: params.image ?? undefined } : {}),
+    }, skipDuplicates: true });
+    const user = await tx.user.findUniqueOrThrow({ where: { id: params.id }, select: accountSelect });
+    if (created.count) {
+      if (params.signupBonus) await awardSignupBonus(tx, user.id, params.signupBonus);
+      if (serverMeasurementId()) await queueAnalyticsReport(tx, {
+        userId: user.id, key: `${user.id}:${user.createdAt.toISOString()}`,
+        name: "sign_up", params: { method: "google" },
+        context: params.analyticsContext || null, occurredAt: user.createdAt,
+      });
+    }
+    return user;
+  });
+}
+
+export async function upsertAppUser(params: AppUserInput) {
   try {
     const existing = await prisma.user.findUnique({
       where: { id: params.id },
@@ -20,18 +52,7 @@ export async function upsertAppUser(params: {
     });
 
     if (!existing) {
-      const data = {
-        id: params.id, email: params.email, name: params.name ?? undefined,
-        image: params.image ?? undefined, providerImage: params.image ?? undefined,
-      };
-      if (!serverMeasurementId()) return prisma.user.create({ data });
-      return prisma.$transaction(async tx => {
-        const created = await tx.user.createMany({ data, skipDuplicates: true });
-        const user = await tx.user.findUniqueOrThrow({ where: { id: params.id } });
-        if (created.count) await queueAnalyticsReport(tx, { userId: user.id, key: `${user.id}:${user.createdAt.toISOString()}`,
-          name: "sign_up", params: { method: "google" }, context: params.analyticsContext || null, occurredAt: user.createdAt });
-        return user;
-      });
+      return await createAppUser(params);
     }
 
     return prisma.user.update({
@@ -46,26 +67,14 @@ export async function upsertAppUser(params: {
   } catch (error) {
     if (!isMissingProfileSchemaError(error)) throw error;
 
-    return prisma.user.upsert({
+    const existing = await prisma.user.findUnique({ where: { id: params.id }, select: { id: true } });
+    if (!existing) return createAppUser(params, true);
+    return prisma.user.update({
       where: { id: params.id },
-      create: {
-        id: params.id,
-        email: params.email,
-        name: params.name ?? undefined,
-        image: params.image ?? undefined,
-      },
-      update: {
+      data: {
         email: params.email,
       },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        image: true,
-        stripeCustomerId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: accountSelect,
     });
   }
 }

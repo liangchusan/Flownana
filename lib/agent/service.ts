@@ -57,7 +57,7 @@ export async function beginAgentTurn(account: GenerationAccount, value: unknown)
     const asset = await prisma.mediaAsset.findUnique({ where: { userId_url: { userId: account.id, url: ref.url } } });
     if (!asset || asset.type !== (ref.kind === "audio" ? "music" : ref.kind)) throw new AgentError("Choose an uploaded reference from your account.");
     const verified = await enforceInputMediaSize({ url: asset.url, contentType: asset.contentType ?? undefined, sizeBytes: asset.sizeBytes ?? undefined }, ref.kind === "image" ? 20 * 1024 ** 2 : ref.kind === "video" ? 50 * 1024 ** 2 : 15 * 1024 ** 2, ref.kind);
-    const metadata = ref.kind !== "image" ? await inspectReference(verified.url, ref.kind, ref.kind === "video" ? 50 * 1024 ** 2 : 15 * 1024 ** 2) : verified;
+    const metadata = ref.kind !== "image" ? await inspectReference(verified.url, ref.kind, ref.kind === "video" ? 50 * 1024 ** 2 : 15 * 1024 ** 2, account) : verified;
     // Overwrite untrusted browser metadata before the references reach Agent tools.
     Object.assign(ref, { contentType: metadata.contentType, sizeBytes: metadata.sizeBytes,
       ...( "durationSeconds" in metadata ? { durationSeconds: metadata.durationSeconds } : {}) });
@@ -81,9 +81,11 @@ export async function beginAgentTurn(account: GenerationAccount, value: unknown)
     const day = usageDay(), rights = await accountEntitlements(tx, account.id);
     const usage = await tx.agentUsage.upsert({ where: { userId_day: { userId: account.id, day } }, create: { userId: account.id, day }, update: {} });
     if (usage.used >= rights.limit) throw new AgentError("Today's Agent replies are used. Your draft is saved. You can still create with Image or Video.", "daily_limit", 429);
+    // Keep accepted requests durable even when the reply fails, stops, or its conversation is deleted.
+    if (usage.attempts.length >= rights.limit * 3) throw new AgentError("Today's Agent request safety limit is reached. Your draft is saved. Try again after the daily UTC reset, or create with Image or Video.", "rate_limit", 429);
     const attempts = usage.attempts.filter(time => time.getTime() > Date.now() - 60_000);
     if (attempts.length >= 6) throw new AgentError("Please wait a minute before sending another message.", "rate_limit", 429);
-    await tx.agentUsage.update({ where: { userId_day: { userId: account.id, day } }, data: { attempts: [...attempts, new Date()] } });
+    await tx.agentUsage.update({ where: { userId_day: { userId: account.id, day } }, data: { attempts: [...usage.attempts, new Date()] } });
     const created = !c;
     if (!c) c = await tx.agentConversation.create({ data: { id: input.conversationId, userId: account.id, title: input.prompt.slice(0, 60), templateId: template?.id } });
     for (const asset of media) {
@@ -179,7 +181,7 @@ export async function confirmAgentQuote(account: GenerationAccount, id: string, 
         if (!owned || owned.type !== (ref.kind === "audio" ? "music" : ref.kind)) throw new AgentError("A reference is no longer available.");
       }
       try {
-        const metadata = await validateReferenceDurations(getVideoInputCapabilities(q.model), q.inputs);
+        const metadata = await validateReferenceDurations(getVideoInputCapabilities(q.model), q.inputs, account);
         verifiedVideoInputs = q.inputs.map((input, index) => ({ ...input, durationSeconds: metadata[index]?.durationSeconds }));
       }
       catch (e) { throw new AgentError(e instanceof Error ? e.message : "Could not verify references."); }

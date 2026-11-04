@@ -1,6 +1,7 @@
-import { allowedAnalyticsHost, safePage, TEST_GA_ID, validContext, type AnalyticsContext, type CommerceEvent } from "./analytics-policy";
+import { ANALYTICS_BLOCK_COOKIE, allowedAnalyticsHost, safePage, TEST_GA_ID, validContext, type AnalyticsContext, type CommerceEvent } from "./analytics-policy";
 import { analyticsCollectionBasis, type AnalyticsCollectionPolicy } from "./analytics-collection-policy";
-import { configureAdvertisingDefault, hasAdvertisingConsent, revokeAdvertising } from "./advertising-consent";
+import { advertisingAccountScope, configureAdvertisingDefault, hasAdvertisingConsent, revokeAdvertising } from "./advertising-consent";
+import { ACCOUNT_SCOPE_HEADER } from "./account-scope";
 export const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 export const GA_ENABLED = process.env.NEXT_PUBLIC_GA_ENABLED === "true";
 export type AnalyticsEventName = "page_view" | "pricing_view" | "begin_checkout";
@@ -17,6 +18,7 @@ export function configureAnalyticsCollection(policy: AnalyticsCollectionPolicy) 
   collectionPolicy = policy;
   configureAdvertisingDefault(policy.defaultAdvertising === true && analyticsCollectionBasis(policy, analyticsChoice()) !== null);
   if (policy.gpc && !previouslyGpc) requestAnalyticsRevocation();
+  syncAnalyticsBrowserBlock();
   window.dispatchEvent(new Event("flownana:analytics-consent"));
 }
 const REVOCATION_KEY = "flownana_analytics_revocation_pending";
@@ -31,6 +33,14 @@ export function hasAnalyticsConsent() {
   if (typeof window === "undefined" || consentDenied || hasPendingRevocation()) return false;
   return analyticsCollectionBasis(collectionPolicy, analyticsChoice()) !== null;
 }
+// This cookie can only restrict server collection, including when DELETE is offline.
+// Do not clear it until the latest local permission and withdrawal state allow collection.
+export function syncAnalyticsBrowserBlock() {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const blocked = !hasAnalyticsConsent() || (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true;
+  try { document.cookie = `${ANALYTICS_BLOCK_COOKIE}=${blocked ? "1" : ""}; Path=/; SameSite=Lax; Max-Age=${blocked ? 180 * 86400 : 0}${window.location.protocol === "https:" ? "; Secure" : ""}`; }
+  catch { /* Collection still fails closed locally; the callback also checks server GPC/region. */ }
+}
 export function setTagDisabled(disabled: boolean) {
   if (GA_MEASUREMENT_ID && typeof window !== "undefined") window[`ga-disable-${GA_MEASUREMENT_ID}`] = disabled;
 }
@@ -44,11 +54,13 @@ export function reconcileAnalyticsRevocation(): Promise<boolean> {
   try { marker = window.localStorage.getItem(REVOCATION_KEY); } catch { /* Still try to revoke the server context. */ }
   revocationRequest = (async () => {
     try {
-      const response = await fetch("/api/analytics/context", { method: "DELETE", keepalive: true, signal: AbortSignal.timeout(5000) });
+      const scope = advertisingAccountScope();
+      const response = await fetch("/api/analytics/context", { method: "DELETE", headers: scope ? { [ACCOUNT_SCOPE_HEADER]: scope } : {}, keepalive: true, signal: AbortSignal.timeout(5000) });
       if (!response.ok || version !== revocationVersion || (marker !== undefined && window.localStorage.getItem(REVOCATION_KEY) !== marker)) return false;
       // A failed storage update must keep collection blocked on subsequent loads.
       window.localStorage.removeItem(REVOCATION_KEY);
       revocationPending = false;
+      syncAnalyticsBrowserBlock();
       window.dispatchEvent(new Event("flownana:analytics-consent"));
       return true;
     } catch { return false; }
@@ -57,9 +69,10 @@ export function reconcileAnalyticsRevocation(): Promise<boolean> {
   return revocationRequest;
 }
 function requestAnalyticsRevocation() {
-  revokeAdvertising();
   revocationPending = true;
   revocationVersion++;
+  syncAnalyticsBrowserBlock();
+  revokeAdvertising();
   try { window.localStorage.setItem(REVOCATION_KEY, crypto.randomUUID()); } catch { /* Memory remains blocked. */ }
   setTagDisabled(true);
   window.gtag?.("consent", "update", { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" });
@@ -72,6 +85,7 @@ export function setAnalyticsConsent(granted: boolean) {
   try { window.localStorage.setItem("flownana_analytics_consent", granted ? "granted" : "denied"); } catch { /* Fail closed. */ }
   configureAdvertisingDefault(granted && collectionPolicy?.defaultAdvertising === true && hasAnalyticsConsent());
   if (!granted) requestAnalyticsRevocation();
+  syncAnalyticsBrowserBlock();
   const allowed = granted && hasAnalyticsConsent() && GA_ENABLED && !!GA_MEASUREMENT_ID && allowedAnalyticsHost(GA_MEASUREMENT_ID, window.location.hostname);
   setTagDisabled(!allowed);
   const ads = allowed && hasAdvertisingConsent() ? "granted" : "denied";
@@ -100,25 +114,53 @@ export function trackCheckout(checkout: { id?: string; url?: string; event?: Com
   try { window.localStorage.setItem(`flownana:checkout:${checkout.id}`, "1"); } catch { /* Memory fallback. */ }
   return true;
 }
-export async function captureAnalyticsContext(): Promise<AnalyticsContext | null> {
-  if (!canTrack()) return null;
+// A pending policy is different from a deliberate refusal; login may briefly wait for it.
+export function analyticsPreparationState(): "disabled" | "pending" | "denied" | "ready" {
+  if (!GA_ENABLED || !GA_MEASUREMENT_ID || typeof window === "undefined" || !allowedAnalyticsHost(GA_MEASUREMENT_ID, window.location.hostname)) return "disabled";
+  if (consentDenied || hasPendingRevocation() || analyticsChoice() === "denied" ||
+    (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl === true) return "denied";
+  if (!collectionPolicy) return "pending";
+  return hasAnalyticsConsent() ? "ready" : "denied";
+}
+export async function captureAnalyticsContext(signal?: AbortSignal): Promise<AnalyticsContext | null> {
+  if (!canTrack() || signal?.aborted) return null;
   const get = (field: string) => new Promise<unknown>((resolve) => {
-    const timer = setTimeout(() => resolve(null), 1500);
-    window.gtag!("get", GA_MEASUREMENT_ID, field, (value: unknown) => { clearTimeout(timer); resolve(value); });
+    const finish = (value: unknown) => { clearTimeout(timer); signal?.removeEventListener("abort", abort); resolve(value); };
+    const abort = () => finish(null);
+    const timer = setTimeout(abort, 1500);
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) { abort(); return; }
+    try { window.gtag!("get", GA_MEASUREMENT_ID, field, finish); } catch { finish(null); }
   });
   const initial = await Promise.all([get("client_id"), get("session_id")]);
-  if (!canTrack() || typeof initial[0] !== "string" || !Number.isSafeInteger(Number(initial[1])) || Number(initial[1]) <= 0) return null;
+  if (signal?.aborted || !canTrack() || typeof initial[0] !== "string" || !Number.isSafeInteger(Number(initial[1])) || Number(initial[1]) <= 0) return null;
   // During initial SDK startup, session initialization can replace a provisional client ID.
   // Read the pair again through the official API, rather than sending the early identifier.
   const [clientId, sessionId] = await Promise.all([get("client_id"), get("session_id")]);
-  if (!canTrack() || typeof clientId !== "string" || !Number.isSafeInteger(Number(sessionId))) return null;
+  if (signal?.aborted || !canTrack() || typeof clientId !== "string" || !Number.isSafeInteger(Number(sessionId))) return null;
   return validContext({ clientId, sessionId: Number(sessionId), capturedAt: Date.now(), measurementId: GA_MEASUREMENT_ID!,
     collectionBasis: analyticsCollectionBasis(collectionPolicy, analyticsChoice())! }, GA_MEASUREMENT_ID!);
 }
 
+export type AnalyticsSyncResult = "synced" | "context_unavailable" | "network_error" | "retryable_http" | "http_rejected" | "cancelled";
+export async function syncAnalyticsContextAttempt(headers: Record<string, string> = {}, signal?: AbortSignal): Promise<AnalyticsSyncResult> {
+  const context = await captureAnalyticsContext(signal);
+  if (signal?.aborted || !hasAnalyticsConsent()) return "cancelled";
+  if (!context) return "context_unavailable";
+  const request = new AbortController();
+  const abort = () => request.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(abort, 2000);
+  try {
+    const response = await fetch("/api/analytics/context", {
+      method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(context), signal: request.signal,
+    });
+    if (signal?.aborted || !hasAnalyticsConsent()) return "cancelled";
+    if (response.ok) return "synced";
+    return response.status === 408 || response.status === 429 || response.status >= 500 ? "retryable_http" : "http_rejected";
+  } catch { return signal?.aborted ? "cancelled" : "network_error"; }
+  finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
+}
 export async function syncAnalyticsContext(headers: Record<string, string> = {}) {
-  const context = await captureAnalyticsContext();
-  if (context && hasAnalyticsConsent()) await fetch("/api/analytics/context", {
-    method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(context), signal: AbortSignal.timeout(2000),
-  }).catch(() => undefined);
+  return await syncAnalyticsContextAttempt(headers) === "synced";
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { allowedAnalyticsHost, commerceEvent, measurementIdForEnvironment, PRODUCTION_GA_ID, safeCampaignQuery, safePage, TEST_GA_ID, validContext } from "../lib/analytics-policy.ts";
+import { allowedAnalyticsHost, commerceEvent, measurementIdForEnvironment, PRODUCTION_GA_ID, publicCampaignHref, safeCampaignQuery, safePage, TEST_GA_ID, validContext } from "../lib/analytics-policy.ts";
 import { createSourceLoader } from "./helpers/load-source.ts";
 
 test("both environment and hostname prohibit cross-property collection", () => {
@@ -50,6 +50,19 @@ test("campaigns retain long IDs and Unicode labels, reject ambiguous/sensitive v
   assert.equal(oversized.query.has("utm_campaign"), false);
   assert.ok(oversized.query.toString().length <= 1500);
   assert.ok(oversized.rejected.budget);
+});
+test("public navigation carries only sanitized campaigns, keeps target controls and never inherits private/external parameters", () => {
+  const source = "https://www.flownana.com/image?utm_source=google&utm_campaign=launch&gclid=click-1&prompt=private&email=private%40example.test#private";
+  for (const target of ["/", "/image", "/video", "/agent", "/pricing"]) {
+    const url = new URL(publicCampaignHref(target, source), "https://www.flownana.com");
+    assert.equal(url.searchParams.get("utm_campaign"), "launch"); assert.equal(url.searchParams.get("gclid"), "click-1");
+    assert.doesNotMatch(url.href, /private|prompt|email/);
+  }
+  assert.match(publicCampaignHref("/?mode=agent", source), /mode=agent/);
+  assert.match(publicCampaignHref("/agent?template=fixture", source), /template=fixture/);
+  for (const target of ["/assets", "/agent/private", "/account/profile", "https://external.test/image"]) assert.equal(publicCampaignHref(target, source), target);
+  assert.equal(publicCampaignHref("/image", "https://www.flownana.com/agent/private?utm_source=private"), "/image");
+  assert.equal(publicCampaignHref("/video", "https://www.flownana.com/image?utm_campaign=one&utm_campaign=two&gclid=https://private"), "/video");
 });
 test("contexts require real GA format, correct property, nonfuture timestamp and lifetime", () => {
   const c = { clientId: "1234.5678", sessionId: 1234, capturedAt: 10000, measurementId: TEST_GA_ID };

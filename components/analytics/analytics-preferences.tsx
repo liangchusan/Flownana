@@ -24,6 +24,13 @@ export function AnalyticsPreferences() {
   const [pending, setPending] = useState(false);
   const bannerRef = useRef<HTMLElement>(null);
   const choiceVersion = useRef(0);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  useLayoutEffect(() => {
+    choiceVersion.current++;
+    setSavingAds(false);
+    setAdsError("");
+  }, [scope]);
   useEffect(() => {
     const update = () => setAds(advertisingState());
     update(); window.addEventListener(ADVERTISING_EVENT, update);
@@ -90,6 +97,7 @@ export function AnalyticsPreferences() {
   const dismiss = () => { choiceVersion.current++; dismissAnalyticsPrompt(); setShowBanner(false); setOpen(false); };
   const choose = async (granted: boolean) => {
     const version = ++choiceVersion.current;
+    const expectedScope = scope;
     setAdsError("");
     setAnalyticsConsent(granted);
     setAllowed(hasAnalyticsConsent());
@@ -99,16 +107,16 @@ export function AnalyticsPreferences() {
     setOpen(true);
     setSavingAds(true); setAdsError("");
     try {
-      await syncAnalyticsContext({ [ACCOUNT_SCOPE_HEADER]: scope });
-      if (version !== choiceVersion.current) return;
-      const grantedAds = hasAnalyticsConsent() && await allowAdvertising();
+      const synced = await syncAnalyticsContext({ [ACCOUNT_SCOPE_HEADER]: scope });
+      if (version !== choiceVersion.current || currentScope.current !== expectedScope) return;
+      const grantedAds = synced && hasAnalyticsConsent() && await allowAdvertising("explicit", expectedScope);
       if (version !== choiceVersion.current) return;
       if (!grantedAds) {
         setAdsError("Analytics is on. Ad measurement failed; please retry.");
         setOpen(true);
       } else dismiss();
     } catch { if (version === choiceVersion.current) setAdsError("Could not save. Try again when online."); }
-    finally { setSavingAds(false); }
+    finally { if (version === choiceVersion.current) setSavingAds(false); }
   };
   return (showBanner || open) && <section ref={bannerRef} aria-label={open ? "Privacy preferences" : "Analytics privacy choice"} className="fixed inset-x-0 bottom-0 z-40 max-h-[50dvh] overflow-y-auto border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
@@ -116,11 +124,11 @@ export function AnalyticsPreferences() {
         <div className="pr-10 sm:flex-1 sm:pr-0">
           {open && <h2 className="mb-1 text-sm font-semibold">Privacy preferences</h2>}
           <p className="text-sm leading-relaxed text-text-secondary">
-          {policy?.defaultAdvertising && ads.enabled && analyticsChoice() === null ? "Analytics and ad measurement are on by default here. Google receives your hashed email with purchases after sign-in to match ads. No personalized ads. Reject anytime." : ads.enabled ? "We use cookies for analytics and ad measurement, and share your hashed email with Google to match purchases to ads. No personalized ads. Withdraw anytime." : "We use Google Analytics to improve Flownana. You can withdraw anytime."}{" "}
+          {policy?.gpc ? "Analytics and ad measurement are disabled by Global Privacy Control." : pending || ads.pending ? "Analytics and ad measurement are off while your withdrawal is pending." : policy?.defaultAdvertising && ads.enabled && allowed && analyticsChoice() === null ? "Analytics and ad measurement are on by default here. Google receives your hashed email with purchases after sign-in to match ads. No personalized ads. Reject anytime." : ads.enabled ? "We use cookies for analytics and ad measurement, and share your hashed email with Google to match purchases to ads. No personalized ads. Withdraw anytime." : "We use Google Analytics to improve Flownana. You can withdraw anytime."}{" "}
           <Link href="/privacy-policy#analytics" onClick={dismiss} className="underline underline-offset-4 transition-all duration-300 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Privacy policy</Link>
           </p>
           {open && <p className="mt-1 text-sm text-text-secondary">{policy?.gpc ? "Disabled by Global Privacy Control." : pending ? "Analytics off. Withdrawal pending; we'll retry when online." : allowed ? "Analytics on." : "Analytics off."}</p>}
-          {open && ads.enabled && <p className="mt-1 text-sm text-text-secondary" role="status">{ads.pending ? "Ad measurement off. Withdrawal pending; sign back in if needed." : ads.granted && allowed ? "Ad measurement on." : !scope ? "Sign in, then Allow to enable ad measurement." : !ads.verified ? "Sign in again, then Allow to enable ad measurement." : "Ad measurement off."}</p>}
+          {open && ads.enabled && <p className="mt-1 text-sm text-text-secondary" role="status">{policy?.gpc ? "Ad measurement off. Disabled by Global Privacy Control." : pending || ads.pending ? "Ad measurement off. Withdrawal pending; sign back in if needed." : ads.granted && allowed ? "Ad measurement on." : !allowed ? "Ad measurement off." : !scope ? "Sign in, then Allow to enable ad measurement." : !ads.verified ? "Sign in again, then Allow to enable ad measurement." : "Ad measurement off."}</p>}
           {adsError && <p role="alert" className="mt-1 text-sm text-destructive">{adsError}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">

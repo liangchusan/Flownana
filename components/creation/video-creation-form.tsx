@@ -312,7 +312,6 @@ export function VideoCreationForm({
   };
 
   const handleGenerate = async () => {
-    if (unavailableModel || submissionBlocked || imagesOverLimit || creditsCost == null || promptInvalid) return;
     if (status === "loading") {
       return;
     }
@@ -321,6 +320,7 @@ export function VideoCreationForm({
       await signInForCurrentEnvironment();
       return;
     }
+    if (unavailableModel || submissionBlocked || imagesOverLimit || creditsCost == null || promptInvalid) return;
     if (!prompt.trim()) {
       const display = getGenerationErrorDisplay(
         { errorCode: "prompt_required" },
@@ -486,7 +486,7 @@ export function VideoCreationForm({
           {toolbarLeading}
           {settingsControl}
           <Button type="button" onClick={handleGenerate} disabled={status === "loading" || (!!session && (generationLimitReached || promptInvalid || creditsCost == null || unavailableModel || !selectedOption || submissionBlocked || imagesOverLimit))} className="ml-auto h-10 gap-2 px-4">
-            {!session ? getSignInLabel() : <><span>{creditsCost ?? "—"} credits</span><Send className="h-4 w-4" /></>}
+            <span>{creditsCost ?? "—"} credits</span><Send className="h-4 w-4" />
           </Button>
         </div>
       </div>

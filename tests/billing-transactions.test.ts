@@ -23,14 +23,15 @@ type FinalizeModule = typeof import("../lib/stripe-checkout-finalization");
 type WebhookModule = typeof import("../app/api/webhooks/stripe/route");
 
 test("billing enforcement with real isolated PostgreSQL transactions", { skip: !databaseUrl }, async (t) => {
+  // Public Live catalog IDs satisfy the database constraint; all Stripe calls are mocked.
   process.env.VERCEL_ENV = "production";
   const db = isolatedDatabase(databaseUrl!);
   t.after(() => db.$disconnect());
-  process.env.STRIPE_PRICE_STARTER_MONTHLY = "price_test_starter_monthly";
-  process.env.STRIPE_PRICE_STARTER_YEARLY = "price_test_starter_yearly";
-  process.env.STRIPE_PRICE_PRO_YEARLY = "price_test_pro_yearly";
-  process.env.STRIPE_PRICE_PRO_MONTHLY = "price_test_pro_monthly";
-  process.env.STRIPE_PRICE_MAX_MONTHLY = "price_test_max_monthly";
+  process.env.STRIPE_PRICE_STARTER_MONTHLY = "price_1UM5q4RohkvhKuAJ8Ie0xeqr";
+  process.env.STRIPE_PRICE_STARTER_YEARLY = "price_1UM5q5RohkvhKuAJlKiHNcAE";
+  process.env.STRIPE_PRICE_PRO_YEARLY = "price_1UM5q6RohkvhKuAJhbgmCUHY";
+  process.env.STRIPE_PRICE_PRO_MONTHLY = "price_1UM5q6RohkvhKuAJsH1qPH5S";
+  process.env.STRIPE_PRICE_MAX_MONTHLY = "price_1UM5q7RohkvhKuAJ4WYA3IsS";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_isolated_fixture";
 
   async function fixture(yearly = false) {
@@ -63,7 +64,7 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
       } as unknown as Stripe.Invoice);
       return sub;
     }
-    const sub = subscription(`sub_${prefix}`, yearly ? "price_test_starter_yearly" : "price_test_starter_monthly",
+    const sub = subscription(`sub_${prefix}`, yearly ? "price_1UM5q5RohkvhKuAJlKiHNcAE" : "price_1UM5q4RohkvhKuAJ8Ie0xeqr",
       "2026-01-31T00:00:00Z", yearly ? "2027-01-31T00:00:00Z" : "2026-02-28T00:00:00Z");
     const checkout = {
       id: `cs_${prefix}`, mode: "subscription", status: "complete", payment_status: "paid", livemode: true,
@@ -162,7 +163,7 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
       assert.equal(result.creditsGranted, false);
       assert.equal(result.entitlementsReady, false);
       assert.equal(await f.count(), 0);
-      f.sub.items.data[0].price.id = "price_test_pro_yearly";
+      f.sub.items.data[0].price.id = "price_1UM5q6RohkvhKuAJhbgmCUHY";
       assert.equal(await f.grant(), false);
       assert.equal(await f.count(), 0);
     } finally { await f.cleanup(); }
@@ -219,9 +220,9 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
   await t.test("invoice-first upgrades cancel the predecessor; failure rolls back and retry grants once", async () => {
     const f = await fixture(true);
     try {
-      const old = f.subscription(`old_${f.user.id}`, "price_test_starter_yearly");
-      f.sub.items.data[0].price.id = "price_test_pro_yearly";
-      f.invoices.get(`in_${f.sub.id}`)!.lines.data[0].price!.id = "price_test_pro_yearly";
+      const old = f.subscription(`old_${f.user.id}`, "price_1UM5q5RohkvhKuAJlKiHNcAE");
+      f.sub.items.data[0].price.id = "price_1UM5q6RohkvhKuAJhbgmCUHY";
+      f.invoices.get(`in_${f.sub.id}`)!.lines.data[0].price!.id = "price_1UM5q6RohkvhKuAJhbgmCUHY";
       f.sub.metadata.upgradeFromSubscriptionId = old.id;
       f.setFailCancel(true);
       await assert.rejects(f.grant(), /Cancellation unavailable/);
@@ -258,16 +259,16 @@ test("billing enforcement with real isolated PostgreSQL transactions", { skip: !
   await t.test("completed upgrades do not block later paid portal downgrades", async () => {
     const f = await fixture();
     try {
-      const old = f.subscription(`old_${f.user.id}`, "price_test_pro_monthly");
-      f.sub.items.data[0].price.id = "price_test_max_monthly";
-      f.invoices.get(`in_${f.sub.id}`)!.lines.data[0].price!.id = "price_test_max_monthly";
+      const old = f.subscription(`old_${f.user.id}`, "price_1UM5q6RohkvhKuAJsH1qPH5S");
+      f.sub.items.data[0].price.id = "price_1UM5q7RohkvhKuAJ4WYA3IsS";
+      f.invoices.get(`in_${f.sub.id}`)!.lines.data[0].price!.id = "price_1UM5q7RohkvhKuAJ4WYA3IsS";
       f.sub.metadata.upgradeFromSubscriptionId = old.id;
       assert.equal(await f.grant(), true);
-      f.sub.items.data[0].price.id = "price_test_starter_monthly";
+      f.sub.items.data[0].price.id = "price_1UM5q4RohkvhKuAJ8Ie0xeqr";
       f.sub.current_period_start = Date.parse("2026-02-28T00:00:00Z") / 1000;
       f.sub.current_period_end = Date.parse("2026-03-31T00:00:00Z") / 1000;
       const line = f.invoices.get(`in_${f.sub.id}`)!.lines.data[0];
-      line.price!.id = "price_test_starter_monthly";
+      line.price!.id = "price_1UM5q4RohkvhKuAJ8Ie0xeqr";
       line.period = { start: f.sub.current_period_start, end: f.sub.current_period_end };
       assert.equal(await f.grant(), true);
       assert.equal(await f.count(), 2);

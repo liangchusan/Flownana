@@ -30,6 +30,23 @@ model User {
   upgradeConsumptions UpgradeConsumption[]
   analyticsContexts AnalyticsContext[]
   analyticsReports AnalyticsReport[]
+  signupBonusDecision SignupBonusDecision?
+}
+
+model SignupBonusDecision {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+// No account relation: deleting an account must not release the IP window.
+model SignupIpWindow {
+  ipHash    String   @id
+  startedAt DateTime
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 model CheckoutReservation {
@@ -54,6 +71,25 @@ model CheckoutReservation {
 
   // SQL migration adds unique(userId) WHERE closedAt IS NULL.
   @@index([userId, createdAt])
+}
+
+// Filled once, outside customer requests, after old checkout writers are drained.
+model CheckoutHistoryMigration {
+  id          String    @id
+  cutoffAt    DateTime?
+  cursor      String?
+  completedAt DateTime?
+}
+
+model LegacyCheckout {
+  id               String   @id
+  userId           String
+  accountCreatedAt DateTime?
+  reservationId    String?
+  createdAt        DateTime
+
+  @@index([userId, createdAt])
+  @@index([reservationId])
 }
 
 model UpgradeConsumption {

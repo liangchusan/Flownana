@@ -7,6 +7,12 @@
 
 # testing
 /coverage
+/.playwright-cli/
+/test-results/
+/playwright-report/
+
+# local design, browser QA and release evidence (retain locally)
+/output/
 
 # next.js
 /.next/

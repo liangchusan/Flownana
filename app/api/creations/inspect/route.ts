@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     if (body.asset && !await prisma.generation.findFirst({ where: generationWhere, select: { id: true } })) return NextResponse.json({ error: "This asset is no longer available. Choose another." }, { status: 404 });
     const owned = await persistOrReuseMediaInput({ source: body.url, kind: body.kind, userId: session.user.id, requestId: crypto.randomUUID() });
     // The maximum image model input is 30 MB; local uploads remain capped at 20 MB.
-    const metadata = await inspectReference(owned.url, body.kind, (body.kind === "image" ? 30 : body.kind === "video" ? 50 : 15) * 1024 ** 2);
+    const metadata = await inspectReference(owned.url, body.kind, (body.kind === "image" ? 30 : body.kind === "video" ? 50 : 15) * 1024 ** 2, session.user);
     const stillAccount = await prisma.user.findUnique({ where: { id: session.user.id }, select: { createdAt: true } });
     if (!stillAccount || stillAccount.createdAt.toISOString() !== session.user.accountCreatedAt || (body.asset && !await prisma.generation.findFirst({ where: generationWhere, select: { id: true } }))) return NextResponse.json({ error: "This reference is no longer available." }, { status: 409 });
     return NextResponse.json({ url: owned.url, ...metadata }, { headers: { "Cache-Control": "private, no-store" } });

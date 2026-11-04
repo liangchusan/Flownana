@@ -50,8 +50,9 @@ test("pricing opens over existing children and closes without changing the creat
   assert.deepEqual(events, []);
 });
 
-test("legacy pricing URL redirects to the shared modal instead of rendering a pricing page", () => {
+test("legacy pricing URL redirects to the shared modal and carries only safe campaign parameters", async () => {
   const load = createSourceLoader({ "next/navigation": { redirect: (url: string) => { throw new Error(url); } } });
   const Page = load<any>("app/pricing/page.tsx").default;
-  assert.throws(() => Page(), { message: "/#pricing" });
+  await assert.rejects(Page({ searchParams: Promise.resolve({}) }), { message: "/#pricing" });
+  await assert.rejects(Page({ searchParams: Promise.resolve({ utm_source: "google", prompt: "private", utm_campaign: ["one", "two"] }) }), { message: "/?utm_source=google#pricing" });
 });

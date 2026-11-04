@@ -11,10 +11,17 @@ const databaseUrl = process.env.FLOWNANA_TEST_DATABASE_URL;
 test("durable checkout reservations with isolated PostgreSQL and Stripe fault injection", { skip: !databaseUrl }, async (t) => {
   const db = isolatedTestDatabase(databaseUrl!);
   t.after(() => db.$disconnect());
+  await db.checkoutHistoryMigration.update({ where: { id: "legacy-checkouts-v1" }, data: { cutoffAt: new Date("2100-01-01"), completedAt: new Date(), cursor: null } });
+  // Public catalog identifiers satisfy the unchanged database allowlist; all Stripe transports remain mocked.
+  const priceIds: Record<string, string> = {
+    starter_monthly: "price_1UM5q4RohkvhKuAJ8Ie0xeqr", starter_yearly: "price_1UM5q5RohkvhKuAJlKiHNcAE",
+    pro_monthly: "price_1UM5q6RohkvhKuAJsH1qPH5S", pro_yearly: "price_1UM5q6RohkvhKuAJhbgmCUHY",
+    max_monthly: "price_1UM5q7RohkvhKuAJ4WYA3IsS", max_yearly: "price_1UM5q8RohkvhKuAJl70A7Jhi",
+  };
   const prices: Record<string, any> = {};
   for (const [plan, monthly, yearly] of [["starter", 1600, 9600], ["pro", 4800, 28800], ["max", 9600, 57600]] as const) {
     for (const [cycle, amount] of [["monthly", monthly], ["yearly", yearly]] as const) {
-      const id = `price_fixture_${plan}_${cycle}`;
+      const id = priceIds[`${plan}_${cycle}`];
       process.env[`STRIPE_PRICE_${plan.toUpperCase()}_${cycle.toUpperCase()}`] = id;
       prices[id] = { id, active: true, unit_amount: amount, currency: "usd", recurring: { interval: cycle === "yearly" ? "year" : "month", interval_count: 1 } };
     }
@@ -33,6 +40,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     let creates = 0, peakOpen = 0, losses = 0, hideSessions = false, failCancel = false, failExpire = false;
     let afterCreate: (() => Promise<void>) | undefined;
     const stripe = {
+      customers: { create: async (params: any) => ({ id: `cus_${id}`, metadata: params.metadata }) },
       prices: { retrieve: async (id: string) => { assert.ok(prices[id]); return structuredClone(prices[id]); } },
       coupons: { create: async (params: any, options: any) => {
         assert.ok(options.idempotencyKey);
@@ -72,8 +80,10 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
           return structuredClone(session);
         },
         list: async (filter: any) => ({ has_more: false, data: hideSessions ? [] : [...sessions.values()].filter((session) =>
+          (!filter.customer || session.customer === filter.customer) &&
           (!filter.subscription || session.subscription === filter.subscription) &&
           (!filter.status || session.status === filter.status) &&
+          (!filter.created?.lt || session.created < filter.created.lt) &&
           (!filter.created?.gte || session.created >= filter.created.gte)).map((value) => structuredClone(value)) }),
       } },
       subscriptions: {
@@ -93,11 +103,15 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     const sync = load<typeof import("../lib/subscription-sync")>("lib/subscription-sync.ts");
     const finalizer = load<typeof import("../lib/stripe-checkout-finalization")>("lib/stripe-checkout-finalization.ts");
     const webhook = load<typeof import("../app/api/webhooks/stripe/route")>("app/api/webhooks/stripe/route.ts");
+    const addLegacy = async (session: any) => {
+      sessions.set(session.id, session);
+      await db.legacyCheckout.create({ data: { id: session.id, userId: user.id, createdAt: new Date(session.created * 1000), accountCreatedAt: session.metadata?.accountCreatedAt ? new Date(session.metadata.accountCreatedAt) : null } });
+    };
     const create = (priceKey = "starter_monthly", kind = "purchase") => reservation.createReservedCheckout({ userId: id, accountCreatedAt: user.createdAt.toISOString(), kind: kind as "purchase" | "upgrade", priceKey: priceKey as any, baseUrl: "http://localhost" });
     function makeSubscription(subId: string, priceId: string, metadata: any = {}) {
       const sub = { id: subId, customer: user.stripeCustomerId, status: "active", cancel_at_period_end: false,
         created: Date.parse("2026-08-01T00:00:00Z") / 1000, current_period_start: Date.parse("2026-08-01T00:00:00Z") / 1000,
-        current_period_end: Date.parse(priceId.endsWith("yearly") ? "2027-08-01T00:00:00Z" : "2026-09-01T00:00:00Z") / 1000,
+        current_period_end: Date.parse(prices[priceId].recurring.interval === "year" ? "2027-08-01T00:00:00Z" : "2026-09-01T00:00:00Z") / 1000,
         metadata: { userId: id, accountCreatedAt: user.createdAt.toISOString(), ...metadata },
         items: { data: [{ id: `si_${subId}`, quantity: 1, price: prices[priceId] }] }, latest_invoice: `in_${subId}` };
       subs.set(subId, sub);
@@ -108,7 +122,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     }
     const grant = (sub: any) => grants.grantCreditsForCurrentPeriodIfNeeded({ userId: id, sub, invoiceId: sub.latest_invoice, source: "fixture", expectedAccountCreatedAt: user.createdAt.toISOString() });
     async function predecessor() {
-      const sub = makeSubscription(`sub_old_${id}`, "price_fixture_starter_yearly");
+      const sub = makeSubscription(`sub_old_${id}`, priceIds.starter_yearly);
       await grant(sub);
       return sub;
     }
@@ -121,12 +135,12 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     }
     const routePost = async (priceKey = "starter_monthly", path = "checkout") => load<any>(`app/api/stripe/${path}/route.ts`).POST(new Request(`http://localhost/api/stripe/${path}`, { method: "POST", headers: { [ACCOUNT_SCOPE_HEADER]: getAccountScope({ id, accountCreatedAt: user.createdAt.toISOString() })! }, body: JSON.stringify({ priceKey }) }));
     const deletion = load<typeof import("../app/api/account/route")>("app/api/account/route.ts");
-    return { user, stripe, sessions, subs, invoices, requests, couponRequests, reservation, create, makeSubscription, grant, grants, predecessor, pay, routePost, sync, finalizer, webhook, deletion,
+    return { user, stripe, sessions, addLegacy, subs, invoices, requests, couponRequests, reservation, create, makeSubscription, grant, grants, predecessor, pay, routePost, sync, finalizer, webhook, deletion,
       creates: () => creates, peakOpen: () => peakOpen,
       faults: (faults: { losses?: number; hideSessions?: boolean; failCancel?: boolean; failExpire?: boolean; afterCreate?: () => Promise<void> }) => {
         losses = faults.losses ?? losses; hideSessions = faults.hideSessions ?? hideSessions; failCancel = faults.failCancel ?? failCancel; failExpire = faults.failExpire ?? failExpire; afterCreate = faults.afterCreate;
       },
-      cleanup: async () => { await db.user.deleteMany({ where: { id } }); await db.processedStripeEvent.deleteMany({ where: { id: { contains: id } } }); },
+      cleanup: async () => { await db.legacyCheckout.deleteMany({ where: { userId: id } }); await db.user.deleteMany({ where: { id } }); await db.processedStripeEvent.deleteMany({ where: { id: { contains: id } } }); },
     };
   }
 
@@ -191,7 +205,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
       await f.predecessor(); await f.create("pro_yearly", "upgrade");
       const paid = f.pay([...f.sessions.keys()][0]);
       assert.equal(await f.grant(paid), true);
-      const renewed = f.makeSubscription(paid.id, "price_fixture_starter_monthly", paid.metadata);
+      const renewed = f.makeSubscription(paid.id, priceIds.starter_monthly, paid.metadata);
       renewed.current_period_start = Date.parse("2027-08-01T00:00:00Z") / 1000;
       renewed.current_period_end = Date.parse("2027-09-01T00:00:00Z") / 1000;
       f.invoices.get(renewed.latest_invoice).lines.data[0].period = { start: renewed.current_period_start, end: renewed.current_period_end };
@@ -206,8 +220,8 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     const f = await fixture();
     try {
       const old = await f.predecessor();
-      const first = f.makeSubscription(`sub_legacy_a_${f.user.id}`, "price_fixture_pro_yearly", { upgradeFromSubscriptionId: old.id });
-      const second = f.makeSubscription(`sub_legacy_b_${f.user.id}`, "price_fixture_max_yearly", { upgradeFromSubscriptionId: old.id });
+      const first = f.makeSubscription(`sub_legacy_a_${f.user.id}`, priceIds.pro_yearly, { upgradeFromSubscriptionId: old.id });
+      const second = f.makeSubscription(`sub_legacy_b_${f.user.id}`, priceIds.max_yearly, { upgradeFromSubscriptionId: old.id });
       const results = await Promise.allSettled([f.grant(first), f.grant(second)]);
       assert.equal(results.filter((result) => result.status === "fulfilled" && result.value).length, 1);
       assert.equal(results.filter((result) => result.status === "rejected").length, 1);
@@ -248,7 +262,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
       assert.equal((await db.upgradeConsumption.findUniqueOrThrow({ where: { predecessorId: old.id } })).successorId, sub.id);
       assert.equal(await db.creditBatch.count({ where: { userId: f.user.id } }), 2);
       assert.equal((await db.checkoutReservation.findFirstOrThrow({ where: { userId: f.user.id } })).status, "fulfilled");
-      const duplicate = f.makeSubscription(`sub_duplicate_${f.user.id}`, "price_fixture_max_yearly", { upgradeFromSubscriptionId: old.id });
+      const duplicate = f.makeSubscription(`sub_duplicate_${f.user.id}`, priceIds.max_yearly, { upgradeFromSubscriptionId: old.id });
       await assert.rejects(f.grant(duplicate), /already consumed/);
       await assert.rejects(f.sync.upsertSubscriptionFromStripe({ userId: f.user.id, stripeSubscription: duplicate as any, stripePriceId: duplicate.items.data[0].price.id }), /already consumed/);
       assert.equal(await db.creditBatch.count({ where: { userId: f.user.id } }), 2);
@@ -259,10 +273,10 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     const f = await fixture();
     try {
       const old = await f.predecessor();
-      const paid = f.makeSubscription(`sub_paid_${f.user.id}`, "price_fixture_pro_yearly", { upgradeFromSubscriptionId: old.id });
+      const paid = f.makeSubscription(`sub_paid_${f.user.id}`, priceIds.pro_yearly, { upgradeFromSubscriptionId: old.id });
       await f.grant(paid);
       await db.upgradeConsumption.deleteMany({ where: { userId: f.user.id } }); // model a pre-migration successful upgrade
-      const late = f.makeSubscription(`sub_late_${f.user.id}`, "price_fixture_max_yearly", { upgradeFromSubscriptionId: old.id });
+      const late = f.makeSubscription(`sub_late_${f.user.id}`, priceIds.max_yearly, { upgradeFromSubscriptionId: old.id });
       await assert.rejects(f.grant(late), /Legacy upgrade predecessor already consumed/);
       assert.equal(await db.creditBatch.count({ where: { userId: f.user.id } }), 2);
     } finally { await f.cleanup(); }
@@ -280,19 +294,30 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     } finally { await f.cleanup(); }
   });
 
+  await t.test("1001 unrelated checkout sessions cannot block another account or ambiguous-write recovery", async () => {
+    const f = await fixture();
+    try {
+      for (let n = 0; n < 1001; n++) f.sessions.set(`cs_unrelated_${n}`, { id: `cs_unrelated_${n}`, mode: "subscription", status: "expired", created: Math.floor(Date.now() / 1000), customer: "cus_attacker", client_reference_id: "attacker", metadata: { userId: "attacker" } });
+      f.faults({ losses: 1 });
+      assert.match((await f.create()).url, /checkout.example/);
+      assert.equal(f.creates(), 1);
+      await f.reservation.closeCheckoutBeforeAccountDeletion(db, f.user);
+    } finally { await f.cleanup(); }
+  });
+
   await t.test("legacy customer-less open checkouts are expired before issuing a new checkout", async () => {
     const f = await fixture();
     try {
       await db.user.update({ where: { id: f.user.id }, data: { stripeCustomerId: null } });
       const legacy = { id: `cs_legacy_${f.user.id}`, mode: "subscription", status: "open", customer: null,
         created: Math.floor(Date.now() / 1000), client_reference_id: f.user.id, metadata: { userId: f.user.id } };
-      f.sessions.set(legacy.id, legacy);
+      await f.addLegacy(legacy);
       await f.create();
       assert.equal(legacy.status, "expired"); assert.equal(f.peakOpen(), 1);
       const request = [...f.requests.values()][0].params;
-      assert.equal(request.customer, undefined);
-      assert.equal(request.customer_email, f.user.email);
-      assert.equal(request.customer_creation, undefined, "Subscription Checkout creates its Customer at confirmation");
+      assert.equal(request.customer, f.user.stripeCustomerId);
+      assert.equal(request.customer_email, undefined);
+      assert.equal(request.customer_creation, undefined, "Customer is explicitly bound before Checkout");
       assert.deepEqual(request.saved_payment_method_options,
         { payment_method_save: "enabled", allow_redisplay_filters: ["always"] });
     } finally { await f.cleanup(); }
@@ -303,7 +328,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     try {
       const legacy = { id: `cs_legacy_${f.user.id}`, mode: "subscription", status: "complete", subscription: `sub_unprocessed_${f.user.id}`,
         created: Math.floor(Date.now() / 1000), client_reference_id: f.user.id, metadata: { userId: f.user.id } };
-      f.sessions.set(legacy.id, legacy);
+      await f.addLegacy(legacy);
       await assert.rejects(f.create(), /previous checkout/); assert.equal(f.creates(), 0);
     } finally { await f.cleanup(); }
   });
@@ -328,7 +353,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
     const f = await fixture();
     try {
       await f.create(); const session = [...f.sessions.values()][0]; const sub = f.pay(session.id);
-      const copied = f.makeSubscription(`sub_copy_${f.user.id}`, "price_fixture_starter_monthly", sub.metadata);
+      const copied = f.makeSubscription(`sub_copy_${f.user.id}`, priceIds.starter_monthly, sub.metadata);
       await assert.rejects(f.grant(copied), /previous checkout/);
       assert.equal(await db.creditBatch.count({ where: { userId: f.user.id } }), 0);
       await f.grant(sub);
@@ -373,7 +398,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
       await db.user.update({ where: { id: f.user.id }, data: { stripeCustomerId: null } });
       const legacy = { id: `cs_legacy_${f.user.id}`, mode: "subscription", status: "open", customer: null,
         created: Math.floor(Date.now() / 1000), client_reference_id: f.user.id, metadata: { userId: f.user.id } };
-      f.sessions.set(legacy.id, legacy);
+      await f.addLegacy(legacy);
       const request = () => new Request("http://localhost/api/account", { method: "DELETE", body: JSON.stringify({ confirmation: "DELETE" }) });
       f.faults({ failExpire: true });
       assert.equal((await f.deletion.DELETE(request())).status, 409);
@@ -391,7 +416,7 @@ test("durable checkout reservations with isolated PostgreSQL and Stripe fault in
       const legacy = { id: `cs_legacy_quote_${f.user.id}`, mode: "subscription", status: "open", customer: f.user.stripeCustomerId,
         created: Math.floor(Date.now() / 1000), client_reference_id: f.user.id,
         metadata: { userId: f.user.id, upgradeFromSubscriptionId: old.id } };
-      f.sessions.set(legacy.id, legacy);
+      await f.addLegacy(legacy);
       f.faults({ failExpire: true });
       await assert.rejects(f.grants.grantDueYearlyCredits({ userId: f.user.id, stripeSubscriptionId: old.id, now: new Date("2026-09-01T00:00:00Z") }));
       assert.equal(await db.creditBatch.count({ where: { userId: f.user.id } }), 1);

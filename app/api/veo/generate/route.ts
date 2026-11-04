@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     })));
     if (metadataIssue) return videoErrorResponse("invalid_parameters", 400, { message: metadataIssue });
     let metadata;
-    try { metadata = await validateReferenceDurations(capabilities, requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url }))); }
+    try { metadata = await validateReferenceDurations(capabilities, requestedInputs.map((input, index) => ({ ...input, url: inputMedia[index].url })), session.user); }
     catch (e) { return videoErrorResponse("invalid_parameters", 400, { message: e instanceof Error ? e.message : "Check your reference files." }); }
     const normalizedInputs = requestedInputs.map((input, index) => ({
       kind: input.kind, url: inputMedia[index].url,

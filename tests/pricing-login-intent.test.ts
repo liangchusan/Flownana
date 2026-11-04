@@ -53,7 +53,7 @@ test("invalid or tampered login choices are discarded", (t) => {
 test("pricing sign-in returns to the original page with the modal open", async (t) => {
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   Object.defineProperty(globalThis, "window", { configurable: true, value: {
-    location: new URL("https://www.flownana.com/image?mode=agent"),
+    location: new URL("https://www.flownana.com/image?mode=agent"), addEventListener() {}, removeEventListener() {},
   } });
   t.after(() => previousWindow ? Object.defineProperty(globalThis, "window", previousWindow) : Reflect.deleteProperty(globalThis, "window"));
   let received: { provider: string; callbackUrl: string } | null = null;
@@ -62,6 +62,6 @@ test("pricing sign-in returns to the original page with the modal open", async (
       received = { provider, callbackUrl: options.callbackUrl };
     } },
   })<typeof import("../lib/auth-sign-in")>("lib/auth-sign-in.ts");
-  await auth.signInForCurrentEnvironment(true);
+  await auth.continueSignInForCurrentEnvironment(true);
   assert.equal((received as unknown as { callbackUrl: string }).callbackUrl, "https://www.flownana.com/image?mode=agent#pricing");
 });

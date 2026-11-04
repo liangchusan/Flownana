@@ -13,6 +13,7 @@ import { AGENT_INPUT_CAPABILITIES } from "@/lib/reference-validation";
 import { getAccountScope } from "@/lib/account-scope";
 import { signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import type { AgentInput } from "@/lib/agent/contract";
+import { readAgentLoginRecovery } from "@/lib/agent-login-recovery";
 
 
 export type AgentDraft = { prompt: string; inputs: AgentInput[]; sourceGenerationId?: string; pendingRequestId?: string };
@@ -35,14 +36,15 @@ export function AgentComposer({ conversationId, revision = 0, templateId, disabl
   const storageKey = `agent-draft:${scope ?? "anonymous"}:${conversationId ?? templateId ?? "new"}`;
   const loginKey = `agent-login:${conversationId ?? templateId ?? "new"}`;
   useEffect(() => {
+    if (status === "loading") return;
     try {
-      const value = sessionStorage.getItem(storageKey) ?? (scope ? sessionStorage.getItem(loginKey) : null);
-      if (value) setDraft(JSON.parse(value));
-      else setDraft({ prompt: "", inputs: initialInputs });
+      const value = sessionStorage.getItem(storageKey);
+      const recovery = scope ? readAgentLoginRecovery<AgentDraft>(sessionStorage.getItem(loginKey), scope) : null;
+      setDraft(value ? JSON.parse(value) : recovery ?? { prompt: "", inputs: initialInputs });
       if (scope) sessionStorage.removeItem(loginKey);
     } catch { /* Live draft remains usable if browser storage is unavailable. */ }
     setLoaded(true);
-  }, [storageKey, loginKey, scope]);
+  }, [storageKey, loginKey, scope, status]);
   useEffect(() => { if (loaded) try { sessionStorage.setItem(storageKey, JSON.stringify(draft)); } catch { /* Optional draft storage. */ } }, [draft, loaded, storageKey]);
   useEffect(() => {
     if (!seed) return;
@@ -57,7 +59,7 @@ export function AgentComposer({ conversationId, revision = 0, templateId, disabl
   }, [seed]);
   const update = (value: Partial<AgentDraft>) => { requestId.current = ""; setDraft(current => ({ ...current, ...value, pendingRequestId: undefined })); };
   const login = (value = draft) => {
-    try { sessionStorage.setItem(loginKey, JSON.stringify(value)); } catch { /* Optional login recovery. */ }
+    try { sessionStorage.setItem(loginKey, JSON.stringify({ version: 1, sourceScope: scope, draft: value })); } catch { /* Optional login recovery. */ }
 
     void signInForCurrentEnvironment();
   };

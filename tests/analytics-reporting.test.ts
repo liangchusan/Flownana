@@ -11,7 +11,7 @@ test("verified analytics facts, concurrency and recovery on isolated PostgreSQL"
   const db = isolatedTestDatabase(testUrl!);
   Object.assign(process.env, { NEXT_PUBLIC_GA_ENABLED: "true", NEXT_PUBLIC_GA_MEASUREMENT_ID: TEST_GA_ID,
     VERCEL_ENV: "preview", NEXTAUTH_SECRET: "analytics_local_fixture_only", GA_API_SECRET: "local_transport_fixture_only",
-    STRIPE_PRICE_STARTER_MONTHLY: "price_local_ga_starter" });
+    STRIPE_PRICE_STARTER_MONTHLY: "price_1UM5q4RohkvhKuAJ8Ie0xeqr" });
   const fixtures: string[] = [];
   t.after(async () => { await db.user.deleteMany({ where: { id: { in: fixtures } } }); await db.$disconnect(); });
   const deferred: Array<() => Promise<void>> = [];
@@ -83,8 +83,8 @@ test("verified analytics facts, concurrency and recovery on isolated PostgreSQL"
     assert.equal(savedContext.clientId, fresh.clientId); assert.ok(savedContext.capturedAt >= fresh.capturedAt);
     await db.$transaction(async tx => {
       assert.deepEqual(await reports.getAccountAnalyticsContext(tx, user.id), savedContext);
-      await reports.saveAnalyticsContext(tx, user, fresh, "checkout:cs_withdrawal");
-      await reports.queueAnalyticsReport(tx, { userId: user.id, key: `withdrawal:${user.id}`, name: "purchase", params: {}, context: fresh });
+      await reports.saveAnalyticsContext(tx, user, savedContext, "checkout:cs_withdrawal");
+      await reports.queueAnalyticsReport(tx, { userId: user.id, key: `withdrawal:${user.id}`, name: "purchase", params: {}, context: savedContext });
     });
     session = null;
     const withdrawn = await api.DELETE(new Request("http://localhost/api/analytics/context", { method: "DELETE", headers: { origin: "http://localhost", cookie } }));
@@ -168,7 +168,7 @@ test("verified analytics facts, concurrency and recovery on isolated PostgreSQL"
     const invoice = { id: `in_${user.id}`, subscription: sub.id, customer: user.stripeCustomerId, paid: true, status: "paid", livemode: false,
       payment_intent: `pi_${user.id}`, amount_paid: 1400, total: 1400, total_excluding_tax: 1200, currency: "usd", billing_reason: "subscription_cycle",
       created: Math.floor(Date.now()/1000), status_transitions: { paid_at: Math.floor(Date.now()/1000) },
-      lines: { has_more: false, data: [{ amount: 1600, quantity: 1, price: { id: "price_local_ga_starter" } }] } };
+      lines: { has_more: false, data: [{ amount: 1600, quantity: 1, price: { id: "price_1UM5q4RohkvhKuAJ8Ie0xeqr" } }] } };
     const intent = { id: invoice.payment_intent, customer: user.stripeCustomerId, status: "succeeded", amount_received: 1400, currency: "usd", livemode: false };
     let remoteReads = 0;
     const stripe = { invoices: { retrieve: async () => { remoteReads++; return invoice; } }, subscriptions: { retrieve: async () => sub }, paymentIntents: { retrieve: async () => intent } };
@@ -183,7 +183,7 @@ test("verified analytics facts, concurrency and recovery on isolated PostgreSQL"
     // Initial/upgrade payment uses the immutable Checkout context, not a later session.
     const reservationId = `checkout_${user.id}`, checkoutId = `cs_${user.id}`;
     await db.checkoutReservation.create({ data: { id: reservationId, userId: user.id, accountCreatedAt: user.createdAt,
-      kind: "purchase", priceKey: "starter_monthly", stripePriceId: "price_local_ga_starter", stripeSessionId: checkoutId,
+      kind: "purchase", priceKey: "starter_monthly", stripePriceId: "price_1UM5q4RohkvhKuAJ8Ie0xeqr", stripeSessionId: checkoutId,
       sessionParams: {}, expiresAt: new Date(Date.now() + 3600000) } });
     const checkoutContext = { ...context, clientId: "222.333" };
     await db.$transaction(async tx => {
@@ -213,11 +213,11 @@ test("verified analytics facts, concurrency and recovery on isolated PostgreSQL"
       Object.assign(process.env, { VERCEL_ENV: "production", NEXT_PUBLIC_GA_MEASUREMENT_ID: PRODUCTION_GA_ID, STRIPE_WEBHOOK_SECRET: "fixture_signature_secret" });
       await db.$transaction(tx => reports.saveAnalyticsContext(tx, user, { ...context, measurementId: PRODUCTION_GA_ID }));
       const sub = { id: `sub_webhook_${user.id}`, customer: user.stripeCustomerId, livemode: true, created: Math.floor(Date.now()/1000),
-        metadata: { userId: user.id, accountCreatedAt: user.createdAt.toISOString() }, items: { data: [{ price: { id: "price_local_ga_starter" } }] } };
+        metadata: { userId: user.id, accountCreatedAt: user.createdAt.toISOString() }, items: { data: [{ price: { id: "price_1UM5q4RohkvhKuAJ8Ie0xeqr" } }] } };
       const invoice = { id: `in_webhook_${user.id}`, subscription: sub.id, customer: user.stripeCustomerId, paid: true, status: "paid", livemode: true,
         payment_intent: `pi_webhook_${user.id}`, amount_paid: 1600, total: 1600, total_excluding_tax: 1600, currency: "usd", billing_reason: "subscription_cycle",
         created: Math.floor(Date.now()/1000), status_transitions: { paid_at: Math.floor(Date.now()/1000) },
-        lines: { has_more: false, data: [{ amount: 1600, quantity: 1, price: { id: "price_local_ga_starter" } }] } };
+        lines: { has_more: false, data: [{ amount: 1600, quantity: 1, price: { id: "price_1UM5q4RohkvhKuAJ8Ie0xeqr" } }] } };
       let unavailable = true, grants = 0;
       const stripe = { webhooks: { constructEvent: (raw: string, signature: string) => { if (signature !== "valid_fixture_signature") throw new Error("Invalid fixture signature"); return JSON.parse(raw); } },
         subscriptions: { retrieve: async () => sub }, invoices: { retrieve: async () => { if (unavailable) throw new Error("fixture provider outage"); return invoice; } },

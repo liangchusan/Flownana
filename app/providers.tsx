@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
 import { AppToastProvider } from "@/components/blocks/app-toast-provider";
+import { LoginDialog } from "@/components/auth/login-dialog";
 import { PricingModalProvider } from "@/components/pricing/pricing-modal-provider";
 
 export function Providers({
@@ -16,6 +17,7 @@ export function Providers({
     <SessionProvider session={session}>
       <AppToastProvider>
         <PricingModalProvider>{children}</PricingModalProvider>
+        <LoginDialog />
       </AppToastProvider>
     </SessionProvider>
   );

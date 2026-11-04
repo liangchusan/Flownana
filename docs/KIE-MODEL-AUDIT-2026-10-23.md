@@ -2,7 +2,7 @@
 
 用户已授权核对所有在售模型的官方名称、所有参数和价格，并开发上线本对话调整。
 本文件以本次公开模型页、对应 API Reference 和独立 Pricing 表为依据；结构化字段与
-价格行见 [KIE-MODEL-CONTRACTS.json](./KIE-MODEL-CONTRACTS.json)。能力与价格核对
+价格行见 [KIE-MODEL-CONTRACTS.json](KIE-MODEL-CONTRACTS.json)。能力与价格核对
 不等于已经真实出片、完成账单对账或部署；运行证据见 MEMORY 最新记录。
 
 ## 名称、Provider 与上下线

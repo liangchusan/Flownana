@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { grantDueYearlyCredits } from "@/lib/subscription-credit-grant";
 import { cleanupOrphanedMediaUploads } from "@/lib/media-upload-cleanup";
 import { canProcessStripeBilling } from "@/lib/stripe-production-access";
+import { cleanupSignupIpWindows } from "@/lib/signup-bonus";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const now = new Date();
+  let signupWindowsRemoved: number | null = null;
+  try {
+    signupWindowsRemoved = (await cleanupSignupIpWindows(now)).count;
+  } catch {
+    // Do not expose window identifiers or prevent independent billing maintenance.
+    console.error("[cron/monthly-credits] Signup window cleanup failed");
+  }
   const yearlyPriceIds = [
     process.env.STRIPE_PRICE_STARTER_YEARLY,
     process.env.STRIPE_PRICE_PRO_YEARLY,
@@ -57,5 +65,6 @@ export async function GET(request: Request) {
     console.error("[cron/monthly-credits] Media upload cleanup failed:", error);
     mediaCleanup = { error: true };
   }
-  return NextResponse.json({ ok: failed.length === 0, granted, duplicates, ignored, failed, mediaCleanup });
+  return NextResponse.json({ ok: failed.length === 0, granted, duplicates, ignored, failed, mediaCleanup,
+    signupWindowsRemoved });
 }

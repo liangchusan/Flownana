@@ -120,7 +120,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       });
       const pending = Array.from({ length: 12 }, (_, index) => (index % 2
         ? f.video.POST(request("/api/veo/generate", { prompt: "Fixture", modelOptionId: "geminiomni11_720_4", aspectRatio: "16:9" }))
-        : f.image.POST(request("/api/generate", { prompt: "Fixture", model: "gpt-image-2", outputCount: 4 }))).then((response) => {
+        : f.image.POST(request("/api/generate", { prompt: "Fixture", model: "nano-banana-2-1", outputCount: 4 }))).then((response) => {
           if (response.status === 429 && ++rejectedCount === 7) sevenRejected();
           return response;
         }));
@@ -214,8 +214,8 @@ test("generation and deletion route boundaries with an isolated database", { ski
       let calls = 0;
       t.mock.method(globalThis, "fetch", async () => { calls++; throw new Error("Provider must not be called"); });
       const media = await db.mediaAsset.create({ data: { userId: f.account.id, type: "image", origin: "uploaded",
-        url: "https://fixture.public.blob.vercel-storage.com/large-input.png", contentType: "image/png", sizeBytes: 11 * 1024 * 1024 } });
-      const large = await f.image.POST(request("/api/generate", { prompt: "Fixture", model: "qwen-image-3-pro", imageUrls: [media.url] }));
+        url: "https://fixture.public.blob.vercel-storage.com/large-input.png", contentType: "image/png", sizeBytes: 31 * 1024 * 1024 } });
+      const large = await f.image.POST(request("/api/generate", { prompt: "Fixture", model: "nano-banana-2-1", imageUrls: [media.url] }));
       assert.equal((await large.json()).errorCode, "file_too_large");
       for (const body of [[], { prompt: "Fixture", model: "constructor" }, { prompt: "Fixture", imageUrls: [1] }]) {
         assert.equal((await f.image.POST(request("/api/generate", body))).status, 400);
@@ -335,7 +335,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       assert.equal((await response.json()).success, true);
       assert.equal(f.persisted.length, 1);
       assert.deepEqual(f.deleted, []);
-      assert.equal(await f.balance(), 998);
+      assert.equal(await f.balance(), 999);
     } finally { await f.cleanup(); }
   });
 
@@ -369,7 +369,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       const data = await (await f.image.POST(request("/api/generate", { prompt: "Fixture" }))).json();
       assert.equal(data.status, "unknown"); assert.equal(data.generationId, undefined);
       assert.equal(await db.generation.count({ where: { userId: f.account.id, status: "pending" } }), 1);
-      assert.equal(await f.balance(), 998);
+      assert.equal(await f.balance(), 999);
     } finally { await f.cleanup(); }
   });
 
@@ -388,7 +388,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       const data = await (await f.image.POST(request("/api/generate", { prompt: "Fixture" }))).json();
       assert.equal(data.status, "unknown"); assert.equal(data.refundPending, undefined);
       assert.equal((await db.generation.findUniqueOrThrow({ where: { id: data.generationId } })).status, "success");
-      assert.equal(await f.balance(), 998); assert.deepEqual(f.deleted, []);
+      assert.equal(await f.balance(), 999); assert.deepEqual(f.deleted, []);
     } finally { await f.cleanup(); }
   });
 
@@ -405,7 +405,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
       const response = await f.image.POST(request("/api/generate", { prompt: "Fixture", imageUrls: [media.url] }));
       assert.equal((await response.json()).success, true);
       assert.deepEqual(f.remoteReads, [media.url]);
-      assert.equal(await f.balance(), 998);
+      assert.equal(await f.balance(), 999);
     } finally { await f.cleanup(); }
   });
 
@@ -533,7 +533,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
         } as unknown as Stripe.Subscription;
         f.stripeSubs.set(sub.id, sub);
         if (status === "past_due") await db.subscription.create({ data: {
-          userId: f.account.id, stripeSubscriptionId: sub.id, stripePriceId: "price_fixture", planType: "starter", billingCycle: "monthly",
+          userId: f.account.id, stripeSubscriptionId: sub.id, stripePriceId: "price_1UM5q4RohkvhKuAJ8Ie0xeqr", planType: "starter", billingCycle: "monthly",
           status, currentPeriodStart: new Date(), currentPeriodEnd: new Date(Date.now() + 86400000),
         } });
       }
@@ -548,7 +548,7 @@ test("generation and deletion route boundaries with an isolated database", { ski
     try {
       t.mock.method(console, "error", () => {});
       await db.subscription.create({ data: { userId: f.account.id, stripeSubscriptionId: `missing_${f.account.id}`,
-        stripePriceId: "price_fixture", planType: "starter", billingCycle: "monthly", status: "past_due",
+        stripePriceId: "price_1UM5q4RohkvhKuAJ8Ie0xeqr", planType: "starter", billingCycle: "monthly", status: "past_due",
         currentPeriodStart: new Date(), currentPeriodEnd: new Date(Date.now() + 86400000) } });
       const response = await f.deletion.DELETE(request("/api/account", { confirmation: "DELETE" }, "DELETE"));
       assert.equal(response.status, 502);

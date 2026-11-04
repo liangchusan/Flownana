@@ -186,6 +186,10 @@ test("browser grants are account-bound and offline withdrawal survives reload an
   const client = load(); client.bindAdvertisingAccount("account-a"); await client.refreshAdvertisingConsent();
   assert.equal(client.hasAdvertisingConsent(), false); assert.equal(await client.allowAdvertising(), true);
   client.bindAdvertisingAccount("account-b"); assert.equal(client.hasAdvertisingConsent(), false);
+  await client.refreshAdvertisingConsent();
+  const previousPosts = calls.filter(call => call.method === "POST").length;
+  assert.equal(await client.allowAdvertising("explicit", "account-a"), false);
+  assert.equal(calls.filter(call => call.method === "POST").length, previousPosts);
   online = false; client.revokeAdvertising(); await client.reconcileAdvertisingWithdrawal(); assert.equal(client.advertisingState().pending, true);
   const reloaded = load(); reloaded.bindAdvertisingAccount(null); assert.equal(reloaded.hasAdvertisingConsent(), false);
   online = true; await reloaded.reconcileAdvertisingWithdrawal();

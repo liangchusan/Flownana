@@ -1,27 +1,13 @@
+import { mp4Reader, MAX_MP4_TIMING_ENTRIES } from "./mp4-atoms.ts";
 /** Read video-track geometry and average frame rate from bounded MP4/MOV atoms. */
 export function movieVideoMetadata(bytes: Uint8Array) {
   const data = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  type Atom = { type: string; body: number; end: number };
-  function atoms(start: number, end: number): Atom[] {
-    const result: Atom[] = [];
-    for (let offset = start; offset + 8 <= end;) {
-      let size = data.readUInt32BE(offset), header = 8;
-      if (size === 1) {
-        if (offset + 16 > end) throw new Error("Invalid video header.");
-        const extended = data.readBigUInt64BE(offset + 8);
-        if (extended > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Invalid video size.");
-        size = Number(extended); header = 16;
-      } else if (size === 0) size = end - offset;
-      if (size < header || offset + size > end) throw new Error("Incomplete video file.");
-      result.push({ type: data.toString("ascii", offset + 4, offset + 8), body: offset + header, end: offset + size });
-      offset += size;
-    }
-    return result;
-  }
-  const child = (parent: Atom, name: string) => atoms(parent.body, parent.end).find(atom => atom.type === name);
-  const moov = atoms(0, data.length).find(atom => atom.type === "moov");
+  const { atoms, find } = mp4Reader(data);
+  const child = (parent: { body: number; end: number }, name: string) => find(parent.body, parent.end, name);
+  const moov = find(0, data.length, "moov");
   if (!moov) throw new Error("Could not read the video track.");
-  for (const track of atoms(moov.body, moov.end).filter(atom => atom.type === "trak")) {
+  for (const track of atoms(moov.body, moov.end)) {
+    if (track.type !== "trak") continue;
     const mdia = child(track, "mdia"), tkhd = child(track, "tkhd");
     if (!mdia || !tkhd) continue;
     const hdlr = child(mdia, "hdlr"), mdhd = child(mdia, "mdhd");
@@ -39,7 +25,7 @@ export function movieVideoMetadata(bytes: Uint8Array) {
     let samples = 0, units = 0;
     if (stts && stts.body + 8 <= stts.end) {
       const count = data.readUInt32BE(stts.body + 4);
-      if (stts.body + 8 + count * 8 > stts.end) throw new Error("Invalid frame timing.");
+      if (count > MAX_MP4_TIMING_ENTRIES || stts.body + 8 + count * 8 > stts.end) throw new Error("Invalid frame timing.");
       for (let index = 0; index < count; index++) {
         const offset = stts.body + 8 + index * 8, amount = data.readUInt32BE(offset);
         samples += amount; units += amount * data.readUInt32BE(offset + 4);

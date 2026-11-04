@@ -6,7 +6,7 @@ export const metadata = {
 };
 
 export default function PrivacyPolicyPage() {
-  const lastUpdated = "October 12, 2026";
+  const lastUpdated = "October 27, 2026";
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,6 +57,22 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
 
+          <h3 id="signup-credits">New-account credit eligibility and abuse prevention</h3>
+          <p>
+            Eligible new accounts may receive 10 promotional credits, valid for 30 days. Eligibility
+            requires an IP location in the United States, Japan, South Korea, Taiwan, Germany, France,
+            or the United Kingdom. Only the first new account registered from the same IP address
+            within a 72-hour window can qualify. Other accounts can still register and purchase credits.
+          </p>
+          <p>
+            We use our hosting platform&apos;s IP address and country information at registration to
+            apply these rules. We store a keyed hash of the IP, rather than the original address,
+            in a separate abuse-prevention record. The restriction expires after 72 hours; expired
+            records are removed by daily maintenance, including after account deletion. We retain
+            the eligibility outcome and any credit grant with your account. These essential checks
+            apply independently of analytics choices, and the IP and its hash are not sent to Google Analytics.
+          </p>
+
           <h2 id="analytics">Google Analytics and your choices</h2>
           <p>
             We use Google Analytics to measure visits, account creation, pricing interest, checkout, verified
@@ -92,7 +108,9 @@ export default function PrivacyPolicyPage() {
             Global Privacy Control turns analytics off. Open Privacy settings from the account menu, navigation, or website footer to allow, reject, or withdraw analytics
             at any time. This does not disable essential sign-in or payment functionality. Withdrawal stops future
             collection; it does not automatically delete information already sent. If you are offline, we retry the
-            server withdrawal when your connection returns.
+            server withdrawal when your connection returns. We also use an essential preference cookie, lasting up
+            to 180 days, to prevent old analytics context from being used during sign-in when measurement is
+            disabled or withdrawal is pending. It contains no advertising, session, or account identifier.
           </p>
           <p><PrivacySettingsTrigger className="rounded-ui text-sm underline underline-offset-4 transition-all duration-300 hover:text-text-secondary active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open privacy settings</PrivacySettingsTrigger></p>
           <p>

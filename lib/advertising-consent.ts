@@ -47,6 +47,7 @@ export function advertisingState() {
   return { enabled, verified, granted: !pending && (scope ? grantedScope === scope : (regionalDefault || anonymousIntent()?.account === null) && !optedOut()), pending };
 }
 export function hasAdvertisingConsent() { return advertisingState().granted && enabled; }
+export function advertisingAccountScope() { return scope; }
 export function bindAdvertisingAccount(nextScope: string | null) {
   if (scope === nextScope) return;
   scope = nextScope; grantedScope = null; verified = false; serverDefaultAllowed = false; revision++; announce();
@@ -68,9 +69,9 @@ export async function refreshAdvertisingConsent() {
   } catch { if (scope === current && version === revision) grantedScope = null; } // Offline never restores a grant.
   announce();
 }
-export async function allowAdvertising(basis: "explicit" | "regional_default" = "explicit") {
+export async function allowAdvertising(basis: "explicit" | "regional_default" = "explicit", expectedScope = scope) {
   const current = scope, version = revision;
-  if (!current || !enabled || !verified || Object.keys(withdrawals()).length) return false;
+  if (!current || current !== expectedScope || !enabled || !verified || Object.keys(withdrawals()).length) return false;
   if (basis === "regional_default" && (!regionalDefault || !serverDefaultAllowed || optedOut())) return false;
   // Verify durable storage before initiating a server-side grant.
   window.localStorage.setItem(RECEIPTS, JSON.stringify(read(RECEIPTS)));
@@ -111,8 +112,8 @@ export function ensureDefaultAdvertising(): Promise<void> {
       const latest = anonymousIntent();
       if (!latest || (latest.account !== null && latest.account !== current)) return;
       window.localStorage.setItem(INTENT, JSON.stringify({ ...latest, account: current }));
-      if (!hasAdvertisingConsent()) await allowAdvertising("explicit");
-    } else if (!hasAdvertisingConsent() && serverDefaultAllowed) await allowAdvertising("regional_default");
+      if (!hasAdvertisingConsent()) await allowAdvertising("explicit", current);
+    } else if (!hasAdvertisingConsent() && serverDefaultAllowed) await allowAdvertising("regional_default", current);
   })().finally(() => { ensuringDefault = null; });
   return ensuringDefault;
 }

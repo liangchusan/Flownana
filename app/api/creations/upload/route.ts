@@ -5,57 +5,17 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth-options";
 import { matchesRequestAccount } from "@/lib/account-scope";
 import { prisma } from "@/lib/prisma";
+import { reserveMediaUpload, MediaUploadRateLimitError } from "@/lib/upload-reservation";
 import {
-  MEDIA_UPLOAD_BYTES_PER_DAY,
-  MEDIA_UPLOAD_GRANTS_PER_HOUR,
   MEDIA_UPLOAD_RULES,
   MEDIA_UPLOAD_TOKEN_TTL_MS,
-  MEDIA_UPLOAD_TOTAL_BYTES,
   parseMediaUploadPayload,
-  type MediaUploadPayload,
+  getUploadIdFromBlobUrl,
 } from "@/lib/media-upload-policy";
-
-class MediaUploadRateLimitError extends Error {}
-
-async function reserveUpload(userId: string, payload: MediaUploadPayload) {
-  const now = new Date();
-  const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`;
-    const [hourlyCount, dailyBytes, totalReservedBytes] = await Promise.all([
-      tx.mediaUploadGrant.count({ where: { userId, createdAt: { gte: hourAgo } } }),
-      tx.mediaUploadGrant.aggregate({
-        where: { userId, createdAt: { gte: dayAgo } },
-        _sum: { maxBytes: true },
-      }),
-      tx.mediaUploadGrant.aggregate({
-        where: {
-          userId,
-          OR: [{ completedAt: { not: null } }, { expiresAt: { gt: now } }],
-        },
-        _sum: { maxBytes: true },
-      }),
-    ]);
-    if (
-      hourlyCount >= MEDIA_UPLOAD_GRANTS_PER_HOUR ||
-      (dailyBytes._sum.maxBytes ?? 0) + payload.sizeBytes > MEDIA_UPLOAD_BYTES_PER_DAY ||
-      (totalReservedBytes._sum.maxBytes ?? 0) + payload.sizeBytes > MEDIA_UPLOAD_TOTAL_BYTES
-    ) throw new MediaUploadRateLimitError("Upload quota exceeded.");
-    await tx.mediaUploadGrant.create({
-      data: {
-        id: payload.uploadId,
-        userId,
-        kind: payload.kind,
-        maxBytes: payload.sizeBytes,
-        expiresAt: new Date(now.getTime() + MEDIA_UPLOAD_TOKEN_TTL_MS),
-      },
-    });
-  });
-}
 
 async function completeUpload(blobUrl: string, tokenPayload?: string | null) {
   const payload = parseMediaUploadPayload(tokenPayload ?? null);
+  if (getUploadIdFromBlobUrl(blobUrl) !== payload.uploadId) throw new Error("Upload path does not match its reservation.");
   const metadata = await head(blobUrl);
   if (metadata.size > payload.sizeBytes) throw new Error("Completed upload exceeds its reservation.");
   await prisma.$transaction(async (tx) => {
@@ -105,13 +65,13 @@ export async function POST(request: Request) {
         const session = await getServerSession(authOptions);
         if (!session?.user?.id || !matchesRequestAccount(request, session.user)) throw new Error("Authentication required.");
         const payload = parseMediaUploadPayload(clientPayload);
-        if (!pathname.startsWith(`generation-inputs/${payload.kind}/${payload.uploadId}/`)) throw new Error("Invalid upload request.");
-        await reserveUpload(session.user.id, payload);
+        if (!pathname.startsWith(`generation-inputs/${payload.kind}/${payload.uploadId}/`) || pathname.split("/").length !== 4 || !pathname.split("/")[3] || [".", ".."].includes(pathname.split("/")[3])) throw new Error("Invalid upload request.");
+        await reserveMediaUpload(session.user.id, payload, session.user.accountCreatedAt);
         const rule = MEDIA_UPLOAD_RULES[payload.kind];
         return {
           allowedContentTypes: [...rule.types],
           maximumSizeInBytes: payload.sizeBytes,
-          addRandomSuffix: true,
+          addRandomSuffix: false,
           allowOverwrite: false,
           validUntil: Date.now() + MEDIA_UPLOAD_TOKEN_TTL_MS,
           tokenPayload: JSON.stringify(payload),

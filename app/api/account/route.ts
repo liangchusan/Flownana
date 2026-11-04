@@ -101,6 +101,11 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: "Account not found." }, { status: 404 });
       }
 
+      const avatarWrites = await tx.mediaUploadGrant.findMany({ where: { userId: account.id, kind: "avatar" } });
+      if (avatarWrites.some(write => !write.completedAt && write.expiresAt > new Date())) {
+        return NextResponse.json({ code: "avatar_upload_pending", error: "Wait for your profile photo upload to finish before deleting your account." }, { status: 409 });
+      }
+
       const activeGeneration = await tx.generation.findFirst({
         where: {
           userId: session.user.id,
@@ -169,6 +174,7 @@ export async function DELETE(request: Request) {
       }
 
       const blobUrls = new Set<string>();
+      for (const write of avatarWrites) if (write.blobUrl) blobUrls.add(write.blobUrl);
       if (account.customAvatarUrl && isOwnedBlobUrl(account.customAvatarUrl)) {
         blobUrls.add(account.customAvatarUrl);
       }

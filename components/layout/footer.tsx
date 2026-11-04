@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PublicCampaignLink as Link } from "@/components/analytics/public-campaign-link";
 import { PricingTrigger } from "@/components/pricing/pricing-trigger";
 import { Logo } from "@/components/ui/logo";
 import { PrivacySettingsTrigger } from "@/components/analytics/privacy-settings-trigger";

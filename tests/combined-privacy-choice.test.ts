@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createSourceLoader } from "./helpers/load-source.ts";
 
-function fixture(authenticated: boolean, allow: () => Promise<boolean> = async () => true) {
+function fixture(authenticated: boolean, allow: () => Promise<boolean> = async () => true, sync: () => Promise<boolean> = async () => true) {
+  let user = authenticated ? { id: "fixture", accountCreatedAt: "2026-10-12T00:00:00.000Z" } : null;
   const states: any[] = [{ enabled: true, verified: authenticated, granted: false, pending: false }, false, "",
     { defaultAnalytics: false, gpc: false }, true, false, false, false];
   const refs: any[] = []; let cursor = 0, refCursor = 0, basic = false, adsCalls = 0;
@@ -11,9 +12,9 @@ function fixture(authenticated: boolean, allow: () => Promise<boolean> = async (
     "@/components/ui/button": { Button: "button" }, "next/link": { __esModule: true, default: "a" },
     react: { useEffect() {}, useLayoutEffect() {}, useRef: (initial: unknown) => refs[refCursor++] ?? (refs[refCursor - 1] = { current: initial }),
       useState: (initial: unknown) => { const index = cursor++; if (states[index] === undefined) states[index] = initial; return [states[index], (value: unknown) => { states[index] = value; }]; } },
-    "next-auth/react": { useSession: () => ({ data: authenticated ? { user: { id: "fixture", accountCreatedAt: "2026-10-12T00:00:00.000Z" } } : null }) },
+    "next-auth/react": { useSession: () => ({ data: user ? { user } : null }) },
     "@/lib/analytics": { analyticsChoice: () => null, analyticsRevocationPending: () => false, configureAnalyticsCollection() {},
-      hasAnalyticsConsent: () => basic, reconcileAnalyticsRevocation: async () => true, setAnalyticsConsent: (value: boolean) => { choices.push(value); basic = value; }, syncAnalyticsContext: async () => {} },
+      hasAnalyticsConsent: () => basic, reconcileAnalyticsRevocation: async () => true, setAnalyticsConsent: (value: boolean) => { choices.push(value); basic = value; }, syncAnalyticsContext: sync },
     "@/lib/advertising-consent": { ADVERTISING_EVENT: "fixture", advertisingState: () => states[0],
       allowAnonymousAdvertising: () => true, allowAdvertising: async () => { adsCalls++; return allow(); }, reconcileAdvertisingWithdrawal: async () => {}, refreshAdvertisingConsent: async () => {} },
     "@/lib/analytics-preferences": { dismissAnalyticsPrompt() {}, PRIVACY_SETTINGS_EVENT: "fixture", analyticsPromptDismissed: () => false, shouldPromptForAnalytics: () => false },
@@ -22,7 +23,8 @@ function fixture(authenticated: boolean, allow: () => Promise<boolean> = async (
   const render = (): any => { cursor = 0; refCursor = 0; return component.AnalyticsPreferences(); };
   const nodes = (node: any): any[] => !node || typeof node !== "object" ? [] : [node, ...[node.props?.children].flat(Infinity).flatMap(nodes)];
   const button = (name: string) => nodes(render()).find(node => node.props?.children === name);
-  return { render, button, choices, states, adsCalls: () => adsCalls };
+  const text = (node: any): string => node == null || typeof node === "boolean" ? "" : typeof node === "string" ? node : typeof node === "object" ? [node.props?.children].flat(Infinity).map(text).join(" ") : "";
+  return { render, text: () => text(render()), button, choices, states, adsCalls: () => adsCalls, switchAccount: () => { user = { id: "second", accountCreatedAt: "2026-10-12T00:00:00.000Z" }; render(); } };
 }
 const settle = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 
@@ -44,4 +46,26 @@ test("a late allow response cannot reopen the panel after Reject", async () => {
   assert.equal(f.adsCalls(), 1); f.button("Reject").props.onClick();
   finish(false); await settle(); assert.equal(f.states[4], false); assert.equal(f.states[2], "");
   assert.deepEqual(f.choices, [true, false]);
+});
+
+ test("a cross-tab account refresh while context sync is pending cannot grant the new account", async () => {
+  let finish!: (value: boolean) => void;
+  const f = fixture(true, async () => true, () => new Promise(resolve => { finish = resolve; }));
+  f.button("Allow").props.onClick(); await settle(); f.switchAccount(); finish(true); await settle();
+  assert.equal(f.adsCalls(), 0);
+});
+test("a rejected context sync cannot proceed to an advertising grant", async () => {
+  const f = fixture(true, async () => true, async () => false);
+  f.button("Allow").props.onClick(); await settle();
+  assert.equal(f.adsCalls(), 0); assert.match(f.states[2], /failed/);
+});
+test("GPC and pending withdrawal override default-on and sign-in-to-Allow explanations", () => {
+  const f = fixture(false);
+  f.states[3] = { defaultAnalytics: true, defaultAdvertising: true, gpc: true };
+  assert.match(f.text(), /disabled by Global Privacy Control/i);
+  assert.doesNotMatch(f.text(), /on by default|Sign in, then Allow/);
+  assert.equal(f.button("Allow").props.disabled, true);
+  f.states[3].gpc = false; f.states[7] = true;
+  assert.match(f.text(), /off while your withdrawal is pending/);
+  assert.doesNotMatch(f.text(), /on by default|Sign in, then Allow/);
 });

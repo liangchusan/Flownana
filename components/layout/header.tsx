@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { PublicCampaignLink as Link } from "@/components/analytics/public-campaign-link";
 import { PricingTrigger } from "@/components/pricing/pricing-trigger";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";

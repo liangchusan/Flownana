@@ -2,7 +2,7 @@ import { after, NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { getAccountScope, ACCOUNT_SCOPE_HEADER } from "@/lib/account-scope";
-import { analyzeTemplateRun, generateTemplateRun, publicTemplateRun, readTemplateRun, prepareTemplateRetry, latestTemplateRun } from "@/lib/image-templates/service";
+import { generateTemplateRun, publicTemplateRun, readTemplateRun, prepareTemplateRetry, latestTemplateRun } from "@/lib/image-templates/service";
 import { executeTemplateOutput } from "@/lib/image-templates/worker";
 export const maxDuration = 300;
 
@@ -34,9 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ run: publicTemplateRun(run), accountScope: getAccountScope(account) });
     }
     if (data.action === "analyze") {
-      if (!process.env.OPENROUTER_API_KEY) return NextResponse.json({ error: "Template questions are not configured yet." }, { status: 503 });
-      const run = await analyzeTemplateRun(account, data.id, data.revision, data.input);
-      return NextResponse.json({ run: publicTemplateRun(run), accountScope: getAccountScope(account) });
+      return NextResponse.json({ error: "Template questions have moved to Agent. Start an Agent conversation to continue." }, { status: 410 });
     }
     if (data.action === "generate") {
       const result = await generateTemplateRun(account, data.id, data.revision, data.settings);

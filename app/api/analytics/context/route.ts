@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
   delete context.collectionCountry;
   const country = analyticsCollectionPolicy(request.headers).country;
   if (country) context.collectionCountry = country;
+  // The request JSON can select a GA identifier, but can never select withdrawal authority.
+  context.withdrawalToken = contextFromRequest(request, true)?.withdrawalToken ?? randomBytes(32).toString("hex");
   const signature = signAnalyticsContext(context);
   if (!signature) return NextResponse.json({ error: "Unavailable" }, { status: 503 });
   const session = await getServerSession(authOptions);
@@ -40,17 +43,20 @@ export async function DELETE(request: Request) {
   if (!sameOrigin(request)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const session = await getServerSession(authOptions);
   const context = contextFromRequest(request, true);
+  const authenticated = session?.user?.id && matchesRequestAccount(request, session.user) &&
+    (await prisma.user.findUnique({ where: { id: session.user.id }, select: { createdAt: true } }))?.createdAt.toISOString() === session.user.accountCreatedAt;
   // Withdrawal still applies to this browser's stored contexts after signing out.
-  if (serverMeasurementId() && (session?.user?.id || context)) await prisma.$transaction(async tx => {
+  if (serverMeasurementId() && (authenticated || context?.withdrawalToken)) await prisma.$transaction(async tx => {
     const OR = [
-      ...(session?.user?.id ? [{ userId: session.user.id }] : []),
-      ...(context ? [{ context: { path: ["clientId"], equals: context.clientId } }] : []),
+      ...(authenticated ? [{ userId: session!.user.id }] : []),
+      ...(context?.withdrawalToken ? [{ context: { path: ["withdrawalToken"], equals: context.withdrawalToken } }] : []),
     ];
     const where = { environment: analyticsEnvironment(), OR };
     const affected = await tx.analyticsContext.findMany({ where, select: { userId: true }, distinct: ["userId"] });
     const userIds = new Set(affected.map(row => row.userId));
-    if (session?.user?.id) userIds.add(session.user.id);
+    if (authenticated) userIds.add(session!.user.id);
     for (const userId of [...userIds].sort()) await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+    if (authenticated && (await tx.user.findUnique({ where: { id: session!.user.id }, select: { createdAt: true } }))?.createdAt.toISOString() !== session!.user.accountCreatedAt) throw new Error("Account changed during withdrawal.");
     await tx.analyticsContext.deleteMany({ where });
     await tx.analyticsReport.updateMany({ where: { ...where, status: { in: ["pending", "retry", "uncertain", "sending"] } }, data: { status: "revoked", context: Prisma.DbNull, errorCode: "consent_revoked" } });
   });

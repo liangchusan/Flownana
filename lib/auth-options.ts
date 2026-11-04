@@ -1,8 +1,10 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { cookies } from "next/headers";
-import { ANALYTICS_COOKIE, readAnalyticsContext, serverMeasurementId } from "@/lib/analytics-server";
+import { cookies, headers } from "next/headers";
+import { signupBonusEvidence } from "@/lib/signup-bonus-policy";
+import { ANALYTICS_COOKIE, readPermittedAnalyticsContext, serverMeasurementId } from "@/lib/analytics-server";
+import { ANALYTICS_BLOCK_COOKIE } from "@/lib/analytics-policy";
 import { prisma } from "@/lib/prisma";
 import {
   getTestAuthCreditAmount,
@@ -156,12 +158,15 @@ export const authOptions: NextAuthOptions = {
       }
       if (user?.id && user.email) {
         try {
+          const requestHeaders = account?.provider === "google" ? await headers() : null;
+          const analyticsCookies = requestHeaders && serverMeasurementId() ? await cookies() : null;
           const profile = await upsertAppUser({
             id: user.id,
             email: user.email,
             name: user.name,
             image: user.image,
-            analyticsContext: account?.provider === "google" && serverMeasurementId() ? readAnalyticsContext((await cookies()).get(ANALYTICS_COOKIE)?.value) : null,
+            signupBonus: requestHeaders ? signupBonusEvidence(requestHeaders) : undefined,
+            analyticsContext: requestHeaders && analyticsCookies ? readPermittedAnalyticsContext(analyticsCookies.get(ANALYTICS_COOKIE)?.value, requestHeaders, analyticsCookies.get(ANALYTICS_BLOCK_COOKIE) !== undefined) : null,
           });
           user.accountCreatedAt = profile.createdAt.toISOString();
           return true;

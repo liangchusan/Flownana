@@ -1,6 +1,7 @@
 "use client";
 
 import { referenceBatchIssue } from "@/lib/reference-validation";
+import { publicCampaignHref } from "@/lib/analytics-policy";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -61,10 +62,7 @@ function updateWorkspaceUrl(
   destination: WorkspaceCreationDestination | "assets",
   method: "pushState" | "replaceState"
 ) {
-  const nextUrl = new URL(window.location.href);
-  nextUrl.pathname = WORKSPACE_PATHS[destination];
-  nextUrl.search = "";
-  nextUrl.hash = "";
+  const nextUrl = new URL(publicCampaignHref(WORKSPACE_PATHS[destination], window.location.href), window.location.origin);
   if (`${window.location.pathname}${window.location.search}${window.location.hash}` === `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`) return;
   window.history[method](null, "", nextUrl);
 }
@@ -378,7 +376,7 @@ function ScopedMediaCreationWorkspace({
       onTypeChange={setType}
       onBusyChange={setUploadsPending}
       onPendingChange={setPendingAttachments}
-      onAgent={() => { if (isHome) setAgentMode(true); else router.push("/?mode=agent"); }}
+      onAgent={() => { if (isHome) setAgentMode(true); else router.push(publicCampaignHref("/?mode=agent", window.location.href)); }}
       onAdd={(attachments) => setDraft((current) => ({
         ...current,
         attachments: [...current.attachments, ...attachments],
@@ -425,7 +423,7 @@ function ScopedMediaCreationWorkspace({
                   {agentMode ? <AgentComposer onModeChange={(type) => { setAgentMode(false); setType(type); }} /> : composer}
                 </div>
               </div>
-              {isHome && <TemplateGallery onSelect={(id) => {  router.push(`/agent?template=${encodeURIComponent(id)}`); }} />}
+              {isHome && <TemplateGallery onSelect={(id) => { router.push(publicCampaignHref(`/agent?template=${encodeURIComponent(id)}`, window.location.href)); }} />}
               {isHome && sessionStatus === "unauthenticated" && <Footer variant="light" />}
             </main>
             {detailsRun && detailsOpen && <DetailsPanel run={detailsRun} onClose={() => setDetailsOpen(false)} />}

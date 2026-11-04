@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { permitsAnalyticsContext } from "./analytics-collection-policy";
 import { analyticsRetryDelay } from "./analytics-recovery-policy";
 import { adsConsentKey, consentEmailProof, enhancedConversionsEnabled, hashConversionEmail, purchaseAdsEvidence, readAdsConsent } from "./enhanced-conversions";
-import { ANALYTICS_COOKIE, CONTEXT_MAX_AGE_MS, measurementIdForEnvironment, TEST_GA_ID, validContext, type AnalyticsContext } from "./analytics-policy";
+import { ANALYTICS_BLOCK_COOKIE, ANALYTICS_COOKIE, CONTEXT_MAX_AGE_MS, measurementIdForEnvironment, TEST_GA_ID, validContext, type AnalyticsContext } from "./analytics-policy";
 export { ANALYTICS_COOKIE };
 export function serverMeasurementId() {
   return process.env.NEXT_PUBLIC_GA_ENABLED === "true" ? measurementIdForEnvironment(process.env.VERCEL_ENV, process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID) : null;
@@ -30,10 +30,15 @@ export function readAnalyticsContext(value?: string | null) {
     return validContext(JSON.parse(Buffer.from(body, "base64url").toString()), id);
   } catch { return null; }
 }
+export function readPermittedAnalyticsContext(value: string | null | undefined, headers: Headers, browserBlocked: boolean) {
+  if (browserBlocked) return null;
+  const context = readAnalyticsContext(value);
+  return context && permitsAnalyticsContext(headers, context.collectionBasis) ? context : null;
+}
 export function contextFromRequest(request: Request, withdrawal = false) {
   const cookie = request.headers.get("cookie")?.split(";").map(c => c.trim()).find(c => c.startsWith(`${ANALYTICS_COOKIE}=`));
-  const context = readAnalyticsContext(cookie?.slice(ANALYTICS_COOKIE.length + 1));
-  return context && (withdrawal || permitsAnalyticsContext(request.headers, context.collectionBasis)) ? context : null;
+  const blocked = request.headers.get("cookie")?.split(";").some(c => c.trim().startsWith(`${ANALYTICS_BLOCK_COOKIE}=`)) === true;
+  return withdrawal ? readAnalyticsContext(cookie?.slice(ANALYTICS_COOKIE.length + 1)) : readPermittedAnalyticsContext(cookie?.slice(ANALYTICS_COOKIE.length + 1), request.headers, blocked);
 }
 export function contextKey(userId: string, subject = "account") { return `${analyticsEnvironment()}:${userId}:${subject}`; }
 export async function saveAnalyticsContext(tx: Prisma.TransactionClient, user: { id: string; createdAt: Date }, context: AnalyticsContext, subject = "account") {

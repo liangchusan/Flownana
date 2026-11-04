@@ -15,6 +15,8 @@ export class CheckoutConflictError extends Error {
   constructor(message = "Your previous checkout is still being confirmed. Check Billing before trying again.") { super(message); }
 }
 
+const CHECKOUT_HISTORY_MIGRATION_ID = "legacy-checkouts-v1";
+
 const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const writeOptions = (idempotencyKey: string) => ({ ...BILLING_READ_OPTIONS, idempotencyKey });
 
@@ -57,20 +59,40 @@ async function expireCheckout(stripe: Stripe, session: Stripe.Checkout.Session) 
   if (fresh.status !== "expired") throw new CheckoutConflictError();
 }
 
-/** Adoption barrier for checkouts created by the previous code version. */
+/** Only the offline importer may enumerate merchant history. Customer paths use this frozen index. */
+async function legacySessions(stripe: Stripe, tx: Prisma.TransactionClient, user: BillingUser) {
+  const migration = await tx.checkoutHistoryMigration.findUnique({ where: { id: CHECKOUT_HISTORY_MIGRATION_ID } });
+  if (!migration?.cutoffAt) throw new CheckoutConflictError("Checkout history migration is not ready. Please retry later.");
+  if (user.createdAt >= migration.cutoffAt) return [];
+  if (!migration.completedAt) throw new CheckoutConflictError("Checkout history migration is in progress. Please retry later.");
+  const rows = await tx.legacyCheckout.findMany({ where: { userId: user.id, createdAt: { gte: new Date(Math.floor(user.createdAt.getTime() / 1000) * 1000) },
+    OR: [{ accountCreatedAt: user.createdAt }, { accountCreatedAt: null }] }, take: 1001 });
+  if (rows.length > 1000) throw new CheckoutConflictError("Your checkout history needs reconciliation. Please contact support.");
+  const sessions: Stripe.Checkout.Session[] = [];
+  for (const row of rows) {
+    const session = await stripe.checkout.sessions.retrieve(row.id, {}, BILLING_READ_OPTIONS);
+    if (!ownsCheckout(user, session)) throw new CheckoutConflictError("Legacy checkout ownership changed.");
+    sessions.push(session);
+  }
+  return sessions;
+}
 async function reconcileLegacyCheckouts(stripe: Stripe, tx: Prisma.TransactionClient, user: BillingUser) {
-  // Unpaid legacy sessions may not yet have a customer ID. A customer-only list
-  // would miss precisely those first-purchase sessions.
-  const sessions = await listCheckouts(stripe, { created: { gte: Math.floor(user.createdAt.getTime() / 1000) } });
-  for (const session of sessions.filter((item) => ownsCheckout(user, item))) {
+  for (const session of await legacySessions(stripe, tx, user)) {
     if (session.status === "open") await expireCheckout(stripe, session);
     else if (session.status === "complete") {
       const subId = stripeObjectId(session.subscription);
-      if (!subId || !await tx.processedStripeEvent.findFirst({ where: { id: { startsWith: `grant_sub_${subId}_` } } })) {
-        throw new CheckoutConflictError();
-      }
+      if (!subId || !await tx.processedStripeEvent.findFirst({ where: { id: { startsWith: `grant_sub_${subId}_` } } })) throw new CheckoutConflictError();
     } else if (session.status !== "expired") throw new CheckoutConflictError();
   }
+}
+async function ensureCheckoutCustomer(tx: Prisma.TransactionClient, user: BillingUser, stripe: Stripe) {
+  if (user.stripeCustomerId) return user.stripeCustomerId;
+  const customer = await stripe.customers.create({ email: user.email, metadata: { userId: user.id, accountCreatedAt: user.createdAt.toISOString() } },
+    writeOptions(`checkout_customer_${user.id}_${user.createdAt.toISOString()}`));
+  if (customer.metadata.userId !== user.id || customer.metadata.accountCreatedAt !== user.createdAt.toISOString()) throw new CheckoutConflictError("Customer ownership mismatch.");
+  await tx.user.update({ where: { id: user.id }, data: { stripeCustomerId: customer.id } });
+  user.stripeCustomerId = customer.id;
+  return customer.id;
 }
 
 export async function readCheckoutSubscription(tx: Prisma.TransactionClient, user: BillingUser, stripe: Stripe) {
@@ -103,6 +125,9 @@ async function prepareCheckout(tx: Prisma.TransactionClient, user: BillingUser, 
   const upgrade = params.kind === "upgrade" ? await buildLockedCheckoutQuote(tx, user, stripe, params.priceKey) : null;
   const priceId = getStripePriceId(params.priceKey);
   assertStripePriceMatchesPlan(params.priceKey, await stripe.prices.retrieve(priceId, {}, BILLING_READ_OPTIONS));
+  const customer = await ensureCheckoutCustomer(tx, user, stripe);
+  const since = new Date(Date.now() - 3600_000);
+  if (await tx.checkoutReservation.count({ where: { userId: user.id, createdAt: { gte: since } } }) >= 12) throw new CheckoutConflictError("Too many checkout changes. Please wait before trying again.");
   const id = randomUUID();
   const expiresAt = new Date((Math.floor(Date.now() / 1000) + 3600) * 1000);
   const metadata: Record<string, string> = { userId: user.id, accountCreatedAt: user.createdAt.toISOString(), priceKey: params.priceKey, checkoutReservationId: id };
@@ -126,7 +151,7 @@ async function prepareCheckout(tx: Prisma.TransactionClient, user: BillingUser, 
     cancel_url: checkoutCancelUrl(params.baseUrl, params.returnTo), metadata, subscription_data: { metadata },
     // Checkout collects opt-in consent; renewal-only cards stay hidden.
     saved_payment_method_options: { payment_method_save: "enabled", allow_redisplay_filters: ["always"] },
-    ...(user.stripeCustomerId ? { customer: user.stripeCustomerId } : { customer_email: user.email }),
+    customer,
     ...(couponParams ? { discounts: [{ coupon: couponParams.id! }] } : {}),
   };
   // New subscription Checkout defaults to starting the cycle at actual payment;
@@ -157,13 +182,18 @@ async function materializeCheckout(stripe: Stripe, tx: Prisma.TransactionClient,
       } catch { /* The external write may have completed. Inspect before retrying. */ }
     }
     if (!session) {
-      const matches = (await listCheckouts(stripe, { created: { gte: Math.floor(reservation.createdAt.getTime() / 1000) - 1 } }))
-        .filter((item) => item.metadata?.checkoutReservationId === reservation.id);
+      const customer = (reservation.sessionParams as unknown as Stripe.Checkout.SessionCreateParams).customer;
+      const candidates = typeof customer === "string"
+        ? await listCheckouts(stripe, { customer, created: { gte: Math.floor(reservation.createdAt.getTime() / 1000) - 1 } })
+        : await legacySessions(stripe, tx, { id: reservation.userId, createdAt: reservation.accountCreatedAt, email: "", stripeCustomerId: null });
+      const matches = candidates.filter((item) => item.metadata?.checkoutReservationId === reservation.id);
       if (matches.length !== 1) throw new CheckoutConflictError();
       session = matches[0];
     }
   }
   assertReservationSession(reservation, session);
+  const customer = (reservation.sessionParams as unknown as Stripe.Checkout.SessionCreateParams).customer;
+  if (typeof customer === "string" && stripeObjectId(session.customer) !== customer) throw new CheckoutConflictError("Checkout Customer mismatch.");
   await tx.checkoutReservation.update({ where: { id: reservation.id }, data: { stripeSessionId: session.id, status: session.status || "creating" } });
   return session;
 }
@@ -237,7 +267,7 @@ export async function expirePredecessorCheckout(tx: Prisma.TransactionClient, us
     await expireCheckout(stripe, session);
     await tx.checkoutReservation.update({ where: { id: reservation.id }, data: { status: "expired", closedAt: new Date() } });
   }
-  const legacy = await listCheckouts(stripe, { created: { gte: Math.floor(user.createdAt.getTime() / 1000) } });
+  const legacy = await legacySessions(stripe, tx, user);
   for (const session of legacy.filter((item) => ownsCheckout(user, item) && item.metadata?.upgradeFromSubscriptionId === predecessorId)) {
     // A completed upgrade awaiting settlement must win before old value issues.
     await expireCheckout(stripe, session);

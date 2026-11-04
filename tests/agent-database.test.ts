@@ -51,7 +51,7 @@ test("Agent: real database allowance, idempotent quotes, refunds, isolation and 
   const tenth = await service.beginAgentTurn(account, { ...message, id: randomUUID(), revision: second.turn.revision });
   await service.finishAgentTurn(account, tenth.turn, { response: "Which style?", suggestions: ["Minimal"], quote: null });
   await assert.rejects(service.beginAgentTurn(account, { ...message, id: randomUUID(), revision: tenth.turn.revision }), (e: any) => e.code === "daily_limit");
-  await db.subscription.create({ data: { userId: user.id, stripeSubscriptionId: randomUUID(), stripePriceId: "test", status: "active", planType: "starter", billingCycle: "monthly", currentPeriodStart: new Date(), currentPeriodEnd: new Date(Date.now() + 86400000) } });
+  await db.subscription.create({ data: { userId: user.id, stripeSubscriptionId: randomUUID(), stripePriceId: "price_1UM5q4RohkvhKuAJ8Ie0xeqr", status: "active", planType: "starter", billingCycle: "monthly", currentPeriodStart: new Date(), currentPeriodEnd: new Date(Date.now() + 86400000) } });
   await db.agentUsage.update({ where: { userId_day: { userId: user.id, day } }, data: { used: 99, attempts: [] } });
   const hundredth = await service.beginAgentTurn(account, { ...message, id: randomUUID(), revision: tenth.turn.revision });
   await service.finishAgentTurn(account, hundredth.turn, { response: "Done", suggestions: [], quote: null });
