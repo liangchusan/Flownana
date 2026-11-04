@@ -5,7 +5,37 @@
 [docs/README.md](./docs/README.md)。历史条目的状态只代表记录当时，不能当作实时生产状态。
 产品和验收以 [PRODUCT](./docs/PRODUCT.md) 为准，UI 以 [DESIGN](./docs/DESIGN.md) 为准。
 
-## 最近记录的生产基线（2026-11-02）
+## 当前生产状态（2026-11-04 全量发布）
+
+- 用户明确批准全部本地内容上线，包含整理、连接器删除、安全整改、Agent 限额和支付迁移。
+  正式部署 dpl_BF3hnpsF5r7jnJSUuzYcsKPR9c9e（READY / Production / Next.js），
+  URL 为 flownana-hpaorwowo-liangchusans-projects.vercel.app；根域及 www 均回读到该版本。
+  云端构建约 49 秒，正式 Stripe 商户及六个 Live Price 校验通过。
+- 全量代码已保存为 main 提交 db5affe；387 项上传源文件与独立发布包 SHA1 全部一致。
+  第一次 GitHub push 因远端 Internal Server Error 被拒，远端同步结果见本节后续记录。
+- 17:36（北京时间）暂停旧 Checkout/升级写入及月积分调度，确认生效后等待超过
+  300 秒旧函数上限，回读无切换前应用事务。Webhook 原处理与可重试投递保留。
+- 正式库新增 CheckoutHistoryMigration / LegacyCheckout，两表开启 RLS，仅应用角色
+  flownana_app 有 DML 和 Policy；anon/authenticated/service_role 无表权限。
+  Prisma 已登记 20261024090000_checkout_history_index；既有 Live Price 约束核对无误，
+  补齐其缺失的 20261002231000 迁移台账。未改已有价格、订单、订阅或积分记录。
+- 固定导入边界为 2026-11-04T09:41:44.711Z，完成时间 09:42:45.565Z。
+  经已连接 Live Stripe 只读接口按与导入脚本相同的固定边界/分页/归属逻辑读取，
+  在数据库锁与事务中导入 3 条旧 Checkout 并提交游标；3 条账号版本匹配，
+  唯一已付款 Checkout 的既有积分凭证存在。未发起付款、补发积分或补造归因。
+- 全量应用于导入完成后提升，购买/升级匿名接口恢复 401，调度恢复鉴权，
+  npm run smoke:prod 全部通过。旧演示视频及 popup 辅助地址为 404。
+- 隔离 PostgreSQL 17.11 重放 18 个迁移通过；623 项测试为 621 通过/2 项真实
+  Stripe 环境跳过/0 失败。类型、build、design:check 通过；lint 0 错误/15 既有警告。
+  四份旧数据库测试夹具已按当前模型、价格及撤回凭证修正，保持生产约束。
+- 正式内置浏览器：1440px 首页/登录、390px 登录/Pricing 均正常；关闭重开通过，
+  390px 无横向溢出，手机装饰图 DOM 为 0，桌面插画已加载。未完成 OAuth 或付费操作。
+  新部署最近 10 分钟 error/fatal 聚合无记录，仅代表该短窗口；日志外送接口 404，未核实配置。
+- 回滚明确使用 dpl_DQtqt3re751bXRuF5hY2PnbX21aD，**不要回滚到临时维护部署**
+  dpl_CcWdZqeVBEDkymiVxFp9XPzNHbAo。新增表为兼容性添加，不通过删表回滚。
+  证据位于 output/releases/full-local-release-20261104；临时测试 PostgreSQL 已停止。
+
+## 上一生产基线（2026-11-02，历史）
 
 - 品牌登录弹窗已隔离发布，部署 `dpl_DQtqt3re751bXRuF5hY2PnbX21aD`，当时为 READY，
   根域及 www 别名均已核对。回滚基线 `dpl_ANoBboiVLjHgycLqF8yT6iSafDQe`。
@@ -29,18 +59,17 @@
 - 2026-10-23 模型版本已发布：4 个图片、5 个视频模型；退役模型只保留历史兼容。
   当前能力与计价由共享模块定义，审计依据见 `docs/KIE-MODEL-CONTRACTS.json`。
 
-## 工作区中仍未发布的工作（必须保留）
+## 本轮已发布的整改（2026-11-04）
 
 - 2026-10-24 安全整改：媒体解码/MP4/WAV 解析预算、共享检查租约、头像/上传预约与
   清理、匿名撤回凭证、账号绑定的许可与草稿恢复。扫描为 failed/partial，不能宣称完整扫描。
 - Checkout 历史兼容迁移：新增 `CheckoutHistoryMigration` / `LegacyCheckout`、
   `20261024090000_checkout_history_index` 及离线导入脚本。
-  生产切换必须排空旧写入、冻结扫描边界、完整导入后再发布，不能只上线代码。
+  已按排空旧写入、冻结扫描边界、完整导入后发布的顺序完成生产切换。
   详见 [切换手册](./docs/operations/CHECKOUT-HISTORY-CUTOVER.md)。
 - Agent 每日尝试安全上限：免费 30 / 付费 300，完整回复仍 10/100、每分钟 6 次；
   成功/失败/停止均计尝试，幂等重放不重复计，UTC 跨日重置，不返还已删除对话的尝试。
-- 上述安全与预算曾有隔离 PostgreSQL/替身验证，不能冒称生产已应用。
-  本次整理未覆盖、撤回或发布其他聊天已有修改。
+- 上述安全、预算和迁移现已完整发布；真实集成及真机仍有人工验收缺口。
 
 ## 当前实现导航
 
@@ -133,5 +162,7 @@
 - 外部支付、Blob、数据库不可形成单一事务；旧孤儿 Blob、丢失的扣费快照及历史来源
   不能自动重建。上游已受理但响应丢失时仍可能产生成本。
 - 早期 Git 中的旧凭据已轮换或撤销；不因本次整理重写历史或触碰当前配置。
-- 未发布改动与 CLI 隔离发布共存，部署前须重新核对线上基线和授权范围。
-  `output/releases/` 当前只在本机，忽略规则不构成备份，后续需独立保存重建材料。
+- 本轮应用源码已统一保存 main 提交，部署前继续核对线上基线与授权范围。
+  `output/releases/` 的旧重建补丁及验收证据仍仅在本机，忽略规则不构成备份。
+- 2026-11-04 只读核对 flownana-test 为 INACTIVE，未恢复测试项目；本轮外部收费集成
+  未在该测试站重新验收，不能把本地替身或上线冒烟当作真实支付/生成验收。
