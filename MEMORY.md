@@ -11,8 +11,10 @@
   正式部署 dpl_BF3hnpsF5r7jnJSUuzYcsKPR9c9e（READY / Production / Next.js），
   URL 为 flownana-hpaorwowo-liangchusans-projects.vercel.app；根域及 www 均回读到该版本。
   云端构建约 49 秒，正式 Stripe 商户及六个 Live Price 校验通过。
-- 全量代码已保存为 main 提交 db5affe；387 项上传源文件与独立发布包 SHA1 全部一致。
-  第一次 GitHub push 因远端 Internal Server Error 被拒，远端同步结果见本节后续记录。
+- 全量代码已保存为本地 main 提交 db5affe，发布记录提交 cf38722；387 项上传源文件
+  与独立发布包 SHA1 全部一致。GitHub 三次正常快进 push 均返回远端 500，改用 REST
+  上传 Git 对象亦返回 502；远端 main 仍为 cbad973，未强推或改写远端历史。
+  生产发布不受影响；待 GitHub 写入恢复后同步本地 main。
 - 17:36（北京时间）暂停旧 Checkout/升级写入及月积分调度，确认生效后等待超过
   300 秒旧函数上限，回读无切换前应用事务。Webhook 原处理与可重试投递保留。
 - 正式库新增 CheckoutHistoryMigration / LegacyCheckout，两表开启 RLS，仅应用角色
@@ -34,6 +36,7 @@
 - 回滚明确使用 dpl_DQtqt3re751bXRuF5hY2PnbX21aD，**不要回滚到临时维护部署**
   dpl_CcWdZqeVBEDkymiVxFp9XPzNHbAo。新增表为兼容性添加，不通过删表回滚。
   证据位于 output/releases/full-local-release-20261104；临时测试 PostgreSQL 已停止。
+  同目录保存从 cbad973 起的增量 Git bundle，包含本轮源码与记录，供远端同步恢复。
 
 ## 上一生产基线（2026-11-02，历史）
 
