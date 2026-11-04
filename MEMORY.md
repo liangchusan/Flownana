@@ -7,20 +7,25 @@
 ## 当前生产与源码
 
 - 用户已明确批准全部本地改动发布，包含目录整理、邮箱连接器删除、安全整改、
-  Agent 限额及支付历史迁移；2026-11-04 已完成上线。
-- 正式部署：`dpl_BF3hnpsF5r7jnJSUuzYcsKPR9c9e`，READY / Production / Next.js。
-  地址：flownana-hpaorwowo-liangchusans-projects.vercel.app；根域及 www 已回读匹配。
-  云端构建约 49 秒，正式 Stripe 商户和六个 Live Price 校验通过。
-- 上传的 387 项源文件与完整发布包逐项 SHA1 一致。源码提交 `db5affe`，
-  发布记录 `cf38722`，GitHub 同步故障记录 `35087da`；本地仅 main。
-- GitHub 三次正常快进 push 返回远端 500，Git 对象 API 返回 502；上次核对
-  origin/main 仍为 `cbad973`。待写入恢复后同步本地 main，禁止从旧远端重新部署。
-  此次本地文件精简未重试远端同步或再次部署，应用代码保持正式版本。
-- 发布恢复材料：`output/releases/full-local-release-20261104/` 内有校验清单、
-  迁移/测试/构建记录及经验证的增量 Git bundle（从 cbad973 至 35087da）。
+  Agent 限额及支付历史迁移；2026-11-04 已完成上线，随后又明确批准精简后的版本发布。
+- 当前正式部署：`dpl_E5FHif12TtzMykcSAU31sZCxYEVy`，READY / Production / Next.js。
+  地址：flownana-8mv2754v8-liangchusans-projects.vercel.app；根域及 www 已回读匹配。
+  构建阶段约 28 秒，编译及 TypeScript 通过，正式 Stripe 商户和六个 Live Price 校验通过。
+- 本次发布提交 `1b87309`，387 项上传源文件与该提交的独立快照逐项 SHA1 一致。
+  与上一正式部署 BF3 的业务代码完全一致，差异仅文档与清理记录，无新数据库操作。
+  之前全量业务发布源码为 `db5affe`，记录为 `cf38722`；本地仅 main。
+- GitHub 此前 push 500 / 对象 API 502 故障已恢复；本轮普通快进推送成功，
+  已将 cbad973 之后积压的提交及本次清理提交 1b87309 同步至远端 main，未强推。
+- 本次先暂存 Production 构建，核对源文件及首页 200、账单接口应用层 401 后提升。
+  上线 smoke:prod 全部通过；本次部署最近 10 分钟 error/fatal 聚合无记录，仅代表
+  已运行的短窗口。日志外送接口仍 404，配置未核实；未重跑浏览器或真实收费链路。
+  证据见 `output/releases/cleanup-release-20261104/`；发布临时源码目录已清理。
+- 上一全量发布的 `output/releases/full-local-release-20261104/` 保留校验清单、
+  迁移/测试/构建记录及经验证的增量 Git bundle（从 cbad973 至本次发布记录提交）。
   注册赠送、注册归因和登录弹窗三个旧发布目录中的补丁仍保留，用于重建回滚版本。
   这些目录被 Git/部署忽略，不随克隆恢复，也不等于远端备份。
-- 回滚使用 `dpl_DQtqt3re751bXRuF5hY2PnbX21aD`；不要回滚到临时维护部署
+- 本次回滚使用上一全量正式部署 `dpl_BF3hnpsF5r7jnJSUuzYcsKPR9c9e`。
+  更早的隔离登录版本为 `dpl_DQtqt3re751bXRuF5hY2PnbX21aD`；不要回滚到临时维护部署
   `dpl_CcWdZqeVBEDkymiVxFp9XPzNHbAo`。新增表兼容旧代码，不通过删表回滚。
 
 ## 当前实现与边界
@@ -73,7 +78,7 @@
 - 发布时最近 10 分钟 error/fatal 聚合无记录，仅代表该短窗口；日志外送接口 404，
   未核实配置。安全 advisor 仅原 _prisma_migrations 无 Policy 的信息项。
 
-## 本地精简（2026-11-04，未再次部署）
+## 本地精简（2026-11-04，整理后的源码已发布）
 
 - 再次检查全部受版本管理文件、源码 import/动态引用、依赖、资源、文档及忽略目录；
   没有发现新的独立无引用源码模块，public 无完全重复文件。
@@ -90,7 +95,8 @@
   清缓存后 npm run dev 会重建；npm run start 前须先 npm run build。
 - 本轮实际验证：517 项测试，500 通过 / 17 环境依赖跳过 / 0 失败；lint 0 错误 /
   15 既有警告，design:check、文档链接和 diff 检查通过。373 个业务、配置、测试与资源
-  文件逐字节未变，Git bundle 验证通过。未重建 build 或重跑浏览器，避免重新生成已清缓存。
+  文件逐字节未变，Git bundle 验证通过。整理阶段未重建本地 build 或重跑浏览器；
+  后续正式云端构建和发布验证见首节，本机 .next 未重新生成。
 
 ## 剩余风险与手动验收
 
@@ -103,4 +109,4 @@
 - 2026-11-04 核对 flownana-test 为 INACTIVE，未恢复测试项目。本地测试只用隔离临时库，
   缺少 FLOWNANA_TEST_DATABASE_URL 时专项明确跳过，不用默认业务库替代。
 - 真实凭据只存获批准的 .env* / 平台变量，不写入代码或文档；早期 Git 旧凭据已轮换/撤销。
-  当前远端同步故障与本地恢复材料的保留要求见首节。
+  GitHub 同步已恢复；临时日志和本机忽略目录不能作为远端备份。
