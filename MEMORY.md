@@ -8,18 +8,21 @@
 
 - 用户已明确批准全部本地改动发布，包含目录整理、邮箱连接器删除、安全整改、
   Agent 限额及支付历史迁移；2026-11-04 已完成上线，随后又明确批准精简后的版本发布。
-- 当前正式部署：`dpl_E5FHif12TtzMykcSAU31sZCxYEVy`，READY / Production / Next.js。
-  地址：flownana-8mv2754v8-liangchusans-projects.vercel.app；根域及 www 已回读匹配。
-  构建阶段约 28 秒，编译及 TypeScript 通过，正式 Stripe 商户和六个 Live Price 校验通过。
-- 本次发布提交 `1b87309`，387 项上传源文件与该提交的独立快照逐项 SHA1 一致。
+- 正式站 https://www.flownana.com 使用 GitHub main 自动构建发布，目标 Production / Next.js。
+  源码与发布记录推送都会触发新构建；最终部署 ID、commit、构建及根域/www 回读结果
+  统一保存到 `output/releases/cleanup-release-20261104/manifest.json`，不将旧暂存 ID 当作实时状态。
+- 本次清理源码提交 `1b87309`；人工暂存验收产物 `dpl_E5FHif12TtzMykcSAU31sZCxYEVy`
+  的 387 项上传源文件与独立快照逐项 SHA1 一致，构建约 28 秒；编译、TypeScript、
+  正式 Stripe 商户和六个 Live Price 校验通过。后续发布记录提交只更新本文。
   与上一正式部署 BF3 的业务代码完全一致，差异仅文档与清理记录，无新数据库操作。
   之前全量业务发布源码为 `db5affe`，记录为 `cf38722`；本地仅 main。
 - GitHub 此前 push 500 / 对象 API 502 故障已恢复；本轮普通快进推送成功，
   已将 cbad973 之后积压的提交及本次清理提交 1b87309 同步至远端 main，未强推。
 - 本次先暂存 Production 构建，核对源文件及首页 200、账单接口应用层 401 后提升。
-  上线 smoke:prod 全部通过；本次部署最近 10 分钟 error/fatal 聚合无记录，仅代表
-  已运行的短窗口。日志外送接口仍 404，配置未核实；未重跑浏览器或真实收费链路。
-  证据见 `output/releases/cleanup-release-20261104/`；发布临时源码目录已清理。
+  暂存版本上线 smoke:prod 全部通过、短窗口 error/fatal 聚合无记录。GitHub 恢复同步后
+  自动发布清理提交及后续记录；保留最新 main 自动构建，并在记录同步后核验该最终版本。
+  自动审批拒绝回切旧暂存版本，未执行回退。最终冒烟与日志结果见上述 manifest。
+  日志外送接口仍 404，配置未核实；未重跑浏览器或真实收费链路，临时源码目录已清理。
 - 上一全量发布的 `output/releases/full-local-release-20261104/` 保留校验清单、
   迁移/测试/构建记录及经验证的增量 Git bundle（从 cbad973 至本次发布记录提交）。
   注册赠送、注册归因和登录弹窗三个旧发布目录中的补丁仍保留，用于重建回滚版本。
