@@ -11,6 +11,13 @@ export function buildKieImageRequest(params: {
   const hasImages = !!params.inputUrls?.length;
   const input: Record<string, unknown> = { prompt: params.prompt };
   switch (params.modelId) {
+    case "gpt-image-2-6-flare":
+    case "gpt-image-2-6-sunburst":
+      input.aspect_ratio = params.aspectRatio;
+      input.resolution = params.resolution;
+      input.output_format = "png";
+      if (hasImages) input.input_urls = params.inputUrls;
+      break;
     case "grok-imagine-image-2-0":
       input.aspect_ratio = params.aspectRatio;
       if (hasImages) input.image_urls = params.inputUrls;

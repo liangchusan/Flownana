@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { withGenerationAccount, GenerationRequestError, MAX_ACTIVE_OUTPUTS, recoverGenerationObligations, type GenerationAccount } from "@/lib/generation-lifecycle";
 import { consumeCreditsFIFOWithClient } from "@/lib/credit-consumption";
 import { syncGenerationMediaAssets, enforceInputMediaSize } from "@/lib/media-assets";
-import { getImageGenerationCredits, type ImageResolutionKey } from "@/lib/generation-pricing";
+import { getImageGenerationCredits, IMAGE_MODEL_OPTION_MAP, type ImageResolutionKey } from "@/lib/generation-pricing";
 import { getImageInputCapabilities } from "@/lib/generation-input-capabilities";
 import { getImageAspectRatios, isSupportedImageInputType, IMAGE_PROMPT_MAX_LENGTH } from "@/lib/image-model-capabilities";
 import { getImageTemplate, TEMPLATE_MODEL } from "./catalog";
@@ -117,9 +117,9 @@ export async function generateTemplateRun(account: GenerationAccount, id: string
       const consumed = await consumeCreditsFIFOWithClient(tx, account.id, cost);
       const generation = await tx.generation.create({ data: {
         userId: account.id, type: "image", status: "pending", prompt, inputUrls: input.images,
-        modelOptionId: input.images.length ? "gpt-image-2-5-sunburst-image-to-image" : "gpt-image-2-5-sunburst-text-to-image", creditsCost: cost,
+        modelOptionId: input.images.length ? IMAGE_MODEL_OPTION_MAP[TEMPLATE_MODEL].imageToImageModel : IMAGE_MODEL_OPTION_MAP[TEMPLATE_MODEL].textToImageModel, creditsCost: cost,
         creditConsumption: consumed as Prisma.InputJsonValue,
-        parameters: { model: "GPT Image 2.5 Sunburst", resolution, aspectRatio, runId: id, outputIndex: index, outputCount: count,
+        parameters: { model: IMAGE_MODEL_OPTION_MAP[TEMPLATE_MODEL].label, resolution, aspectRatio, runId: id, outputIndex: index, outputCount: count,
           templateId: template.id, templateVersion: template.version, templateRunId: id, templateBrief: analysis.spec.summary, templateDirection: analysis.spec.variants[directionIndex].title,
           ...(input.parentGenerationId ? { parentGenerationId: input.parentGenerationId } : {}) },
       } });

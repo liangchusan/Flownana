@@ -11,7 +11,10 @@ export async function executeTemplateOutput(account: GenerationAccount, generati
   let acknowledged = false;
   try {
     const parameters = generation.parameters as Record<string, string>;
-    const modelId = (parameters.agentImageModel || TEMPLATE_MODEL) as ImageModelOptionId;
+    // Accepted work keeps its saved provider route when the current default changes.
+    const savedModel = Object.values(IMAGE_MODEL_OPTION_MAP).find(option =>
+      [option.textToImageModel, option.imageToImageModel].includes(generation.modelOptionId ?? ""));
+    const modelId = (parameters.agentImageModel || savedModel?.id || TEMPLATE_MODEL) as ImageModelOptionId;
     const taskId = await createImageTask({ modelId, prompt: generation.prompt,
       aspectRatio: parameters.aspectRatio, resolution: parameters.resolution as ImageResolutionKey, inputUrls: generation.inputUrls });
     const current = await attachGenerationTask(account, generation.id, taskId);

@@ -150,7 +150,7 @@ test("verified analytics facts, concurrency and recovery on isolated PostgreSQL"
     const templates = source<typeof import("../lib/image-templates/service")>("lib/image-templates/service.ts");
     const runId = randomUUID();
     const run = await templates.analyzeTemplateRun(scoped, runId, 0, { templateId: "logo", prompt: "Create a symbol", images: [], answers: {} });
-    const unit = source<typeof import("../lib/generation-pricing")>("lib/generation-pricing.ts").getImageGenerationCredits("gpt-image-2-5-sunburst", "1K", 0)!;
+    const unit = source<typeof import("../lib/generation-pricing")>("lib/generation-pricing.ts").getImageGenerationCredits("gpt-image-2-6-sunburst", "1K", 0)!;
     const batch = await templates.generateTemplateRun(scoped, runId, run.revision, { count: 4, resolution: "1K", aspectRatio: "1:1", quotedCredits: unit * 4 });
     await settle(batch.outputs);
     await db.$transaction(tx => reports.saveAnalyticsContext(tx, user, context));

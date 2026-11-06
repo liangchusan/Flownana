@@ -223,7 +223,15 @@ export function getKieMarketVideoTaskBody(params: {
   });
 
   let input: Record<string, unknown>;
-  if (params.option.family === "seedance") {
+  if (params.option.family === "kling") {
+    const refs = params.inputs ?? imageUrls.map(url => ({ kind: "image", url }));
+    const images = refs.filter(ref => ref.kind === "image").map(ref => ref.url);
+    const videos = refs.filter(ref => ref.kind === "video").map(ref => ref.url);
+    input = { prompt: params.prompt, duration: params.option.duration, resolution: getKieVideoResolution(params.option) };
+    if (params.aspectRatio && params.aspectRatio !== "Auto") input.aspect_ratio = params.aspectRatio;
+    if (images.length) input.image_urls = images;
+    if (videos.length) { input.video_urls = videos; input.keep_original_sound = false; }
+  } else if (params.option.family === "seedance") {
     input = getSeedanceMiniVideoInput({
       prompt: params.prompt,
       inputs:

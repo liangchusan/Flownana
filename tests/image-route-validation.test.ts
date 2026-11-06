@@ -22,6 +22,7 @@ test("invalid image requests never reserve credits or call Kie", async () => {
     });
     const { POST } = load<typeof import("../app/api/generate/route")>("app/api/generate/route.ts");
     const cases = [
+      ...["gpt-image-2-5-flare", "gpt-image-2-5-sunburst", "gpt-image-2-5-flare-text-to-image", "unknown", "__proto__"].map(model => [{ model }, "invalid_parameters"] as const),
       [{ prompt: "x".repeat(5001) }, "invalid_parameters"],
       [{ model: "gpt-image-2", resolution: "4K", aspectRatio: "1:1" }, "invalid_parameters"],
       [{ model: "qwen-image-3-pro", resolution: "4K" }, "invalid_parameters"],
@@ -30,7 +31,7 @@ test("invalid image requests never reserve credits or call Kie", async () => {
       [{ model: "grok-imagine-image-2-0", resolution: "1K" }, "invalid_parameters"],
       [{ model: "seedream-5-pro", resolution: "4K" }, "invalid_parameters"],
       [{ model: "seedream-5-pro", prompt: "ab" }, "invalid_parameters"],
-      ...(["gpt-image-2-5-flare", "gpt-image-2-5-sunburst"] as const).flatMap(model => [
+      ...(["gpt-image-2-6-flare", "gpt-image-2-6-sunburst"] as const).flatMap(model => [
         [{ model, resolution: "2K", aspectRatio: "27:16" }, "invalid_parameters"],
         [{ model, imageUrls: Array.from({ length: 17 }, () => "https://example.test/image") }, "invalid_parameters"],
       ] as const),
@@ -91,7 +92,7 @@ test("image routes dispatch all models through reservation, storage and settleme
             "@/lib/media-assets": { persistOrReuseImageInput: async () => ({ url: "https://example.test/input.png", contentType: "image/png", sizeBytes: 100 }), enforceInputMediaSize: async (media: unknown) => media },
           });
           const { POST } = load<typeof import("../app/api/generate/route")>("app/api/generate/route.ts");
-          const response = await POST(new Request("https://example.test/api/generate", { method: "POST", body: JSON.stringify({ prompt: "Landscape", model: model.id, aspectRatio: "1:1", ...(model.resolutions?.length === 0 ? {} : { resolution: "1K" }), ...(editing ? { imageUrls: Array.from({ length: model.id === "seedream-5-pro" ? 10 : model.id.startsWith("gpt-image-2-5-") ? 16 : 1 }, () => "https://example.test/input.png") } : {}) }) }) as NextRequest);
+          const response = await POST(new Request("https://example.test/api/generate", { method: "POST", body: JSON.stringify({ prompt: "Landscape", model: model.id, aspectRatio: "1:1", ...(model.resolutions?.length === 0 ? {} : { resolution: "1K" }), ...(editing ? { imageUrls: Array.from({ length: model.id === "seedream-5-pro" ? 10 : model.id.startsWith("gpt-image-2-6-") ? 16 : 1 }, () => "https://example.test/input.png") } : {}) }) }) as NextRequest);
           assert.equal((await response.json()).status, failure ? "failed" : "success");
           assert.equal(outbound?.model, editing ? model.imageToImageModel : model.textToImageModel);
           assert.equal(parameters.resolution, model.resolutions?.length === 0 ? undefined : "1K");

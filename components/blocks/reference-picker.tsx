@@ -134,7 +134,7 @@ export function ReferencePicker({ capabilities, attachments, onAdd, menuPlacemen
     void run(batch).catch(() => undefined);
     if (input.current) input.current.value = "";
   };
-  const accepted = (["image", "video", "audio"] as const).flatMap(kind => referenceLimit(capabilities, kind) ? MEDIA_UPLOAD_RULES[kind].types.filter(type => kind !== "image" || !capabilities.imageContentTypes || capabilities.imageContentTypes.includes(type)) : []).join(",");
+  const accepted = (["image", "video", "audio"] as const).flatMap(kind => referenceLimit(capabilities, kind) ? MEDIA_UPLOAD_RULES[kind].types.filter(type => kind === "image" ? !capabilities.imageContentTypes || capabilities.imageContentTypes.includes(type) : kind === "video" ? !capabilities.videoContentTypes || capabilities.videoContentTypes.includes(type) : true) : []).join(",");
   return <div ref={root} className="relative shrink-0">
     <button type="button" aria-label="Add input" aria-expanded={open} onClick={() => setOpen(v => !v)} disabled={disabled || status === "loading"} className={`flex h-11 w-11 items-center justify-center rounded-full hover:bg-surface-soft ${interactive}`}><Plus className="h-4 w-4" /></button>
     <input hidden ref={input} type="file" accept={accepted} multiple onChange={e => chooseFiles(e.target.files)} />

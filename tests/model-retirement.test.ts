@@ -68,3 +68,19 @@ test("actual video resolver rejects explicit blank and legacy IDs while preservi
   assert.equal(resolveVideoOption({ model: "" }), null);
   assert.equal(resolveVideoOption({}).id, "seedance2mini_480_4");
 });
+
+
+test("Kling uses measured reference time and rejects invalid references before payment", async () => {
+  const body = { prompt: "Use @video_1", modelOptionId: "kling40_720_10", quotedCredits: 68, inputs: [{ url: "https://media.test/owned.mp4", kind: "video", durationSeconds: 25 }] };
+  const route = videoRoute(5);
+  assert.equal((await route.post(body)).status, 200);
+  assert.deepEqual(route.state(), { debits: 1, dispatches: 1, cost: 68 });
+  for (const override of [{ prompt: "Use @image_1" }, { prompt: "Use @Hero" }, { generateAudio: false }, { aspectRatio: "4:3" }, { quotedCredits: 85 }, { quotedCredits: undefined }, { inputs: [{ url: "https://media.test/audio.mp3", kind: "audio" }] }, { inputs: Array(6).fill(body.inputs[0]) }]) {
+    const invalid = videoRoute(5);
+    assert.equal((await invalid.post({ ...body, ...override })).status, 400, JSON.stringify(override));
+    assert.equal(invalid.state().debits, 0); assert.equal(invalid.state().dispatches, 0);
+  }
+  const changed = videoRoute(15);
+  assert.equal((await changed.post(body)).status, 400);
+  assert.equal(changed.state().debits, 0);
+});

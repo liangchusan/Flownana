@@ -5,6 +5,7 @@ import { Bot, Check, ChevronDown, FileAudio, Image as ImageIcon, Loader2, Video,
 import { ReferencePicker } from "./reference-picker";
 import type { ReferenceMetadata } from "@/lib/reference-validation";
 import type { GenerationInputCapabilities } from "@/lib/generation-input-capabilities";
+import { videoReferenceLabels } from "@/lib/video-model-capabilities";
 
 export type ActiveComposerType = "image" | "video";
 export interface ComposerAttachment extends ReferenceMetadata {
@@ -19,20 +20,23 @@ function formatReferenceDuration(seconds: number | undefined) {
   return Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(1)}s`;
 }
 
-export function ComposerAttachments({ attachments, pendingAttachments = [], onRemove }: {
+export function ComposerAttachments({ attachments, pendingAttachments = [], onRemove, numberedReferences = false }: {
   attachments: ComposerAttachment[];
   pendingAttachments?: PendingComposerAttachment[];
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
+  numberedReferences?: boolean;
 }) {
   const [videoDurations, setVideoDurations] = useState<Record<string, number>>({});
   const previews = [...attachments, ...pendingAttachments.map((attachment) => ({ ...attachment, pending: true as const }))];
+  const labels = numberedReferences ? videoReferenceLabels(attachments) : [];
   if (!previews.length) return null;
-  return <div className="subtle-horizontal-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Prompt attachments">{previews.map((a) => {
+  return <div className="subtle-horizontal-scrollbar flex gap-2 overflow-x-auto pb-1" aria-label="Prompt attachments">{previews.map((a, index) => {
     const duration = a.kind === "video" ? formatReferenceDuration(a.durationSeconds ?? videoDurations[a.id]) : null;
     return <div key={a.id} className="group/reference relative h-20 w-20 shrink-0">
       <div className="flex size-full items-center justify-center overflow-hidden rounded-ui bg-surface-soft">{"pending" in a ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label={`Uploading ${a.name}`} /> : a.kind === "image" ? <img src={a.url} alt={a.name} className="size-full object-cover" /> : a.kind === "video" ? <video src={a.url} aria-label={a.name} muted playsInline preload="metadata" onLoadedMetadata={(event) => { const seconds = event.currentTarget.duration; if (Number.isFinite(seconds) && seconds > 0) setVideoDurations((current) => current[a.id] === seconds ? current : { ...current, [a.id]: seconds }); }} className="size-full object-cover" /> : <FileAudio className="h-5 w-5" />}</div>
       {duration && <span className="pointer-events-none absolute bottom-1 right-1 rounded-ui bg-stone-950/80 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">{duration}</span>}
-      {!('pending' in a) && <button type="button" onClick={() => onRemove(a.id)} aria-label={`Remove ${a.name}`} className={`absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-stone-950/70 text-white shadow-soft transition-all duration-300 hover:bg-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:translate-y-1 sm:opacity-0 sm:group-hover/reference:translate-y-0 sm:group-hover/reference:opacity-100 sm:group-focus-within/reference:translate-y-0 sm:group-focus-within/reference:opacity-100`}><X className="h-3.5 w-3.5" /></button>}
+      {labels[index] && <span className="pointer-events-none absolute bottom-1 left-1 rounded-ui bg-surface-dark/90 px-1 py-0.5 text-[10px] font-medium text-background">{labels[index]}</span>}
+      {!('pending' in a) && onRemove && <button type="button" onClick={() => onRemove(a.id)} aria-label={`Remove ${a.name}`} className={`absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-stone-950/70 text-white shadow-soft transition-all duration-300 hover:bg-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:translate-y-1 sm:opacity-0 sm:group-hover/reference:translate-y-0 sm:group-hover/reference:opacity-100 sm:group-focus-within/reference:translate-y-0 sm:group-focus-within/reference:opacity-100`}><X className="h-3.5 w-3.5" /></button>}
     </div>;
   })}</div>;
 }

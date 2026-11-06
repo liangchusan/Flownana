@@ -25,7 +25,7 @@ import {
   type VideoModelOption,
   type VideoResolutionOption,
 } from "@/lib/generation-pricing";
-import { getVideoPromptLimits, videoPromptIssue, videoInputMode } from "@/lib/video-model-capabilities";
+import { getVideoPromptLimits, videoPromptIssue, videoInputMode, videoReferencePromptIssue } from "@/lib/video-model-capabilities";
 import { useToast } from "@/components/blocks/app-toast-provider";
 import { getSignInLabel, signInForCurrentEnvironment } from "@/lib/auth-sign-in";
 import { getGenerationErrorDisplay } from "@/lib/generation-errors";
@@ -196,7 +196,8 @@ export function VideoCreationForm({
   const selectedOption = optionsForModel.find(o => formatVideoResolution(o.resolution) === resolution && o.duration === duration);
   const creditsCost = selectedOption ? getVideoGenerationCredits(selectedOption, requestInputs) : undefined;
   const promptLimits = getVideoPromptLimits(selectedModelName);
-  const promptInvalid = !!videoPromptIssue(selectedModelName, prompt);
+  const referencePromptIssue = videoReferencePromptIssue(selectedModelName, prompt, requestInputs);
+  const promptInvalid = !!videoPromptIssue(selectedModelName, prompt) || !!referencePromptIssue;
   const unavailableModel = !modelNameOptions.includes(selectedModelName);
   const showSound = !!selectedOption?.hasAudio;
   const sound = showSound ? "On" : "Off";
@@ -468,7 +469,7 @@ export function VideoCreationForm({
   };
 
   // ── Trigger button shared class ──────────────────────────────────────────
-  const settingsControl = <GenerationSettings placement={menuPlacement} models={modelNameOptions.map(name => ({ id: name, label: name }))} model={selectedModelName} onModel={setSelectedModelName} ratios={aspectRatioOptions} ratio={aspectRatio} onRatio={v => setAspectRatio(v as VideoAspectRatio)} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as VideoResolutionOption)} durations={durationOptions} duration={duration} onDuration={setDuration} followsImage={followsImage} notice={[unavailableModel ? `${selectedModelName} is no longer available. Choose an available model to recheck settings and price.` : settingsNotice, hasVideoInput && creditsCost == null ? "Check reference video durations to calculate the price." : "", hasVideoInput && selectedModelName === "Wan 3.0 Video" ? "With a reference video, output is limited to 15 seconds." : ""].filter(Boolean).join(" ")} />;
+  const settingsControl = <GenerationSettings placement={menuPlacement} models={modelNameOptions.map(name => ({ id: name, label: name }))} model={selectedModelName} onModel={name => { setSelectedModelName(name); if (name === "Kling 4.0" && name !== selectedModelName) { setResolution("720P"); setDuration(5); setAspectRatio("Auto"); } }} ratios={aspectRatioOptions} ratio={aspectRatio} onRatio={v => setAspectRatio(v as VideoAspectRatio)} resolutions={resolutionOptions} resolution={resolution} onResolution={v => setResolution(v as VideoResolutionOption)} durations={durationOptions} duration={duration} onDuration={setDuration} followsImage={followsImage} notice={[referencePromptIssue, selectedModelName === "Kling 4.0" ? "Use @image_1 and @video_1 to refer to numbered attachments. Source video audio is not retained." : "", unavailableModel ? `${selectedModelName} is no longer available. Choose an available model to recheck settings and price.` : settingsNotice, hasVideoInput && creditsCost == null ? "Check reference video durations to calculate the price." : "", hasVideoInput && selectedModelName === "Wan 3.0 Video" ? "With a reference video, output is limited to 15 seconds." : ""].filter(Boolean).join(" ")} />;
 
   if (variant === "composer") {
     return (

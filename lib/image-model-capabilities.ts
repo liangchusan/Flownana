@@ -8,6 +8,7 @@ export function getImagePromptMinLength(model: ImageModelOptionId) {
 const STANDARD_RATIOS = ["9:16", "16:9", "1:1", "3:4", "4:3"];
 
 function getModelImageAspectRatios(model: ImageModelOptionId, resolution: ImageResolutionKey, imageCount: number): string[] {
+  if (model === "gpt-image-2-6-flare" || model === "gpt-image-2-6-sunburst") return [...CREATION_ASPECT_RATIOS];
   if (model === "gpt-image-2-5-flare" || model === "gpt-image-2-5-sunburst") {
     return ["auto", "1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "21:9", ...(resolution === "1K" ? ["27:16", "16:27", "9:8", "8:9"] : [])];
   }

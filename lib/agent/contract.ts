@@ -1,7 +1,7 @@
 import { referenceBatchIssue, referenceIssue } from "../reference-validation.ts";
 import { z } from "zod";
 import { IMAGE_MODEL_OPTION_MAP, IMAGE_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS, findAvailableImageModel, canonicalVideoModelName, getImageGenerationCredits, getVideoGenerationCredits, getVideoModelName, DEFAULT_VIDEO_RESOLUTIONS, DEFAULT_VIDEO_ASPECT_RATIOS, videoFollowsInputRatio, type ImageModelOptionId, type ImageResolutionKey } from "../generation-pricing.ts";
-import { videoPromptIssue } from "../video-model-capabilities.ts";
+import { videoPromptIssue, videoReferencePromptIssue } from "../video-model-capabilities.ts";
 import { getImageInputCapabilities, getVideoInputCapabilities } from "../generation-input-capabilities.ts";
 import { getImageAspectRatios, isSupportedImageInputType } from "../image-model-capabilities.ts";
 
@@ -59,7 +59,7 @@ export function buildQuote(value: unknown, inputs: AgentInput[], context: {
   inputs.forEach(input => counts[input.kind]++);
   const base = { ...p, inputs, ...(context.templateId ? { templateId: context.templateId, templateVersion: context.templateVersion } : {}) };
   if (p.type === "image") {
-    const modelId = (p.model ? findAvailableImageModel(p.model)?.id : "gpt-image-2-5-flare") as ImageModelOptionId | undefined;
+    const modelId = (p.model ? findAvailableImageModel(p.model)?.id : "gpt-image-2-6-flare") as ImageModelOptionId | undefined;
     if (!modelId) throw new AgentError("Choose an available image model.");
     const model = IMAGE_MODEL_OPTION_MAP[modelId];
     const caps = getImageInputCapabilities(modelId);
@@ -83,6 +83,8 @@ export function buildQuote(value: unknown, inputs: AgentInput[], context: {
   if (!option) throw new AgentError("This video model does not support those settings. Offer a supported alternative.");
   const promptIssue = videoPromptIssue(getVideoModelName(option), `${p.prompt}${p.exactText.length ? `\nExact visible text: ${p.exactText.join(" | ")}` : ""}`);
   if (promptIssue) throw new AgentError(promptIssue);
+  const referencePromptIssue = videoReferencePromptIssue(getVideoModelName(option), `${p.prompt}${p.exactText.length ? `\nExact visible text: ${p.exactText.join(" | ")}` : ""}`, inputs);
+  if (referencePromptIssue) throw new AgentError(referencePromptIssue);
   const sound = p.sound ?? !!option.hasAudio;
   const caps = getVideoInputCapabilities(getVideoModelName(option));
   if (counts.image > caps.maxImages || counts.video > caps.maxVideos || counts.audio > caps.maxAudios || (caps.imageRequired && !counts.image) || (option.family === "wan" && counts.video > 0 && duration > 15)) throw new AgentError("The references do not fit this video model. Ask for compatible inputs.");

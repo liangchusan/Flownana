@@ -6,13 +6,14 @@ import { Check, ChevronDown, Maximize } from "lucide-react";
 const descriptions: Record<string, string> = {
   "Nano Banana 2.1": "Create and edit with up to ten reference images, from 1K to 4K.",
   "Grok Imagine Image 2.0": "Create and edit with up to five reference images.",
-  "GPT Image 2.5 Flare": "Create and edit with up to sixteen references, up to 4K.",
-  "GPT Image 2.5 Sunburst": "Generate up to 4K images with multi-image references and flexible framing.",
+  "GPT Image 2.6 Flare": "Create and edit with up to sixteen references, up to 4K.",
+  "GPT Image 2.6 Sunburst": "Generate up to 4K images with multi-image references and flexible framing.",
   "Seedance 2.0 Mini": "Combine image, video and audio references in 4–15 second clips.",
   "Gemini Omni 1.1 Flash": "Create up to 4K video with sound and up to seven reference images.",
   "Wan 3.0 Video": "Generate up to 30 seconds, with image, video and audio references.",
   "MiniMax H3 (Hailuo-03)": "Guide 4–15 second clips with optional first and last frames.",
   "Grok Imagine Video 1.5": "Turn a single image into a 1–15 second video.",
+  "Kling 4.0": "Create 3–30 second videos with image and video references, up to 1080p.",
 };
 const interaction = "transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 const shapes: Record<string, string> = {
@@ -55,7 +56,15 @@ export function GenerationSettings({ models, model, onModel, ratios, ratio, onRa
     const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); setOpen(false); trigger.current?.focus(); } };
     position();
-    panel.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus({ preventScroll: true });
+    const selected = panel.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
+    selected?.focus({ preventScroll: true });
+    // Reveal the active model inside its list without moving the page or parameter pane.
+    const list = selected?.parentElement?.parentElement;
+    if (selected && list) {
+      const item = selected.getBoundingClientRect(), bounds = list.getBoundingClientRect();
+      if (item.top < bounds.top) list.scrollTop -= bounds.top - item.top;
+      else if (item.bottom > bounds.bottom) list.scrollTop += item.bottom - bounds.bottom;
+    }
     window.addEventListener("resize", position);
     document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape);

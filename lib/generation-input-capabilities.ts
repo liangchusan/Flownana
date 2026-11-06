@@ -9,8 +9,11 @@ export interface GenerationInputCapabilities {
   videoGeometry?: { minSide: number; maxSide: number; minRatio: number; maxRatio: number; minPixels?: number; maxPixels?: number; minFrameRate?: number; maxFrameRate?: number };
   maxReferences?: number;
   referenceDurationLimits?: boolean;
+  videoDuration?: { min: number; max: number; maxTotal: number };
+  numberedReferences?: boolean;
   maxImages: number;
   imageContentTypes?: string[];
+  videoContentTypes?: string[];
   maxImageBytes: number;
   imageRequired: boolean;
   imageRoles: string[];
@@ -46,12 +49,13 @@ export function getImageInputCapabilities(
     };
   }
 
+  const maxImages = modelId === "grok-imagine-image-2-0" ? 5 : (modelId === "seedream-5-pro" || modelId === "nano-banana-2-1") ? 10 : modelId.startsWith("gpt-image-2-5-") || modelId.startsWith("gpt-image-2-6-") ? 16 : 1;
   return {
-    maxImages: modelId === "grok-imagine-image-2-0" ? 5 : (modelId === "seedream-5-pro" || modelId === "nano-banana-2-1") ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1,
+    maxImages,
     imageContentTypes: getImageInputTypes(modelId),
     maxImageBytes: DEFAULT_MAX_IMAGE_BYTES,
     imageRequired: false,
-    imageRoles: Array.from({ length: modelId === "grok-imagine-image-2-0" ? 5 : (modelId === "seedream-5-pro" || modelId === "nano-banana-2-1") ? 10 : modelId === "gpt-image-2-5-flare" || modelId === "gpt-image-2-5-sunburst" ? 16 : 1 }, (_, i) => `Reference ${i + 1}`),
+    imageRoles: Array.from({ length: maxImages }, (_, i) => `Reference ${i + 1}`),
     acceptsVideo: false,
     acceptsAudio: false,
     maxVideos: 0,
@@ -64,6 +68,19 @@ export function getImageInputCapabilities(
 export function getVideoInputCapabilities(
   modelName: string
 ): GenerationInputCapabilities {
+  if (modelName === "Kling 4.0") {
+    return {
+      imageContentTypes: ["image/jpeg", "image/png", "image/webp"],
+      videoContentTypes: ["video/mp4"],
+      imageGeometry: { minSide: 300, maxSide: 8000, minRatio: 0.4, maxRatio: 2.5 },
+      maxImages: 10, maxImageBytes: 10 * 1024 * 1024, imageRequired: false,
+      imageRoles: Array.from({ length: 10 }, (_, i) => `@image_${i + 1}`),
+      acceptsVideo: true, maxVideos: 5, maxVideoBytes: 10 * 1024 * 1024,
+      videoDuration: { min: 2, max: 30, maxTotal: 30 }, maxReferences: 15,
+      numberedReferences: true,
+      acceptsAudio: false, maxAudios: 0, maxAudioBytes: DEFAULT_MAX_AUDIO_BYTES,
+    };
+  }
   if (["Gemini Omni Video", "Gemini Omni 1.1 Flash"].includes(modelName)) {
     return {
       imageContentTypes: ["image/jpeg", "image/png", "image/webp"],

@@ -6,7 +6,7 @@ const { buildQuote, quotaLimit, usageDay, resetTime, modelCatalog, messageSchema
 const proposal = { type: "image", summary: "A symbol", prompt: "A green leaf symbol", exactText: [], directions: [] };
 test("Agent quote defaults and exact text use server-owned pricing and capabilities", () => {
   const q = buildQuote(proposal, [], { userText: "" });
-  assert.equal(q.modelId, "gpt-image-2-5-flare"); assert.equal(q.count, 4); assert.deepEqual(q.directions, []);
+  assert.equal(q.modelId, "gpt-image-2-6-flare"); assert.equal(q.count, 4); assert.deepEqual(q.directions, []);
   assert.equal(q.credits, load<any>("lib/generation-pricing.ts").getImageGenerationCredits(q.modelId, q.resolution, 0) * 4);
   assert.throws(() => buildQuote({ ...proposal, exactText: ["invented price"] }, [], { userText: "logo" }));
   assert.throws(() => buildQuote({ ...proposal, model: "invented" }, [], { userText: "" }));

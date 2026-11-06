@@ -30,7 +30,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 import { createVideoTask, resolveVideoOption, settleVideoTask, videoErrorResponse } from "@/lib/video-generation-service";
-import { videoInputMode, videoPromptIssue } from "@/lib/video-model-capabilities";
+import { videoInputMode, videoPromptIssue, videoReferencePromptIssue } from "@/lib/video-model-capabilities";
 import { referenceBatchIssue } from "@/lib/reference-validation";
 export const maxDuration = 300;
 
@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
     const requestedInputs: VideoReferenceInput[] = inputs ??
       (imageUrls || []).map((url: string) => ({ url, kind: "image" as const }));
     const capabilities = getVideoInputCapabilities(getVideoModelName(option));
+    const referencePromptIssue = videoReferencePromptIssue(getVideoModelName(option), prompt, requestedInputs);
+    if (referencePromptIssue) return videoErrorResponse("invalid_parameters", 400, { message: referencePromptIssue });
     const counts = requestedInputs.reduce((sum, input) => ({ ...sum, [input.kind]: sum[input.kind] + 1 }),
       { image: 0, video: 0, audio: 0 });
     const followsImage = videoFollowsInputRatio(getVideoModelName(option), counts.image);

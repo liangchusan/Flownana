@@ -419,7 +419,7 @@ function ScopedMediaCreationWorkspace({
               <div ref={scrollRef} className={isHome ? "hidden" : "min-h-0 flex-1 overflow-y-auto"}>{!isHome && <CreationStream creations={creations.filter(c => !c.parameters?.agentConversationId)} onReprompt={restoreCreation} onReference={referenceAsset} onDetails={openDetails} onChange={updateCreation} />}</div>
               <div className={isHome ? "relative z-30 shrink-0 px-4 pb-12 md:px-8 md:pb-16" : "pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-3 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6"}>
                 <div className="pointer-events-auto mx-auto w-full max-w-4xl rounded-ui-xl border border-border bg-background p-2.5 shadow-[0_18px_54px_rgb(17_17_17/0.12)] sm:p-3">
-                  {!agentMode && <ComposerAttachments attachments={draft.attachments} pendingAttachments={pendingAttachments} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />}
+                  {!agentMode && <ComposerAttachments attachments={draft.attachments} pendingAttachments={pendingAttachments} numberedReferences={composerType === "video" && inputCapabilities.numberedReferences} onRemove={(id) => setDraft((current) => ({ ...current, attachments: current.attachments.filter((attachment) => attachment.id !== id) }))} />}
                   {agentMode ? <AgentComposer onModeChange={(type) => { setAgentMode(false); setType(type); }} /> : composer}
                 </div>
               </div>

@@ -25,7 +25,7 @@ test("Agent actual AI SDK tool loop creates a priced proposal without dispatchin
   const value = { type: "image", summary: "A symbol", prompt: "A leaf symbol", exactText: [], directions: [{ title: "Leaf", prompt: "Simple green leaf" }] };
   const result = await run([start, { type: "tool-call", toolCallId: "q", toolName: "prepare_generation", input: JSON.stringify(value) }, finish("tool-calls")]);
   assert.equal(result.failed.length, 0); assert.equal(result.completed.length, 1);
-  assert.equal(result.completed[0].quote.modelId, "gpt-image-2-5-flare"); assert.equal(result.calls.length, 1);
+  assert.equal(result.completed[0].quote.modelId, "gpt-image-2-6-flare"); assert.equal(result.calls.length, 1);
   assert.equal(result.costs[0].inputTokens, 200);
 });
 test("Agent actual AI SDK question produces clickable answers", async () => {

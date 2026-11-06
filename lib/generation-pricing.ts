@@ -260,12 +260,30 @@ function createWan30VideoOptions(): VideoModelOption[] {
   );
 }
 
+function createKling40Options(): VideoModelOption[] {
+  return (["720P", "1080P"] as const).flatMap(resolution =>
+    Array.from({ length: 28 }, (_, index) => {
+      const duration = index + 3;
+      return {
+        id: `kling40_${resolution === "720P" ? "720" : "1080"}_${duration}`,
+        label: `Kling 4.0 · ${resolution} · ${duration}s`,
+        family: "kling" as const, provider: "kie" as const,
+        providerModel: "kling-4.0/reference-to-video",
+        resolution, duration, hasAudio: true,
+        aspectRatios: ["Auto", "21:9", "16:9", "1:1", "9:16"] as VideoAspectRatio[],
+        credits: platformVideoCredits(resolution === "720P" ? 28.5 : 42.5, duration),
+      };
+    })
+  );
+}
+
 export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
   ...createSeedanceMiniOptions(),
   ...createGeminiOmniVideoOptions(),
   ...createWan30VideoOptions(),
   ...createMiniMaxH3Options().filter(option => option.resolution === "720P"),
   ...createGrokImagineVideo15Options(),
+  ...createKling40Options(),
 ];
 
 // Retired options exist solely for paid-task polling and historical parameter display.
@@ -295,7 +313,7 @@ export const VIDEO_MODEL_OPTION_MAP: Record<VideoModelOptionId, VideoModelOption
   }, {} as Record<VideoModelOptionId, VideoModelOption>);
 
 export type ImageResolutionKey = "1K" | "2K" | "4K";
-export type ImageModelOptionId = "gpt-image-2-5-flare" | "gpt-image-2-5-sunburst" | "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro" | "nano-banana-2-1";
+export type ImageModelOptionId = "gpt-image-2-6-flare" | "gpt-image-2-6-sunburst" | "gpt-image-2-5-flare" | "gpt-image-2-5-sunburst" | "gpt-image-2" | "nano-banana-2" | "qwen-image-3-pro" | "grok-imagine-image-2-0" | "seedream-5-pro" | "nano-banana-2-1";
 
 export type ImageModelOption = {
   id: ImageModelOptionId;
@@ -396,11 +414,20 @@ export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   { id: "nano-banana-2-1", label: "Nano Banana 2.1",
     textToImageModel: "nano-banana-2-1", imageToImageModel: "nano-banana-2-1",
     resolutions: ["1K", "2K", "4K"], credits: { "1K": 1, "2K": 2, "4K": 3 } },
-  ...ALL_IMAGE_MODEL_OPTIONS.filter(option => ["grok-imagine-image-2-0", "gpt-image-2-5-flare", "gpt-image-2-5-sunburst"].includes(option.id)),
+  ...ALL_IMAGE_MODEL_OPTIONS.filter(option => option.id === "grok-imagine-image-2-0"),
+  ...(["flare", "sunburst"] as const).map(version => ({
+    id: `gpt-image-2-6-${version}` as ImageModelOptionId,
+    label: `GPT Image 2.6 ${version === "flare" ? "Flare" : "Sunburst"}`,
+    textToImageModel: `gpt-image-2-6/${version}-text-to-image`,
+    imageToImageModel: `gpt-image-2-6/${version}-image-to-image`,
+    resolutions: ["1K", "2K", "4K"] as ImageResolutionKey[],
+    // User approved retaining 2.5 prices on 2026-11-06; upstream is token-billed.
+    credits: { "1K": 2, "2K": 3, "4K": 5 },
+  })),
 ];
 export const AVAILABLE_IMAGE_MODEL_IDS = new Set<string>(IMAGE_MODEL_OPTIONS.map(option => option.id));
 export function findAvailableImageModel(value: string) {
-  const canonical = value.replace("GPT-Image-2.5", "GPT Image 2.5");
+  const canonical = value.replace("GPT-Image-2.6", "GPT Image 2.6");
   return IMAGE_MODEL_OPTIONS.find(option => option.id === value || option.label === canonical);
 }
 
@@ -440,6 +467,11 @@ export function getVideoGenerationCredits(option: VideoModelOption, inputs: Arra
   if (!videos.length) return Number.isSafeInteger(option.credits) && option.credits > 0 ? option.credits : undefined;
   if (videos.some(input => input.durationSeconds == null || !Number.isFinite(input.durationSeconds) || input.durationSeconds <= 0)) return undefined;
   const inputDuration = videos.reduce((sum, input) => sum + input.durationSeconds!, 0);
+  if (option.providerModel === "kling-4.0/reference-to-video") {
+    if (videos.length > 5 || videos.some(input => input.durationSeconds! < 2 || input.durationSeconds! > 30) || inputDuration > 30) return undefined;
+    const rate = option.resolution === "720P" ? 17 : option.resolution === "1080P" ? 25.5 : undefined;
+    return rate == null ? undefined : platformVideoCredits(rate, option.duration + Math.max(inputDuration, option.duration));
+  }
   if (option.family === "seedance") {
     const rate = option.resolution === "480P" ? 2.4 : option.resolution === "720P" ? 5 : undefined;
     return rate == null ? undefined : platformVideoCredits(rate, option.duration + inputDuration);

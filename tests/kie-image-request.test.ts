@@ -18,7 +18,7 @@ test("all image models send mode-specific provider fields and preserve ordered r
       if (model.id === "qwen-image-3-pro") Object.assign(expected, { image_size: "16:9", resolution: "2K", output_format: "png" });
       else if (model.id === "seedream-5-pro") Object.assign(expected, { aspect_ratio: "16:9", quality: "high", output_format: "png", nsfw_checker: true });
       else if (model.id === "grok-imagine-image-2-0") Object.assign(expected, { aspect_ratio: "16:9" });
-      else Object.assign(expected, { aspect_ratio: "16:9", resolution: "2K", ...(model.id === "nano-banana-2-1" ? { output_format: "png" } : {}) });
+      else Object.assign(expected, { aspect_ratio: "16:9", resolution: "2K", ...((model.id === "nano-banana-2-1" || model.id.startsWith("gpt-image-2-6-")) ? { output_format: "png" } : {}) });
       if (editing) expected[model.id.startsWith("gpt-image-") ? "input_urls" : model.id === "nano-banana-2-1" ? "image_input" : "image_urls"] = inputUrls;
       assert.deepEqual(request.input, expected, `${model.id}: ${editing}`);
     }
@@ -59,8 +59,8 @@ test("Grok verified flat price applies to text and all supported reference count
   }
 });
 
-test("GPT 2.5 variants retain distinct IDs, prices and resolution-specific ratios", () => {
-  for (const id of ["gpt-image-2-5-flare", "gpt-image-2-5-sunburst"] as const) {
+test("GPT 2.6 variants retain distinct IDs, prices and resolution-specific ratios", () => {
+  for (const id of ["gpt-image-2-6-flare", "gpt-image-2-6-sunburst"] as const) {
     assert.equal(getImageInputCapabilities(id).maxImages, 16);
     for (const resolution of ["1K", "2K", "4K"] as const) {
       const ratios = getImageAspectRatios(id, resolution, 0);
@@ -69,7 +69,7 @@ test("GPT 2.5 variants retain distinct IDs, prices and resolution-specific ratio
       assert.equal(getImageGenerationCredits(id, resolution, 16), { "1K": 2, "2K": 3, "4K": 5 }[resolution]);
       const refs = Array.from({ length: 16 }, (_, i) => `https://example.test/${i}.png`);
       assert.deepEqual(build({ modelId: id, prompt: "Landscape", aspectRatio: "auto", resolution, inputUrls: refs }), {
-        model: `${id}-image-to-image`, input: { prompt: "Landscape", aspect_ratio: "auto", resolution, input_urls: refs },
+        model: `${id.replace("gpt-image-2-6-", "gpt-image-2-6/")}-image-to-image`, input: { prompt: "Landscape", aspect_ratio: "auto", resolution, output_format: "png", input_urls: refs },
       });
     }
   }

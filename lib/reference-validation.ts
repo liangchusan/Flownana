@@ -11,7 +11,7 @@ export function referenceMaxBytes(caps: GenerationInputCapabilities, kind: Compo
 }
 export function referenceIssue(caps: GenerationInputCapabilities, ref: ReferenceMetadata, options: { upload?: boolean; requireMetadata?: boolean } = {}) {
   if (!referenceLimit(caps, ref.kind)) return `This model does not support ${ref.kind} references.`;
-  const allowed = ref.kind === "image" ? caps.imageContentTypes ?? MEDIA_UPLOAD_RULES.image.types : MEDIA_UPLOAD_RULES[ref.kind].types;
+  const allowed = ref.kind === "image" ? caps.imageContentTypes ?? MEDIA_UPLOAD_RULES.image.types : ref.kind === "video" ? caps.videoContentTypes ?? MEDIA_UPLOAD_RULES.video.types : MEDIA_UPLOAD_RULES.audio.types;
   if (ref.contentType && !allowed.includes(ref.contentType.toLowerCase() as never)) return `Unsupported ${ref.kind} format. Choose ${allowed.map(t => t.split("/")[1]).join(", ")}.`;
   if (options.upload && ref.contentType && !MEDIA_UPLOAD_RULES[ref.kind].types.includes(ref.contentType as never)) return "This file format is not supported for upload.";
   const max = referenceMaxBytes(caps, ref.kind, options.upload);
@@ -35,7 +35,8 @@ export function referenceIssue(caps: GenerationInputCapabilities, ref: Reference
     const d = ref.durationSeconds;
     if (d != null && (!Number.isFinite(d) || d <= 0)) return "Could not read the duration. Choose another file.";
     // Agent accepts references before selecting a generation model.
-    if (caps.referenceDurationLimits !== false && d != null && (d < 2 || d > 15)) return `File is ${d.toFixed(2)}s. Reference ${ref.kind} must be 2–15 seconds.`;
+    const limits = ref.kind === "video" ? caps.videoDuration : undefined;
+    if (caps.referenceDurationLimits !== false && d != null && (d < (limits?.min ?? 2) || d > (limits?.max ?? 15))) return `File is ${d.toFixed(2)}s. Reference ${ref.kind} must be ${limits?.min ?? 2}–${limits?.max ?? 15} seconds.`;
   }
   return undefined;
 }
@@ -46,7 +47,8 @@ export function referenceBatchIssue(caps: GenerationInputCapabilities, refs: Ref
     if (items.length > referenceLimit(caps, kind)) return `This model accepts at most ${referenceLimit(caps, kind)} ${kind} references; ${items.length} selected.`;
     for (const ref of items) { const issue = referenceIssue(caps, ref, { requireMetadata }); if (issue) return `${ref.name ? `${ref.name}: ` : ""}${issue}`; }
     const totalSeconds = items.reduce((n, r) => n + (r.durationSeconds ?? 0), 0);
-    if (kind !== "image" && caps.referenceDurationLimits !== false && totalSeconds > 15) return `Combined ${kind} references are ${totalSeconds.toFixed(2)}s. Maximum: 15 seconds. Remove or replace a file.`;
+    const maxTotal = kind === "video" ? caps.videoDuration?.maxTotal ?? 15 : 15;
+    if (kind !== "image" && caps.referenceDurationLimits !== false && totalSeconds > maxTotal) return `Combined ${kind} references are ${totalSeconds.toFixed(2)}s. Maximum: ${maxTotal} seconds. Remove or replace a file.`;
   }
   return undefined;
 }

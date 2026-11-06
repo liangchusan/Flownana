@@ -1,5 +1,9 @@
 # KIE 模型合同与计价核查（2026-10-23）
 
+2026-11-06 已批准的 GPT Image 2.6 / Kling 4.0 调整见
+[本轮合同与验收](KIE-MODEL-UPGRADE-2026-11-06.md)。本文保留 10 月核查基线；
+当前范围以 PRODUCT 6.4/7.3 为准，结构化快照分别记录新增证据日期。
+
 用户已授权核对所有在售模型的官方名称、所有参数和价格，并开发上线本对话调整。
 本文件以本次公开模型页、对应 API Reference 和独立 Pricing 表为依据；结构化字段与
 价格行见 [KIE-MODEL-CONTRACTS.json](KIE-MODEL-CONTRACTS.json)。能力与价格核对

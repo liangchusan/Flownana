@@ -16,7 +16,7 @@ test("template runs: real PostgreSQL RLS, concurrent batches and refunds", { ski
   const loader = createSourceLoader({ "@/lib/prisma": { prisma: db }, "./understand": { understandTemplate: async () => ({ status: "ready", spec: { summary: "Test symbol", subject: "A symbol", composition: "Centered", style: "Minimal", preserve: [], text: [], constraints: [], variants: ["A","B","C","D"].map((title) => ({ title, direction: `${title} distinct concept` })), outputCount: 4 } }) } });
   const service = loader<any>("lib/image-templates/service.ts");
   const lifecycle = loader<any>("lib/generation-lifecycle.ts");
-  const price = loader<any>("lib/generation-pricing.ts").getImageGenerationCredits("gpt-image-2-5-sunburst", "1K", 0);
+  const price = loader<any>("lib/generation-pricing.ts").getImageGenerationCredits("gpt-image-2-6-sunburst", "1K", 0);
   const id = randomUUID();
   const ready = await service.analyzeTemplateRun(account, id, 0, { templateId: "logo", prompt: "Create a symbol without text", images: [], answers: {} });
   assert.equal(ready.status, "ready");

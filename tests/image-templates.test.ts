@@ -44,7 +44,7 @@ test("OpenRouter retry is bounded and never switches model", async (t) => {
 
 test("template batch reservation: concurrency, rollback and quote contracts", async (t) => {
   const { getImageGenerationCredits } = load<any>("lib/generation-pricing.ts");
-  const unit = getImageGenerationCredits("gpt-image-2-5-sunburst", "1K", 0);
+  const unit = getImageGenerationCredits("gpt-image-2-6-sunburst", "1K", 0);
   const input = inputFor("logo");
   const initialRun = { id: "run", userId: "owner", templateId: "logo", templateVersion: 1, revision: 1, status: "ready", input, analysis: parseAnalysis(ready(), input), generationIds: [] };
   let state: any;

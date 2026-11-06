@@ -1,5 +1,5 @@
 import catalog from "./catalog.json";
-export const TEMPLATE_MODEL = "gpt-image-2-5-sunburst" as const;
+export const TEMPLATE_MODEL = "gpt-image-2-6-sunburst" as const;
 export const TEMPLATE_LLM = "qwen/qwen3-vl-32b-instruct";
 export type ImageTemplate = (typeof catalog)[number];
 export const imageTemplates = catalog;

@@ -46,5 +46,8 @@ test("every active video output combination and accepted reference mode follows 
       assert.equal("first_frame_url" in body.input, false);
       assert.equal("web_search" in body.input, false);
     }
+    if (option.family === "kling") {
+      validate(option.providerModel, getKieMarketVideoTaskBody({ option, prompt: "Use @image_1 and @video_1", aspectRatio: "Auto", inputs: [{ url: "https://media.test/i.png", kind: "image" }, { url: "https://media.test/v.mp4", kind: "video" }] }).input);
+    }
   }
 });
