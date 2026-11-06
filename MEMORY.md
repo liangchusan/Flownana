@@ -4,12 +4,12 @@
 产品及验收以 [PRODUCT](./docs/PRODUCT.md) 为准，UI 以 [DESIGN](./docs/DESIGN.md) 为准；
 目录地图见 [README](./README.md)，历史查阅见 [文档导航](./docs/README.md#历史资料)。
 
-## 模型升级（2026-11-06，已批准生产发布、发布中）
+## 模型升级（2026-11-06，已发布）
 
 - 用户批准开发 GPT Image 2.6 替换 2.5 及 Kling 4.0 首版，并明确要求 2.6 沿用
   2.5 每张 1K/2K/4K：2/3/5 积分。PRODUCT 6.4/7.3、结构化合同及
   [本轮验收记录](./docs/KIE-MODEL-UPGRADE-2026-11-06.md)已同步。
-- 本地在售为 4 图片/6 视频：两版 2.6 取代 2.5，Kling 4.0 在视频列表末尾。
+- 当前生产在售为 4 图片/6 视频：两版 2.6 取代 2.5，Kling 4.0 在视频列表末尾。
   直接图片默认 Nano Banana 2.1 保持，Agent 默认 2.6 Flare；套餐、数据库及 GA4 不变。
   2.6 使用含斜线的四个独立 Provider ID、最多16参考图、PNG；2.5 禁止新生成/报价，
   历史元数据与已受理任务保留，旧草稿/Reprompt/报价必须重选并重新确认。
@@ -31,9 +31,16 @@
   验证旧2.5按钮禁用、改选2.6后重报价；不是生产账号/真实Provider验收。
   本地服务器显式隔离业务库并清空Provider Key，未写真实账号数据、生成或收费。
 - 用户已明确授权本轮提交、推送及生产部署。发布前源码与已验证快照一致；
-  目标为现有 Flownana 项目的 main 自动 Production 发布，无数据库迁移。
+  已通过现有 Flownana 项目的 main 自动 Production 发布，无数据库迁移。
   本轮源码文档、截图、日志与模拟代理位于忽略目录 `output/model-integration-20261106/`，
-  不随Git克隆恢复；发布结果与冒烟证据将记录到 `output/releases/model-upgrade-20261106/manifest.json`。
+  不随Git克隆恢复；最终提交、部署与冒烟证据记录在 `output/releases/model-upgrade-20261106/manifest.json`。
+- 业务源码 `abcdef9c632ea952a073fc279202b6b7788666f6` 已提交并推送；首个生产构建
+  `dpl_DEqre2YhsuNrshKCBKVfpp4fzs9C` READY、构建约42秒，根域/www生产别名已切换。
+  后续发布记录提交会再次自动构建，最终部署以 manifest 为准，业务代码一致。
+- 生产 smoke:prod 全部通过；根域/www 视频目录均返回6模型、56个Kling规格、720P/5秒29积分。
+  内置浏览器正式菜单、2.6四张4K=20、Kling默认720P/5秒=29核对通过。
+  本次部署最近10分钟 error/fatal 聚合未返回记录，仅代表该短窗口；Drains接口仍404，配置未核实。
+  生产回滚候选为发布前 `dpl_CuvpfPUa2B8ACHf5mNatuYkhXAWN`（源码5757a4e），未执行回退。
   尚需真实生成、账单/Token/毛利、输出尺寸/时长/音轨、失败退款、旧任务、真实上传/Assets
   和真机验收；真实付费测试预算仍需另行授权；生产发布已获授权。
 
@@ -60,7 +67,7 @@
   迁移/测试/构建记录及经验证的增量 Git bundle（从 cbad973 至本次发布记录提交）。
   注册赠送、注册归因和登录弹窗三个旧发布目录中的补丁仍保留，用于重建回滚版本。
   这些目录被 Git/部署忽略，不随克隆恢复，也不等于远端备份。
-- 本次回滚使用上一全量正式部署 `dpl_BF3hnpsF5r7jnJSUuzYcsKPR9c9e`。
+- 2026-11-04 发布时的回滚基线为上一全量正式部署 `dpl_BF3hnpsF5r7jnJSUuzYcsKPR9c9e`。
   更早的隔离登录版本为 `dpl_DQtqt3re751bXRuF5hY2PnbX21aD`；不要回滚到临时维护部署
   `dpl_CcWdZqeVBEDkymiVxFp9XPzNHbAo`。新增表兼容旧代码，不通过删表回滚。
 
@@ -79,7 +86,7 @@
   不补造历史来源。匿名撤回使用随机服务端浏览器凭证，不以 GA client ID 授权删除。
 - 创作、付款、上传、私有草稿与缓存按账号 id + 注册时间隔离，操作携带预期账号。
   登录恢复/Allow 均校验账号版本。不确定请求不直接判失败，不自动重建上游任务。
-- 已发布基线仍为 4 个图片、5 个视频模型；本地升级为 4/6（见上节）。
+- 当前已发布 4 个图片、6 个视频模型（见本轮升级）。
   退役模型保留历史兼容。共享模块定义能力与计价，
   [KIE 合同快照](./docs/KIE-MODEL-CONTRACTS.json)也是测试输入。
 - 安全整改已发布：媒体解码/MP4/WAV 工作预算、共享检查租约、头像/上传预约及清理、
